@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore HekCoreApi.sln
+
+      - name: Build
+        run: dotnet build HekCoreApi.sln --no-restore -c Release
+
+      # Block 1 ships unit-level coverage only (no Testcontainers/mock-idp integration suite yet -
+      # deferred to the post-sprint hardening phase's automated-test-suite stage, see PROJECT_STATUS.md).
+      # All current tests run in-process with no external dependencies, so no filter is needed yet;
+      # once Testcontainers-based tests are added, filter them out of this fast lane by trait.
+      - name: Test
+        run: >
+          dotnet test HekCoreApi.sln --no-build -c Release
+          --logger trx
+          --collect:"XPlat Code Coverage"
+
+      - name: Publish test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: "**/TestResults/**"

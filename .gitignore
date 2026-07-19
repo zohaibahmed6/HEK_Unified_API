@@ -1,0 +1,32 @@
+# Build outputs
+bin/
+obj/
+out/
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+
+# Test results
+TestResults/
+*.trx
+coverage/
+**/coverage.cobertura.xml
+
+# Environment / secrets
+.env
+*.env.local
+appsettings.*.local.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.local.yml
+
+# Logs
+*.log
+logs/

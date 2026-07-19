@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Serilog.Sinks.File" />
+    <PackageReference Include="Serilog.Enrichers.Environment" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="AspNetCore.HealthChecks.SqlServer" />
+    <PackageReference Include="AspNetCore.HealthChecks.UI.Client" />
+    <PackageReference Include="Swashbuckle.AspNetCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Application\HekCoreApi.Application.csproj" />
+    <ProjectReference Include="..\Infrastructure\HekCoreApi.Infrastructure.csproj" />
+    <ProjectReference Include="..\Contracts\HekCoreApi.Contracts.csproj" />
+    <ProjectReference Include="..\Adapters.Hiso\HekCoreApi.Adapters.Hiso.csproj" />
+    <ProjectReference Include="..\Adapters.Karo\HekCoreApi.Adapters.Karo.csproj" />
+    <ProjectReference Include="..\Adapters.Erms\HekCoreApi.Adapters.Erms.csproj" />
+  </ItemGroup>
+
+</Project>

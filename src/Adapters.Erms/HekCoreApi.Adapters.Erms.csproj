@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- COL/Pegasus translation lives under Erms/Col/ in this project (ADR-012) - not a separate
+       Adapters.Col project - but is coded to always assign OriginScope.Col, never OriginScope.Erms. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\Application\HekCoreApi.Application.csproj" />
+    <ProjectReference Include="..\Contracts\HekCoreApi.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,1318 @@
+openapi: 3.0.3
+info:
+  title: Unified Healthcare API
+  description: >
+    Canonical contract consolidating HISO, KARO, and ERMS. See
+    Unified-Healthcare-API_API-Contract-Design.md for full rationale,
+    traceability, and reconciliation decisions. No version identifier
+    appears in the URL/header/media-type per stakeholder decision (Section 9
+    of the contract document) — version is tracked here via info.version and
+    an append-only changelog only; no request/response shape changes without
+    a coordinated migration.
+  version: "1.1.0"
+  x-changelog:
+    - version: "1.0.0"
+      date: "2026-07-19"
+      description: Initial canonical contract, Phase 7 (API Contract Design).
+    - version: "1.1.0"
+      date: "2026-07-19"
+      description: >
+        Demographics split into 4 legacy-shaped endpoints instead of one merged
+        endpoint; HISO's addInvoice/launchForm actions and static-mode form
+        retrieval implemented (previously excluded as dead stubs); KARO's
+        GetEncounterSummary and SaveScreeningCode implemented for real
+        (previously excluded as confirmed-broken); rate limiting confirmed
+        as a built, config-toggled capability.
+servers:
+  - url: https://api.hek.example
+    description: Production (illustrative host — actual host is an Infrastructure Design decision, not yet made)
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Auth
+  - name: Demographics
+  - name: Clinical Notes
+  - name: Conditions
+  - name: Medications
+  - name: Lab and Radiology
+  - name: Documents
+  - name: Observations
+  - name: ACC45
+  - name: Encounter Summary
+  - name: Tasks
+  - name: Recalls
+  - name: Screening
+  - name: Providers
+  - name: Practice Context
+  - name: Billing
+  - name: Admin
+  - name: Health
+
+paths:
+
+  /auth/token:
+    post:
+      tags: [Auth]
+      summary: Issue a resource-scoped token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRequest'
+      responses:
+        '200':
+          description: Token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness/readiness check
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+
+  /patients/{patientId}/demographics/hiso:
+    get:
+      tags: [Demographics]
+      summary: Retrieve HISO-shaped patient demographics (kept separate per stakeholder decision, not merged)
+      parameters:
+        - $ref: '#/components/parameters/patientId'
+      responses:
+        '200':
+          description: HISO-shaped demographic data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DemographicsHiso'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /patients/{patientId}/demographics/karo:
+    get:
+      tags: [Demographics]
+      summary: Retrieve KARO-shaped patient demographics (kept separate per stakeholder decision, not merged)
+      parameters:
+        - $ref: '#/components/parameters/patientId'
+      responses:
+        '200':
+          description: KARO-shaped demographic data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DemographicsKaro'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /patients/{patientId}/demographics/erms:
+    get:
+      tags: [Demographics]
+      summary: Retrieve ERMS-shaped patient demographics (kept separate per stakeholder decision, not merged)
+      parameters:
+        - $ref: '#/components/parameters/patientId'
+      responses:
+        '200':
+          description: ERMS-shaped demographic data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DemographicsErms'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /patients/{patientId}/demographics/col:
+    get:
+      tags: [Demographics]
+      summary: Retrieve COL/Pegasus-shaped patient demographics (kept separate per stakeholder decision, not merged)
+      parameters:
+        - $ref: '#/components/parameters/patientId'
+      responses:
+        '200':
+          description: COL/Pegasus-shaped demographic data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DemographicsCol'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /patients/{patientId}/encounters/{encounterId}/notes:
+    get:
+      tags: [Clinical Notes]
+      summary: Retrieve clinical/consult notes
+      parameters:
+        - $ref: '#/components/parameters/patientId'
+        - $ref: '#/components/parameters/encounterId'
+        - $ref: '#/components/parameters/sinceDate'
+        - $ref: '#/components/parameters/untilDate'
+        - $ref: '#/components/parameters/sortOrder'
+      responses:
+        '200':
+          description: List of clinical notes (default lookback 24 months if no date range supplied)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/ClinicalNote' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Clinical Notes]
+      summary: Save a clinical/consult note
+      parameters:
+        - $ref: '#/components/parameters/patientId'
+        - $ref: '#/components/parameters/encounterId'
+        - $ref: '#/components/parameters/idempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClinicalNoteInput'
+      responses:
+        '201':
+          description: Note created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClinicalNote' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /patients/{patientId}/encounters/{encounterId}/conditions:
+    get:
+      tags: [Conditions]
+      summary: Retrieve conditions/diagnoses
+      parameters:
+        - $ref: '#/components/parameters/patientId'
+        - $ref: '#/components/parameters/encounterId'
+      responses:
+        '200':
+          description: List of conditions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Condition' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Conditions]
+      summary: Save a condition/diagnosis (idempotent on duplicate)
+      parameters:
+        - $ref: '#/components/parameters/patientId'
+        - $ref: '#/components/parameters/encounterId'
+        - $ref: '#/components/parameters/idempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConditionInput'
+      responses:
+        '200':
+          description: Duplicate submission — existing condition returned, not an error (FR-IDEM-01)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Condition' }
+        '201':
+          description: Condition created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Condition' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /patients/{patientId}/encounters/{encounterId}/medications:
+    get:
+      tags: [Medications]
+      summary: Retrieve medications
+      parameters:
+        - $ref: '#/components/parameters/patientId'
+        - $ref: '#/components/parameters/encounterId'
+        - name: view
+          in: query
+          schema: { type: string, enum: [regular, prescribed] }
+          description: Distinguishes ERMS's Regular vs Prescribed views (ERMS-BR-11)
+      responses:
+        '200':
+          description: List of medications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Medication' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /patients/{patientId}/encounters/{encounterId}/lab-results:
+    get:
+      tags: [Lab and Radiology]
+      summary: List lab results
+      parameters:
+        - $ref: '#/components/parameters/patientId'
+        - $ref: '#/components/parameters/encounterId'
+        - $ref: '#/components/parameters/sinceDate'
+        - $ref: '#/components/parameters/untilDate'
+        - $ref: '#/components/parameters/sortOrder'
+      responses:
+        '200':
+          description: List of lab results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/ReportSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /patients/{patientId}/encounters/{encounterId}/lab-results/{reportId}:
+    get:
+      tags: [Lab and Radiology]
+      summary: Lab report detail/content
+      parameters:
+        - $ref: '#/components/parameters/patientId'
+        - $ref: '#/components/parameters/encounterId'
+        - $ref: '#/components/parameters/reportId'
+      responses:
+        '200':
+          description: Lab report content
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportContent' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /patients/{patientId}/encounters/{encounterId}/radiology-results:
+    get:
+      tags: [Lab and Radiology]
+      summary: List radiology results
+      parameters:
+        - $ref: '#/components/parameters/patientId'
+        - $ref: '#/components/parameters/encounterId'
+        - $ref: '#/components/parameters/sinceDate'
+        - $ref: '#/components/parameters/untilDate'
+        - $ref: '#/components/parameters/sortOrder'
+      responses:
+        '200':
+          description: List of radiology results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/ReportSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /patients/{patientId}/encounters/{encounterId}/radiology-results/{reportId}:
+    get:
+      tags: [Lab and Radiology]
+      summary: Radiology report detail/content
+      parameters:
+        - $ref: '#/components/parameters/patientId'
+        - $ref: '#/components/parameters/encounterId'
+        - $ref: '#/components/parameters/reportId'
+      responses:
+        '200':
+          description: Radiology report content
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportContent' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /patients/{patientId}/documents:
+    get:
+      tags: [Documents]
+      summary: List documents
+      parameters:
+        - $ref: '#/components/parameters/patientId'
+        - name: direction
+          in: query
+          schema: { type: string, enum: [in, out] }
+        - name: contentType
+          in: query
+          schema: { type: string }
+        - name: referenceId
+          in: query
+          schema: { type: string }
+        - name: subject
+          in: query
+          schema: { type: string }
+        - $ref: '#/components/parameters/sinceDate'
+        - $ref: '#/components/parameters/untilDate'
+        - $ref: '#/components/parameters/sortOrder'
+      responses:
+        '200':
+          description: List of documents (metadata only, no content)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/DocumentSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Documents]
+      summary: Save a document
+      parameters:
+        - $ref: '#/components/parameters/patientId'
+        - $ref: '#/components/parameters/idempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentInput'
+      responses:
+        '201':
+          description: Document saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocumentSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /patients/{patientId}/documents/{documentId}:
+    get:
+      tags: [Documents]
+      summary: Retrieve document content
+      parameters:
+        - $ref: '#/components/parameters/patientId'
+        - name: documentId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Document content
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Document' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /patients/{patientId}/encounters/{encounterId}/observations:
+    get:
+      tags: [Observations]
+      summary: Retrieve observations/measurements
+      parameters:
+        - $ref: '#/components/parameters/patientId'
+        - $ref: '#/components/parameters/encounterId'
+        - name: conceptId
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: List of observations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Observation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Observations]
+      summary: Save observations (at least one measurement field required, KARO-BR-14)
+      parameters:
+        - $ref: '#/components/parameters/patientId'
+        - $ref: '#/components/parameters/encounterId'
+        - $ref: '#/components/parameters/idempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObservationInput'
+      responses:
+        '201':
+          description: Observation saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Observation' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /acc45/version:
+    get:
+      tags: [ACC45]
+      summary: Version/dictionary metadata (HISO getVersion equivalent)
+      responses:
+        '200':
+          description: Version metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  application: { type: string }
+                  applicationVersion: { type: string }
+                  dictionaryVersion: { type: string }
+                  hisoVersion: { type: integer }
+
+  /acc45/sessions/{sessionKey}:
+    get:
+      tags: [ACC45]
+      summary: Resolve session GUID to Provider/Patient/Appointment/Practice context
+      parameters:
+        - $ref: '#/components/parameters/sessionKey'
+      responses:
+        '200':
+          description: Resolved session context
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionContext' }
+        '401':
+          description: Invalid session key (HISO-BR-02)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /acc45/sessions/{sessionKey}/delivery-options:
+    get:
+      tags: [ACC45]
+      summary: EDI delivery/submission options
+      parameters:
+        - $ref: '#/components/parameters/sessionKey'
+      responses:
+        '200':
+          description: Delivery options
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url: { type: string }
+                  practiceEdi: { type: string }
+
+  /acc45/sessions/{sessionKey}/forms:
+    get:
+      tags: [ACC45]
+      summary: Retrieve form data via concept-mapping (HISO-BR-03/08/09/10)
+      parameters:
+        - $ref: '#/components/parameters/sessionKey'
+        - name: mode
+          in: query
+          schema: { type: string, enum: [dynamic, static], default: dynamic }
+          description: >
+            Reflects the practice's IsDynamic setting. Legacy "static" mode was an
+            empty, unimplemented stub (HISO-BR-17) — implemented for real per
+            stakeholder decision 2026-07-19, not carried forward as a no-op.
+      responses:
+        '200':
+          description: Form data container
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FormData' }
+
+  /acc45/sessions/{sessionKey}/forms/{formInstanceId}:
+    get:
+      tags: [ACC45]
+      summary: Retrieve a previously saved form's rendered view/definition
+      parameters:
+        - $ref: '#/components/parameters/sessionKey'
+        - $ref: '#/components/parameters/formInstanceId'
+      responses:
+        '200':
+          description: Saved form view/definition
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FormData' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [ACC45]
+      summary: Save a completed form (render to DMS, then persist ACC45 definition/diagnosis/referral — HISO-BR-12 sequencing)
+      parameters:
+        - $ref: '#/components/parameters/sessionKey'
+        - $ref: '#/components/parameters/formInstanceId'
+        - $ref: '#/components/parameters/idempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FormSaveInput' }
+      responses:
+        '200':
+          description: Form saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FormData' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /acc45/sessions/{sessionKey}/actions:
+    post:
+      tags: [ACC45]
+      summary: >
+        Dispatch a form action: save, addTask, addInvoice, launchForm. The latter
+        two were unimplemented no-op stubs in legacy HISO; implemented for real
+        per stakeholder decision 2026-07-19 (Section 8 Decision 4 of the contract doc).
+      parameters:
+        - $ref: '#/components/parameters/sessionKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [actionId]
+              properties:
+                actionId: { type: string, enum: [save, addTask, addInvoice, launchForm] }
+                actionContainer: { type: object }
+      responses:
+        '200':
+          description: Action processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  processed: { type: boolean }
+
+  /encounter-summary-templates/{identifier}/schema:
+    get:
+      tags: [Encounter Summary]
+      summary: Schema-driven field/caption/type lookup for a template (KARO-BR-10)
+      parameters:
+        - name: identifier
+          in: path
+          required: true
+          schema: { type: string }
+          description: e.g. diap, cvra, foot-exam, retinopathy
+      responses:
+        '200':
+          description: Template schema
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  identifier: { type: string }
+                  fields:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name: { type: string }
+                        caption: { type: string }
+                        type: { type: string }
+
+  /patients/{patientId}/encounters/{encounterId}/encounter-summary:
+    get:
+      tags: [Encounter Summary]
+      summary: >
+        Retrieve a patient's saved encounter summary. Legacy GetEncounterSummary
+        returned hardcoded mock data unrelated to the requested patient
+        (KARO-BR-09); implemented for real per stakeholder decision 2026-07-19.
+      parameters:
+        - $ref: '#/components/parameters/patientId'
+        - $ref: '#/components/parameters/encounterId'
+        - name: identifier
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Saved encounter summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  identifier: { type: string }
+                  fields:
+                    type: object
+                    additionalProperties: true
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Encounter Summary]
+      summary: Save a templated encounter summary (typed validation against schema, replacing loose JObject parsing)
+      parameters:
+        - $ref: '#/components/parameters/patientId'
+        - $ref: '#/components/parameters/encounterId'
+        - $ref: '#/components/parameters/idempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [identifier, fields]
+              properties:
+                identifier: { type: string }
+                fields:
+                  type: object
+                  additionalProperties: true
+      responses:
+        '201':
+          description: Encounter summary saved
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /patients/{patientId}/tasks:
+    post:
+      tags: [Tasks]
+      summary: Create a task/reminder (subject = resolved concept name + free text, HISO-BR-19/20)
+      parameters:
+        - $ref: '#/components/parameters/patientId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [conceptCode, description]
+              properties:
+                conceptCode: { type: string }
+                description: { type: string }
+                status: { type: string, enum: [Active, Completed] }
+      responses:
+        '201':
+          description: Task created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  taskId: { type: string }
+                  subject: { type: string }
+                  status: { type: string }
+
+  /recall-categories:
+    get:
+      tags: [Recalls]
+      summary: List recall categories
+      parameters:
+        - name: group
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Recall categories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        categoryId: { type: string }
+                        name: { type: string }
+
+  /patients/{patientId}/recalls:
+    get:
+      tags: [Recalls]
+      summary: List recalls for a patient
+      parameters:
+        - $ref: '#/components/parameters/patientId'
+      responses:
+        '200':
+          description: List of recalls
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Recall' }
+    post:
+      tags: [Recalls]
+      summary: Save a recall (empty categoryId defaults per group, KARO-BR-22)
+      parameters:
+        - $ref: '#/components/parameters/patientId'
+        - $ref: '#/components/parameters/idempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecallInput'
+      responses:
+        '201':
+          description: Recall saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Recall' }
+
+  /screening-codes:
+    get:
+      tags: [Screening]
+      summary: List screening codes
+      responses:
+        '200':
+          description: Screening codes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        code: { type: string }
+                        description: { type: string }
+
+  /patients/{patientId}/encounters/{encounterId}/screening-codes:
+    post:
+      tags: [Screening]
+      summary: >
+        Save a screening code result, with real authentication and persistence.
+        Legacy SaveScreeningCode performed no token validation and always
+        reported fake success without persisting (KARO-BR-06); implemented for
+        real per stakeholder decision 2026-07-19 (FR-AUTH-04 bars reproducing
+        the legacy no-auth behavior).
+      parameters:
+        - $ref: '#/components/parameters/patientId'
+        - $ref: '#/components/parameters/encounterId'
+        - $ref: '#/components/parameters/idempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string }
+                value: { type: string }
+      responses:
+        '201':
+          description: Screening code result saved
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /providers:
+    get:
+      tags: [Providers]
+      summary: List/lookup providers
+      parameters:
+        - name: practiceLocationId
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: List of providers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Provider' }
+
+  /practices/{practiceId}/context:
+    get:
+      tags: [Practice Context]
+      summary: Practice/surgery/session context (COL/Pegasus)
+      parameters:
+        - name: practiceId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Practice/session/surgery context
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  practiceId: { type: string }
+                  surgery: { type: object, additionalProperties: true }
+                  session: { type: object, additionalProperties: true }
+
+  /patients/{patientId}/invoices:
+    post:
+      tags: [Billing]
+      summary: Save an invoice/service record (idempotent on duplicate; requires billing:write scope)
+      security:
+        - bearerAuth: [billing:write]
+      parameters:
+        - $ref: '#/components/parameters/patientId'
+        - $ref: '#/components/parameters/idempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoiceInput'
+      responses:
+        '200':
+          description: Duplicate submission — existing invoice returned, not an error (FR-IDEM-01)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Invoice' }
+        '201':
+          description: Invoice created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Invoice' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/practices:
+    post:
+      tags: [Admin]
+      summary: Register a new practice in the tenant registry (FR-TEN-01, ADR-001)
+      security:
+        - bearerAuth: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PracticeInput'
+      responses:
+        '201':
+          description: Practice registered
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Practice' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/practices/{practiceId}:
+    get:
+      tags: [Admin]
+      summary: Retrieve a practice's registry entry
+      security:
+        - bearerAuth: [admin]
+      parameters:
+        - name: practiceId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Practice registry entry
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Practice' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Admin]
+      summary: Update a practice's routing/config entry
+      security:
+        - bearerAuth: [admin]
+      parameters:
+        - name: practiceId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PracticeInput'
+      responses:
+        '200':
+          description: Practice updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Practice' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        Resource-scoped token per ADR-003 (patientId + encounterId + practiceId +
+        structurally-determined originScope). Issued via POST /auth/token, or
+        internally minted by the HISO SOAP edge adapter from an existing
+        SessionGUID (ADR-004/ADR-007).
+
+  parameters:
+    patientId:
+      name: patientId
+      in: path
+      required: true
+      schema: { type: integer }
+    encounterId:
+      name: encounterId
+      in: path
+      required: true
+      schema: { type: integer }
+    reportId:
+      name: reportId
+      in: path
+      required: true
+      schema: { type: string }
+    sessionKey:
+      name: sessionKey
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    formInstanceId:
+      name: formInstanceId
+      in: path
+      required: true
+      schema: { type: string }
+    sinceDate:
+      name: sinceDate
+      in: query
+      schema: { type: string, format: date }
+    untilDate:
+      name: untilDate
+      in: query
+      schema: { type: string, format: date }
+    sortOrder:
+      name: sortOrder
+      in: query
+      schema: { type: string, enum: [asc, desc], default: desc }
+    idempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string }
+      description: See Section 12 of the contract document. Optional; falls back to natural-key duplicate detection if omitted.
+
+  responses:
+    BadRequest:
+      description: Validation failed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: Missing/invalid/expired credential
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Valid credential, insufficient scope
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: Genuine conflict outside the documented idempotency path
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      description: Data-minimized error shape — never contains PHI, stack traces, or internal exception detail (SRS §12.14).
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string, description: Generic, static, non-PHI message. }
+        traceId: { type: string }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field: { type: string }
+              message: { type: string }
+      required: [title, status]
+
+    TokenRequest:
+      type: object
+      description: Canonical shape. Edge adapters translate each legacy consumer's existing Authenticate payload to this.
+      required: [username, password]
+      properties:
+        username: { type: string }
+        password: { type: string, format: password }
+        patientId: { type: integer }
+        encounterId: { type: integer }
+        practiceId: { type: string }
+
+    TokenResponse:
+      type: object
+      properties:
+        token: { type: string }
+        expiry: { type: string, format: date-time }
+        practiceId: { type: string }
+        originScope: { type: string, enum: [HISO, KARO, ERMS, COL] }
+
+    DemographicsHiso:
+      type: object
+      description: HISO's concept-driven demographics shape. Kept separate, not merged (Section 8 Decision 6 of the contract doc).
+      properties:
+        patientId: { type: integer }
+        practiceId: { type: string }
+        firstName: { type: string }
+        lastName: { type: string }
+        dateOfBirth: { type: string, format: date }
+
+    DemographicsKaro:
+      type: object
+      description: KARO's DemographicInfo shape, per KARO_HSS_doc.md sample. Kept separate, not merged.
+      properties:
+        patientId: { type: integer }
+        practiceId: { type: string }
+        firstName: { type: string }
+        lastName: { type: string }
+        dateOfBirth: { type: string, format: date }
+        dateOfEnrolment: { type: string, format: date, nullable: true }
+        endEnrolmentDate: { type: string, format: date, nullable: true }
+
+    DemographicsErms:
+      type: object
+      description: ERMS APIController's PatientData shape (JSON-translated from legacy XML). Kept separate, not merged.
+      properties:
+        patientId: { type: integer }
+        encounterId: { type: integer }
+        firstName: { type: string }
+        lastName: { type: string }
+        dob: { type: string, format: date }
+        nhi: { type: string, nullable: true }
+
+    DemographicsCol:
+      type: object
+      description: COL/Pegasus PegasusAPIModel.PatientData shape. Kept separate, not merged.
+      properties:
+        patientId: { type: integer }
+        practiceId: { type: string }
+        firstName: { type: string }
+        lastName: { type: string }
+
+    ClinicalNote:
+      type: object
+      properties:
+        noteId: { type: string }
+        patientId: { type: integer }
+        encounterId: { type: integer }
+        author: { type: string }
+        createdAt: { type: string, format: date-time }
+        content: { type: string }
+
+    ClinicalNoteInput:
+      type: object
+      required: [content]
+      properties:
+        content: { type: string }
+
+    Condition:
+      type: object
+      properties:
+        conditionId: { type: string }
+        status: { type: string, enum: [created, existing] }
+        diagnosisCode: { type: string }
+        description: { type: string }
+        isLongTerm: { type: boolean }
+        sideCode: { type: string, nullable: true }
+        sideDescription: { type: string, nullable: true }
+
+    ConditionInput:
+      type: object
+      required: [diagnosisCode]
+      properties:
+        diagnosisCode: { type: string }
+        description: { type: string }
+        isLongTerm: { type: boolean, default: false }
+        sideCode: { type: string, nullable: true }
+        sideDescription: { type: string, nullable: true }
+
+    Medication:
+      type: object
+      properties:
+        medicationId: { type: string }
+        name: { type: string }
+        view: { type: string, enum: [regular, prescribed] }
+        prescribedDate: { type: string, format: date }
+
+    ReportSummary:
+      type: object
+      properties:
+        reportId: { type: string }
+        type: { type: string }
+        date: { type: string, format: date-time }
+
+    ReportContent:
+      type: object
+      properties:
+        reportId: { type: string }
+        content: { type: string, description: Report text/content, RTF transcoding replaced with a documented modern format per FR-LAB-01. }
+        contentEncoding: { type: string, enum: [plain, base64] }
+
+    DocumentSummary:
+      type: object
+      properties:
+        documentId: { type: string }
+        patientId: { type: integer }
+        direction: { type: string, enum: [in, out] }
+        contentType: { type: string }
+        createdAt: { type: string, format: date-time }
+        subject: { type: string, nullable: true }
+        referenceId: { type: string, nullable: true }
+
+    Document:
+      allOf:
+        - $ref: '#/components/schemas/DocumentSummary'
+        - type: object
+          properties:
+            content: { type: string, format: byte, description: Base64-encoded document content }
+
+    DocumentInput:
+      type: object
+      required: [direction, contentType, content]
+      properties:
+        direction: { type: string, enum: [in, out] }
+        contentType: { type: string }
+        subject: { type: string }
+        referenceId: { type: string }
+        content: { type: string, format: byte }
+
+    Observation:
+      type: object
+      properties:
+        observationId: { type: string }
+        conceptId: { type: string }
+        value: { type: string }
+        recordedAt: { type: string, format: date-time }
+
+    ObservationInput:
+      type: object
+      description: At least one of the nine measurement fields must be non-empty (KARO-BR-14) — enforced at the API layer, not just documented.
+      properties:
+        height: { type: number, nullable: true }
+        weight: { type: number, nullable: true }
+        bmi: { type: number, nullable: true }
+        bloodPressureSystolic: { type: number, nullable: true }
+        bloodPressureDiastolic: { type: number, nullable: true }
+        waistCircumference: { type: number, nullable: true }
+        smokingStatus: { type: string, nullable: true }
+        heartRate: { type: number, nullable: true }
+        temperature: { type: number, nullable: true }
+
+    SessionContext:
+      type: object
+      properties:
+        providerId: { type: string }
+        patientId: { type: integer }
+        appointmentId: { type: string }
+        practiceId: { type: string }
+        referenceId: { type: string, nullable: true }
+        practiceLocationId: { type: string, nullable: true }
+        practiceEdi: { type: string, nullable: true }
+
+    FormData:
+      type: object
+      properties:
+        formInstanceId: { type: string }
+        viewType: { type: string }
+        view: { type: string }
+        dataContainer: { type: object, additionalProperties: true }
+        resumePath: { type: string, nullable: true }
+
+    FormSaveInput:
+      type: object
+      required: [dataContainer, completed]
+      properties:
+        dataContainer: { type: object, additionalProperties: true }
+        view: { type: string }
+        viewType: { type: string }
+        completed: { type: boolean }
+        continueSession: { type: boolean }
+
+    Recall:
+      type: object
+      properties:
+        recallId: { type: string }
+        patientId: { type: integer }
+        categoryId: { type: string, nullable: true }
+        dueDate: { type: string, format: date }
+
+    RecallInput:
+      type: object
+      properties:
+        categoryId: { type: string, nullable: true, description: If empty, defaults to the first category for the group at the stored-procedure level (KARO-BR-22). }
+        dueDate: { type: string, format: date }
+
+    Provider:
+      type: object
+      properties:
+        providerId: { type: string }
+        name: { type: string }
+        practiceLocationId: { type: string, nullable: true }
+
+    InvoiceInput:
+      type: object
+      required: [serviceCode, amountInclGst]
+      properties:
+        serviceCode: { type: string }
+        serviceName: { type: string }
+        amountInclGst: { type: number }
+        payee: { type: string }
+        serviceProvider: { type: string }
+        serviceDate: { type: string, format: date }
+        pegasusReference: { type: string, nullable: true }
+        claimShortCode: { type: string, nullable: true }
+
+    Invoice:
+      allOf:
+        - $ref: '#/components/schemas/InvoiceInput'
+        - type: object
+          properties:
+            invoiceId: { type: string }
+            status: { type: string, enum: [created, existing] }
+
+    PracticeInput:
+      type: object
+      required: [name, databaseServerId]
+      properties:
+        name: { type: string }
+        phoCode: { type: string, nullable: true }
+        databaseServerId: { type: string }
+
+    Practice:
+      allOf:
+        - $ref: '#/components/schemas/PracticeInput'
+        - type: object
+          properties:
+            practiceId: { type: string }

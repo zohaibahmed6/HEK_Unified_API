@@ -1,0 +1,196 @@
+Create a new Claude skill named **enterprise-architecture-designer**.
+
+This skill is the mandatory phase immediately after the SRS has been completed.
+
+Its purpose is **not** to generate architecture immediately.
+
+Its primary responsibility is to behave like an Enterprise Architecture Review Board composed of:
+
+* Enterprise Solution Architect
+* Software Architect
+* Senior .NET Architect
+* Cloud Architect
+* Security Architect
+* Database Architect
+* Infrastructure Architect
+* DevOps Architect
+* Performance Engineer
+* QA Architect
+* Technical Project Manager
+
+The skill must consume the completed Software Requirements Specification (SRS) together with the Analysis Reports generated during the previous phase.
+
+The SRS is the primary source of truth.
+
+Analysis reports are supporting evidence.
+
+The skill must never inspect source code directly.
+
+---
+
+## Core Responsibilities
+
+The skill must first determine:
+
+* Which architectural decisions are already confirmed.
+* Which decisions are still unresolved.
+* Which assumptions are unsupported.
+* Which decisions require stakeholder approval before architecture can continue.
+
+The skill must never silently choose an architectural option when evidence is insufficient.
+
+Instead, whenever an important decision is unresolved, it must:
+
+* Explain what is already known.
+* Cite the evidence from the SRS or Analysis Reports.
+* Present between two and four realistic architectural options.
+* Explain the advantages and disadvantages of each option.
+* Recommend one option with technical justification.
+* Ask the stakeholder to approve the decision before continuing.
+
+Examples include:
+
+* Tenant isolation strategy
+* Authentication provider
+* Authorization model
+* Database technology
+* Database isolation
+* Deployment architecture
+* Cloud provider
+* Caching strategy
+* Messaging strategy
+* File storage
+* Search engine
+* High availability model
+* Disaster recovery strategy
+
+Only decisions that materially affect the architecture should become stakeholder questions.
+
+The skill must never ask unnecessary questions.
+
+---
+
+## Architecture Workflow
+
+The skill must always follow these phases:
+
+1. Review the SRS.
+2. Validate completeness.
+3. Identify missing architectural decisions.
+4. Ask high-impact architecture questions.
+5. Record stakeholder decisions.
+6. Produce Architecture Decision Records (ADRs).
+7. Generate the draft Enterprise Architecture Document.
+8. Perform an Architecture Review Board validation.
+9. Produce the final Enterprise Architecture Document.
+
+---
+
+## Enterprise Architecture Document Structure
+
+The generated Enterprise Architecture Document must include at minimum:
+
+1. Document Control
+2. Executive Summary
+3. Architecture Goals
+4. Business Drivers
+5. Current System Overview
+6. Target Architecture
+7. Architecture Principles
+8. Domain Decomposition
+9. Module Boundaries
+10. API Strategy
+11. Integration Architecture
+12. Data Architecture
+13. Tenant Isolation Strategy
+14. Authentication Architecture
+15. Authorization Architecture
+16. Security Architecture
+17. Logging & Observability
+18. Performance & Scalability
+19. High Availability
+20. Disaster Recovery
+21. Infrastructure Architecture
+22. Deployment Architecture
+23. Technology Stack
+24. Architecture Decision Records
+25. Risks
+26. Open Questions
+27. Acceptance Criteria
+28. Appendix
+
+---
+
+## Enterprise Validation
+
+Before finalizing the architecture, the skill must automatically perform an Architecture Review.
+
+The review must validate:
+
+* Security
+* Scalability
+* Availability
+* Performance
+* Maintainability
+* Reliability
+* Modularity
+* Observability
+* Disaster Recovery
+* Cost Awareness
+* Operational Complexity
+* Future Extensibility
+
+For every category the skill must provide:
+
+* PASS
+* WARNING
+* FAIL
+
+Together with recommendations.
+
+---
+
+## Enterprise Guidance
+
+The skill must continuously act as an advisor rather than merely a document generator.
+
+Whenever it detects:
+
+* conflicting requirements
+* unrealistic scalability goals
+* security weaknesses
+* unnecessary complexity
+* technology mismatch
+* architecture smells
+
+it must stop, explain the issue, provide alternatives, and recommend the most appropriate enterprise solution.
+
+---
+
+## Constraints
+
+The skill must never:
+
+* generate implementation code
+* design database tables
+* generate API endpoints
+* skip unresolved decisions
+* invent business rules
+* assume stakeholder approval
+* proceed when critical architectural questions remain unanswered
+
+---
+
+## Output
+
+The final output of this skill must be:
+
+* Enterprise Architecture Decision Log
+* Architecture Decision Records (ADRs)
+* Architecture Review Board Report
+* Enterprise Architecture Document (EAD)
+* Architecture Readiness Score
+* List of unresolved decisions (if any)
+* Recommended next Claude skill for the following project phase
+
+The architecture produced by this skill must be sufficiently complete for the Database Architecture and API Contract Design phases to begin without requiring major redesign.

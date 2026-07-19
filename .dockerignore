@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.idea/
+**/TestResults/
+.git/
+.github/
+hek_analysis/
+docs/adr/
+*.md
+.env

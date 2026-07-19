@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Zero-dependency shared kernel: wire-shape DTOs (Error, TokenRequest/Response, ResourceScope, OriginScope)
+       referenced by both Api and all Adapters.* projects, matching the OpenAPI spec exactly. See ADR-012. -->
+
+</Project>
