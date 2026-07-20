@@ -83,16 +83,52 @@ path prefix. Needs confirmation before this is relied upon as final.
   `[Appointment].[tblHealthLinkSession]` in any source document. The column name/existence needs
   verification against the live schema.
 
-## Decision 8: Dormant DAL modules deferred entirely (not scaffolded)
+## Decision 8: Dormant DAL modules - deferred entirely, then `DMSDA.cs` ported once source was supplied
 
 Per direct confirmation during Block 1 planning: `DMSDA.cs`, `DBMessages.cs`, and the other
 8-10 retained-but-dormant DAL modules (BPAC, BPI, GP2GP, MHNAppointment, MHNHL7, Procare, Procon,
-Screening, UI, DMSAWS) have no legacy C# source anywhere in this repo - only documentation
+Screening, UI, DMSAWS) had no legacy C# source anywhere in this repo - only documentation
 describing the confirmed SQL-injection vulnerability, not full method signatures. Writing stand-in
-code would mean inventing an API shape beyond what any source document specifies. **Decision:
-defer entirely** - no code written for these modules in Block 0/1. This SRS Phase A hard-blocker
-item ("parameterize or remove the SQL injection in DMSDA.cs/DBMessages.cs") remains open, blocked
-on real legacy source access - tracked in `PROJECT_STATUS.md`, not silently dropped.
+code would have meant inventing an API shape beyond what any source document specifies. **Initial
+decision: defer entirely** - no code written for these modules in Block 0/1.
+
+**Update, same day**: Zohaib supplied the real source for the two confirmed-injection files
+(`legacy-reference/DAL/DMS/DMSDA.cs`, `legacy-reference/DAL/MHNHL7/DBMessages.cs`, outside `src/`,
+reference-only). On reading them:
+
+- **`DMSDA.cs`**: the confirmed injection was real and precisely located - `UpdateInboxFolderDocuments`,
+  a `private` method never called by anything else in the file (dead code within its own class, not
+  just dormant at the module level). Ported to `src/Infrastructure/Legacy/Dormant/Dmsda/DmsDocumentService.cs`
+  with the injection fixed via full parameterization; the rest of the file's already-parameterized
+  methods ported faithfully. This closes the `DMSDA.cs` half of SRS Phase A hard-blocker item 4.
+- **`DBMessages.cs`**: reading the actual file **contradicted the expected framing** - no
+  string-concatenated SQL exists in it; every call is already parameterized via a `DALHelper` class
+  whose own source wasn't supplied. The file is also tightly coupled to HISO's live concept-mapping
+  engine via types not present anywhere in this repo (`HealthLinkSession`, `HisoRequest`,
+  `DynamicParam`, `AWSDoc.IndiciDMS`, `Hiso.ConceptMapper`) - Block 2 ACC45/HISO territory, not
+  something to invent stub shapes for now. Flagged back to Zohaib rather than either silently
+  skipped or silently fabricated. **Decision (2026-07-20): defer to Block 2** - when the ACC45/HISO
+  domain group is built, `DBMessages.cs`'s `ExecuteHisoProcedure`/`GetParamList`/`MapParamList`
+  logic ports naturally alongside the real supporting types Block 2 defines for that group, instead
+  of inventing placeholder types now. This half of SRS Phase A hard-blocker item 4 is intentionally
+  carried forward, not closed, and not silently dropped.
+
+The other 8-10 dormant modules remain fully deferred (no source supplied for them).
+`PROJECT_STATUS.md` §3 item 23 tracks the current split state.
+
+**Update, Block 2 (2026-07-20)**: building Block 2's first domain group (Patient Demographics)
+surfaced that `DBMessages.cs`'s `ExecuteHisoProcedure` engine is not ACC45-specific niche
+plumbing - it's the actual mechanism behind "HISO getData," which the Contract Design doc lists
+as the legacy source for the majority of HISO-sourced read endpoints (demographics, notes,
+conditions, medications, lab results, observations). Deferring it further would have blocked
+most of Block 2, not just the ACC45 group. Ported the core engine into
+`src/Infrastructure/Legacy/Hiso/HisoConceptExecutor.cs` as live, shared infrastructure (not
+dormant), reconstructing `HealthLinkSession`/`HisoRequest`/`DynamicParam` directly from their
+observable property usage in the supplied `DBMessages.cs` source - extracted from real code, not
+invented from nothing. The AWS-enrichment branch is ported but throws/logs rather than executing
+(`AWSDoc.IndiciDMS`'s source was never available even to the original Phase 1 analysis, per SRS
+Section 16). See `PROJECT_STATUS.md` open item 28 for the consolidated flagged-inference note
+covering every Block 2 repository's procedure/column-name assumptions, including this engine's.
 
 ## Decision 9: `ILogger<T>` permitted in the Application layer
 

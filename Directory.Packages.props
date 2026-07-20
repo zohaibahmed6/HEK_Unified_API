@@ -38,8 +38,19 @@
     <PackageVersion Include="AspNetCore.HealthChecks.SqlServer" Version="8.0.2" />
     <PackageVersion Include="AspNetCore.HealthChecks.UI.Client" Version="8.0.1" />
 
+    <!-- Idempotency store (Day-1 in-memory implementation, see IIdempotencyStore remarks) -->
+    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="8.0.1" />
+
     <!-- OpenAPI (contract verification, Block 3, referenced here for CPM consistency) -->
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="6.9.0" />
+
+    <!-- Ported dormant DAL module (DMSDA.cs) - faithfully reproduces the legacy TIFF/BMP->PDF
+         conversion. System.Drawing.Common is Windows-only since .NET 6 (throws
+         PlatformNotSupportedException on Linux); the legacy code's own catch-all fallback (return
+         original bytes unconverted) already handles this gracefully - flagged, not a functional
+         break, just reduced capability on Linux containers (ADR-005). See ADR-012 for detail. -->
+    <PackageVersion Include="System.Drawing.Common" Version="8.0.10" />
+    <PackageVersion Include="PdfSharp" Version="6.1.1" />
 
     <!-- Testing -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />

@@ -13,6 +13,8 @@ using HekCoreApi.Application.Common.Options;
 using HekCoreApi.Application.Features.Auth.Commands;
 using HekCoreApi.Contracts.Security;
 using HekCoreApi.Infrastructure.Auth;
+using HekCoreApi.Infrastructure.DependencyInjection;
+using HekCoreApi.Infrastructure.Legacy.Dormant.Dmsda;
 using HekCoreApi.Infrastructure.Persistence;
 using HekCoreApi.Infrastructure.Routing;
 using HekCoreApi.Infrastructure.Secrets;
@@ -44,9 +46,16 @@ try
     builder.Services.Configure<HisoServerAddressMapOptions>(builder.Configuration.GetSection(HisoServerAddressMapOptions.SectionName));
     builder.Services.Configure<RateLimitOptions>(builder.Configuration.GetSection(RateLimitOptions.SectionName));
     builder.Services.Configure<CorsOptions>(builder.Configuration.GetSection(CorsOptions.SectionName));
+    builder.Services.Configure<LegacyDmsOptions>(builder.Configuration.GetSection(LegacyDmsOptions.SectionName));
+    builder.Services.Configure<TaskStatusOptions>(builder.Configuration.GetSection(TaskStatusOptions.SectionName));
 
     // ---- Secrets (Block 0 vertical slice) ----
     builder.Services.AddSingleton<ISecretProvider, EnvironmentVariableSecretProvider>();
+
+    // ---- Dormant DAL module, SQL-injection-fixed (PROJECT_STATUS.md open item 23) ----
+    // Registered so the fixed capability exists and is DI-resolvable, but no controller/endpoint
+    // calls it - "dormant," per the stakeholder's "keep, don't delete" decision.
+    builder.Services.AddScoped<DmsDocumentService>();
 
     // ---- Tenant registry (ADR-001) ----
     builder.Services.AddDbContext<TenantRegistryDbContext>(options =>
@@ -56,6 +65,11 @@ try
     // ---- HISO session handling (ADR-004/ADR-007) ----
     builder.Services.AddScoped<IHisoSessionRepository, HekCoreApi.Infrastructure.Persistence.Hiso.HisoSessionRepository>();
     builder.Services.AddScoped<HisoSessionResolver>();
+
+    // ---- Block 2 foundation: legacy practice DB routing + idempotency ----
+    builder.Services.AddScoped<ILegacyPracticeConnectionResolver, HekCoreApi.Infrastructure.Routing.LegacyPracticeConnectionResolver>();
+    builder.Services.AddMemoryCache();
+    builder.Services.AddScoped<IIdempotencyStore, HekCoreApi.Infrastructure.Idempotency.InMemoryIdempotencyStore>();
 
     // ---- Auth core (ADR-002/ADR-003) ----
     builder.Services.AddScoped<IIdentityValidator, EntraIdIdentityValidator>();
@@ -126,6 +140,10 @@ try
     builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
     builder.Services.AddProblemDetails();
 
+    // ---- Block 2 domain repositories - convention-scanned (see AddInfrastructureRepositories
+    // remarks); called after all explicit registrations above so TryAddScoped never overrides them.
+    builder.Services.AddInfrastructureRepositories();
+
     // ---- Health checks (Block 0) ----
     builder.Services.AddHealthChecks()
         .AddCheck<SelfHealthCheck>("self")
@@ -168,9 +186,15 @@ try
 
     app.MapControllers();
 
+    // OpenAPI spec: GET /health -> 200 { "status": "ok" } (KARO Ping / ERMS Ping equivalent).
     app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
     {
-        Predicate = _ => false
+        Predicate = _ => false,
+        ResponseWriter = (context, _) =>
+        {
+            context.Response.ContentType = "application/json";
+            return context.Response.WriteAsync("""{"status":"ok"}""");
+        }
     });
     app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
     {

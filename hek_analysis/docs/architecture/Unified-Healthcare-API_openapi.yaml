@@ -9,7 +9,7 @@ info:
     of the contract document) — version is tracked here via info.version and
     an append-only changelog only; no request/response shape changes without
     a coordinated migration.
-  version: "1.1.0"
+  version: "1.1.1"
   x-changelog:
     - version: "1.0.0"
       date: "2026-07-19"
@@ -23,6 +23,24 @@ info:
         GetEncounterSummary and SaveScreeningCode implemented for real
         (previously excluded as confirmed-broken); rate limiting confirmed
         as a built, config-toggled capability.
+    - version: "1.1.1"
+      date: "2026-07-20"
+      description: >
+        Block 3 contract re-verification against the actual Day-1 build (all 42
+        operations implemented, route-for-route and verb-for-verb match).
+        One drift corrected here rather than left silently mismatched:
+        POST /auth/token now documents a 501 response. Reason: the
+        TokenResponse.originScope enum only defines Hiso|Karo|Erms|Col (one per
+        legacy entry point), and no source document specifies what origin scope
+        a caller of the *canonical* (non-legacy-compat) endpoint should receive.
+        Fabricating a fifth value not in this spec would violate the project's
+        "never invent a contract field" rule, so the endpoint is implemented but
+        gated to 501 pending that decision (see ADR-012 Decision 4 and
+        PROJECT_STATUS.md open item 26). Every legacy consumer instead reaches
+        the platform through its own compat entry point (HSS Portal, ERMS
+        eReferrals, COL/Pegasus), each of which mints a real token via this
+        same underlying auth pipeline with its origin scope structurally
+        assigned - those paths are unaffected and fully functional.
 servers:
   - url: https://api.hek.example
     description: Production (illustrative host — actual host is an Infrastructure Design decision, not yet made)
@@ -72,6 +90,17 @@ paths:
                 $ref: '#/components/schemas/TokenResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '501':
+          description: >
+            Not yet implemented for direct (non-legacy) callers - the originScope
+            claim to assign is undecided (no source document specifies it; see
+            x-changelog 1.1.1 and ADR-012 Decision 4). Every legacy consumer
+            reaches the platform through its own compat entry point instead
+            (POST /karo/authenticate, POST /erms/authenticate,
+            POST /erms/col/authenticate), which are unaffected.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /health:
     get:

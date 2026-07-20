@@ -12,6 +12,9 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Identity.Client" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
+    <PackageReference Include="System.Drawing.Common" />
+    <PackageReference Include="PdfSharp" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
   </ItemGroup>
 
   <ItemGroup>
