@@ -1,4 +1,3 @@
-
 ---
 name: enterprise-technical-advisor
 description: Enterprise technical advisor for planning and guiding the development of a unified healthcare API.

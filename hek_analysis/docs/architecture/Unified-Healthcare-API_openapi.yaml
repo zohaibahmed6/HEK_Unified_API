@@ -9,8 +9,45 @@ info:
     of the contract document) — version is tracked here via info.version and
     an append-only changelog only; no request/response shape changes without
     a coordinated migration.
-  version: "1.1.1"
+  version: "1.1.4"
   x-changelog:
+    - version: "1.1.4"
+      date: "2026-07-20"
+      description: >
+        PracticeInput/Practice's single databaseServerId field replaced with three
+        explicit fields: dbServerHost, dbName, sourceSystem (enum Hiso|Karo|Erms|Col).
+        Reason: the tenant registry needs all three independently to route a request
+        (Server={dbServerHost};Database={dbName};...) - the single-field version
+        forced the implementation to duplicate one value into both the server host
+        and database name, which is wrong for any real practice (a database name is
+        never the same string as its server's hostname). No source document ever
+        defined this admin API's schema, so this is a new-design correction, not a
+        legacy-compat concern - signed off per PROJECT_STATUS.md open items 24/31.
+    - version: "1.1.3"
+      date: "2026-07-20"
+      description: >
+        POST /patients/{patientId}/invoices no longer requires the billing:write
+        scope - it now uses the same standard resource-scoped auth as every
+        other write endpoint. Reason: the real legacy ERMS COLController.SaveInvoice
+        (source supplied and reviewed) required only a valid session token, with
+        no distinct financial-write permission tier at all - the earlier
+        billing:write requirement came from an SRS recommendation (Section 12.2)
+        that cited ERMS SEC-04 as evidence, but SEC-04 is actually a wildcard-CORS
+        finding, not a missing-authorization finding. Zohaib decided to match
+        the legacy system's real behavior instead of the SRS's recommendation.
+        Closes PROJECT_STATUS.md open item 29.
+    - version: "1.1.2"
+      date: "2026-07-20"
+      description: >
+        InvoiceInput/Invoice gained description, accountHolderId, and
+        serviceProviderType fields. Reason: the real ERMS COL SaveInvoice
+        source (legacy-reference/controller/COLController.cs and
+        legacy-reference/DAL/HSS/HSSDA.cs, supplied after this contract was
+        first drafted) confirmed these three fields were genuinely accepted
+        by the legacy endpoint; the original v1.1.0 InvoiceInput shape
+        omitted them because the field list was inferred, not sourced.
+        Carried forward per the project's "don't drop what the old system
+        implemented" rule (PROJECT_STATUS.md open item 17, now closed).
     - version: "1.0.0"
       date: "2026-07-19"
       description: Initial canonical contract, Phase 7 (API Contract Design).
@@ -896,9 +933,7 @@ paths:
   /patients/{patientId}/invoices:
     post:
       tags: [Billing]
-      summary: Save an invoice/service record (idempotent on duplicate; requires billing:write scope)
-      security:
-        - bearerAuth: [billing:write]
+      summary: Save an invoice/service record (idempotent on duplicate; standard resource-scoped auth, same as every other write endpoint - see x-changelog 1.1.3)
       parameters:
         - $ref: '#/components/parameters/patientId'
         - $ref: '#/components/parameters/idempotencyKey'
@@ -1317,8 +1352,11 @@ components:
         serviceCode: { type: string }
         serviceName: { type: string }
         amountInclGst: { type: number }
+        description: { type: string, nullable: true }
+        accountHolderId: { type: string, nullable: true }
         payee: { type: string }
         serviceProvider: { type: string }
+        serviceProviderType: { type: string, nullable: true }
         serviceDate: { type: string, format: date }
         pegasusReference: { type: string, nullable: true }
         claimShortCode: { type: string, nullable: true }
@@ -1333,11 +1371,13 @@ components:
 
     PracticeInput:
       type: object
-      required: [name, databaseServerId]
+      required: [name, dbServerHost, dbName, sourceSystem]
       properties:
         name: { type: string }
         phoCode: { type: string, nullable: true }
-        databaseServerId: { type: string }
+        dbServerHost: { type: string, description: "Physical database server hostname (ADR-001 tenant registry routing target)." }
+        dbName: { type: string, description: "Database name on dbServerHost." }
+        sourceSystem: { type: string, enum: [Hiso, Karo, Erms, Col], description: "Which legacy system originates this practice's data." }
 
     Practice:
       allOf:

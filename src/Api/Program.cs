@@ -21,6 +21,7 @@ using HekCoreApi.Infrastructure.Secrets;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using Serilog;
 
 // Bootstrap logger - captures anything that happens before the full Serilog pipeline is configured
@@ -32,6 +33,10 @@ Log.Logger = new LoggerConfiguration()
 try
 {
     var builder = WebApplication.CreateBuilder(args);
+
+    // Local-only overrides (real connection strings, etc.) - gitignored via appsettings.*.local.json,
+    // never committed. Optional, so nothing breaks when the file doesn't exist.
+    builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.local.json", optional: true, reloadOnChange: true);
 
     builder.Host.UseSerilog((context, services, configuration) => configuration
         .ReadFrom.Configuration(context.Configuration)
@@ -48,6 +53,9 @@ try
     builder.Services.Configure<CorsOptions>(builder.Configuration.GetSection(CorsOptions.SectionName));
     builder.Services.Configure<LegacyDmsOptions>(builder.Configuration.GetSection(LegacyDmsOptions.SectionName));
     builder.Services.Configure<TaskStatusOptions>(builder.Configuration.GetSection(TaskStatusOptions.SectionName));
+    builder.Services.Configure<LegacyPracticeResolutionOptions>(builder.Configuration.GetSection(LegacyPracticeResolutionOptions.SectionName));
+    builder.Services.Configure<HisoConceptMappingOptions>(builder.Configuration.GetSection(HisoConceptMappingOptions.SectionName));
+    builder.Services.Configure<HisoGetDataOptions>(builder.Configuration.GetSection(HisoGetDataOptions.SectionName));
 
     // ---- Secrets (Block 0 vertical slice) ----
     builder.Services.AddSingleton<ISecretProvider, EnvironmentVariableSecretProvider>();
@@ -154,7 +162,25 @@ try
 
     builder.Services.AddControllers();
     builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen();
+    builder.Services.AddSwaggerGen(options =>
+    {
+        options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+        {
+            Name = "Authorization",
+            Type = SecuritySchemeType.Http,
+            Scheme = "Bearer",
+            BearerFormat = "JWT",
+            In = ParameterLocation.Header,
+            Description = "Paste just the JWT itself (no \"Bearer \" prefix - Swagger adds that for you)."
+        });
+        options.AddSecurityRequirement(new OpenApiSecurityRequirement
+        {
+            {
+                new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" } },
+                Array.Empty<string>()
+            }
+        });
+    });
 
     var app = builder.Build();
 

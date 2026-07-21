@@ -1,20 +1,21 @@
 using HekCoreApi.Api.Controllers;
-using HekCoreApi.Api.Security;
 using HekCoreApi.Application.Features.Billing.Commands;
 using HekCoreApi.Contracts.Billing;
 using HekCoreApi.Contracts.Idempotency;
 using MediatR;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace HekCoreApi.Api.Features.Billing.Controllers;
 
 /// <summary>
-/// Requires billing:write scope, distinct from clinical read scope (Contract Design doc Section 13,
-/// SRS Section 12.2, ERMS SEC-04). FLAGGED GAP: no source document specifies how/when a caller is
-/// granted the billing:write scope claim - Block 1's JwtTokenIssuer does not currently mint it for
-/// any caller, so in practice this endpoint rejects every caller until scope-granting is designed.
-/// Implemented faithfully (the check is real, not bypassed) rather than silently working around the gap.
+/// Standard resource-scoped auth only (same as every other Block 2 write endpoint) - matches the real
+/// legacy `COLController.SaveInvoice`, which required only a valid session token, no elevated/distinct
+/// permission tier (PROJECT_STATUS.md open item 29, resolved 2026-07-20). An earlier build had this
+/// endpoint behind an additional `billing:write` scope per an SRS recommendation (Section 12.2, citing
+/// ERMS SEC-04) - but SEC-04 itself is about wildcard CORS, not a missing scope, and no legacy system
+/// ever had a billing-specific permission concept. Zohaib decided: match the legacy system's actual
+/// behavior instead. The `BillingWrite` policy stays defined (`AuthorizationPolicyNames.BillingWrite`,
+/// `Program.cs`) in case a real scope-granting design is wanted later - just no longer applied here.
 /// </summary>
 [Route("patients/{patientId:int}/invoices")]
 public sealed class InvoicesController : ResourceScopedControllerBase
@@ -27,13 +28,12 @@ public sealed class InvoicesController : ResourceScopedControllerBase
     }
 
     [HttpPost]
-    [Authorize(Policy = AuthorizationPolicyNames.BillingWrite)]
     public async Task<IActionResult> Save(int patientId, [FromBody] InvoiceInput input, CancellationToken ct)
     {
         EnsurePatientScope(patientId);
 
         var idempotencyKey = Request.Headers.TryGetValue(IdempotencyHeaderNames.IdempotencyKey, out var value) ? value.ToString() : null;
-        var outcome = await _mediator.Send(new SaveInvoiceCommand(patientId, CurrentScope.PracticeId, input, idempotencyKey), ct);
+        var outcome = await _mediator.Send(new SaveInvoiceCommand(patientId, CurrentScope.EncounterId, CurrentScope.PracticeId, input, idempotencyKey), ct);
 
         return outcome.WasDuplicate ? Ok(outcome.Resource) : StatusCode(StatusCodes.Status201Created, outcome.Resource);
     }

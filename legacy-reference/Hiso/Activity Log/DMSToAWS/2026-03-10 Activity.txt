@@ -1,0 +1,4 @@
+00:57:21---CheckAWSIsEnabled on Practice .... 901
+00:57:21---IsAWS .... True
+01:00:18---GetDocumentStatusFromIndici Key : 24D46D8F-937F-4B62-80F0-52862386DDDF PracticeID : 901
+01:01:16---GetDocumentStatusFromIndici Key : C4FF6C24-43C7-458D-87FF-136469900F43 PracticeID : 901

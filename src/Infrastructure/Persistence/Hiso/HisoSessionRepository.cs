@@ -5,16 +5,17 @@ using Microsoft.Data.SqlClient;
 namespace HekCoreApi.Infrastructure.Persistence.Hiso;
 
 /// <summary>
-/// Read-only query against the existing, unchanged [Appointment].[tblHealthLinkSession]
-/// (ProviderID, PatientID, AppointmentID, PracticeID - the columns confirmed by HISO-BR-01 and
-/// ADR-010's evidence). No schema changes. Connection string is resolved per server address via
-/// ISecretProvider, never hardcoded - direct replacement for the legacy pattern this project exists
-/// to retire (SRS Section 12.10). Always parameterized - never string concatenation.
+/// Calls the real legacy `[Appointment].[usptblHealthLinkSession_GetByGUID]` (confirmed against the
+/// real PMS_NZ_V2 database, 2026-07-21: returns AppointmentID/PatientID/ProviderID/PracticeID/
+/// PMSReferenceID/SessionGUID/PracticeLocationID/EDIAccount - EDIAccount is proc-computed, not a raw
+/// column on `tblHealthLinkSession`). No schema changes. Connection string is resolved per server
+/// address via ISecretProvider, never hardcoded - direct replacement for the legacy pattern this
+/// project exists to retire (SRS Section 12.10). Always parameterized - never string concatenation.
 ///
-/// FLAGGED INFERENCE: a session-creation-timestamp column (referenced below as CreatedAtUtc) is
-/// required to enforce the new 12-hour expiry (ADR-004) but is not named in any source document -
-/// only ProviderID/PatientID/AppointmentID/PracticeID are confirmed present. The actual column name
-/// (and whether one exists at all) needs confirming against the live schema before this is trusted.
+/// The real proc does not expose a session-creation timestamp, so the new 12-hour expiry (ADR-004,
+/// not part of legacy) is enforced via a second, minimal parameterized read of `InsertedAt` directly
+/// from `[Appointment].[tblHealthLinkSession]` (confirmed real column name) - kept separate from the
+/// proc call rather than guessed into the proc's output shape.
 /// </summary>
 public sealed class HisoSessionRepository : IHisoSessionRepository
 {
@@ -33,29 +34,48 @@ public sealed class HisoSessionRepository : IHisoSessionRepository
             return null;
         }
 
-        const string sql = """
-            SELECT ProviderID, PatientID, AppointmentID, PracticeID, CreatedAtUtc
-            FROM [Appointment].[tblHealthLinkSession]
-            WHERE SessionGUID = @SessionGuid
-            """;
-
         await using var connection = new SqlConnection(connectionString);
-        await using var command = new SqlCommand(sql, connection);
-        command.Parameters.AddWithValue("@SessionGuid", sessionGuid);
-
         await connection.OpenAsync(ct);
-        await using var reader = await command.ExecuteReaderAsync(ct);
 
+        await using var command = new SqlCommand("[Appointment].[usptblHealthLinkSession_GetByGUID]", connection) { CommandType = System.Data.CommandType.StoredProcedure };
+        command.Parameters.AddWithValue("@SessionGUID", sessionGuid);
+
+        await using var reader = await command.ExecuteReaderAsync(ct);
         if (!await reader.ReadAsync(ct))
         {
             return null;
         }
 
+        var providerId = reader["ProviderID"].ToString() ?? string.Empty;
+        var patientId = reader["PatientID"].ToString() ?? string.Empty;
+        var appointmentId = reader["AppointmentID"].ToString() ?? string.Empty;
+        var practiceId = reader["PracticeID"].ToString() ?? string.Empty;
+        var practiceEdi = reader["EDIAccount"] is DBNull ? null : reader["EDIAccount"].ToString();
+        await reader.DisposeAsync();
+
+        var insertedAt = await GetInsertedAtAsync(connection, sessionGuid, ct);
+
         return new HisoSessionContext(
-            ProviderId: reader["ProviderID"].ToString() ?? string.Empty,
-            PatientId: reader["PatientID"].ToString() ?? string.Empty,
-            AppointmentId: reader["AppointmentID"].ToString() ?? string.Empty,
-            PracticeId: reader["PracticeID"].ToString() ?? string.Empty,
-            SessionCreatedAtUtc: reader["CreatedAtUtc"] is DateTimeOffset dto ? dto : (DateTime)reader["CreatedAtUtc"]);
+            ProviderId: providerId,
+            PatientId: patientId,
+            AppointmentId: appointmentId,
+            PracticeId: practiceId,
+            SessionCreatedAtUtc: insertedAt,
+            PracticeEdi: practiceEdi);
+    }
+
+    private static async Task<DateTimeOffset> GetInsertedAtAsync(SqlConnection connection, Guid sessionGuid, CancellationToken ct)
+    {
+        await using var command = new SqlCommand(
+            "SELECT InsertedAt FROM [Appointment].[tblHealthLinkSession] WHERE SessionGUID = @SessionGuid", connection);
+        command.Parameters.AddWithValue("@SessionGuid", sessionGuid);
+
+        var result = await command.ExecuteScalarAsync(ct);
+        return result switch
+        {
+            DateTimeOffset dto => dto,
+            DateTime dt => new DateTimeOffset(dt, TimeSpan.Zero),
+            _ => DateTimeOffset.UtcNow
+        };
     }
 }

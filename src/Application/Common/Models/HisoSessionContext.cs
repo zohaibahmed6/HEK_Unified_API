@@ -10,4 +10,5 @@ public sealed record HisoSessionContext(
     string PatientId,
     string AppointmentId,
     string PracticeId,
-    DateTimeOffset SessionCreatedAtUtc);
+    DateTimeOffset SessionCreatedAtUtc,
+    string? PracticeEdi = null);

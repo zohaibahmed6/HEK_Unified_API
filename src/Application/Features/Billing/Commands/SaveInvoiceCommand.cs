@@ -5,7 +5,7 @@ using MediatR;
 
 namespace HekCoreApi.Application.Features.Billing.Commands;
 
-public sealed record SaveInvoiceCommand(int PatientId, string PracticeId, InvoiceInput Input, string? IdempotencyKey) : IRequest<IdempotencyOutcome<Invoice>>;
+public sealed record SaveInvoiceCommand(int PatientId, string? EncounterId, string PracticeId, InvoiceInput Input, string? IdempotencyKey) : IRequest<IdempotencyOutcome<Invoice>>;
 
 public sealed class SaveInvoiceCommandHandler : IRequestHandler<SaveInvoiceCommand, IdempotencyOutcome<Invoice>>
 {
@@ -36,14 +36,14 @@ public sealed class SaveInvoiceCommandHandler : IRequestHandler<SaveInvoiceComma
             return new IdempotencyOutcome<Invoice>(true, existing);
         }
 
-        var created = await _repository.SaveAsync(request.PatientId, request.PracticeId, request.Input, cancellationToken);
+        var (created, wasDuplicate) = await _repository.SaveAsync(request.PatientId, request.EncounterId, request.PracticeId, request.Input, cancellationToken);
 
-        if (!string.IsNullOrEmpty(request.IdempotencyKey))
+        if (!wasDuplicate && !string.IsNullOrEmpty(request.IdempotencyKey))
         {
             var key = IdempotencyKeyBuilder.Build("invoices", request.PracticeId, request.PatientId.ToString(), null, request.IdempotencyKey);
             await _idempotencyStore.SetAsync(key, created, cancellationToken);
         }
 
-        return new IdempotencyOutcome<Invoice>(false, created);
+        return new IdempotencyOutcome<Invoice>(wasDuplicate, created);
     }
 }

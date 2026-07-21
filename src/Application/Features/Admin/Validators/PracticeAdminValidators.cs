@@ -8,7 +8,9 @@ public sealed class RegisterPracticeCommandValidator : AbstractValidator<Registe
     public RegisterPracticeCommandValidator()
     {
         RuleFor(x => x.Input.Name).NotEmpty();
-        RuleFor(x => x.Input.DatabaseServerId).NotEmpty();
+        RuleFor(x => x.Input.DbServerHost).NotEmpty();
+        RuleFor(x => x.Input.DbName).NotEmpty();
+        RuleFor(x => x.Input.SourceSystem).IsInEnum();
     }
 }
 
@@ -17,6 +19,8 @@ public sealed class UpdatePracticeCommandValidator : AbstractValidator<UpdatePra
     public UpdatePracticeCommandValidator()
     {
         RuleFor(x => x.Input.Name).NotEmpty();
-        RuleFor(x => x.Input.DatabaseServerId).NotEmpty();
+        RuleFor(x => x.Input.DbServerHost).NotEmpty();
+        RuleFor(x => x.Input.DbName).NotEmpty();
+        RuleFor(x => x.Input.SourceSystem).IsInEnum();
     }
 }

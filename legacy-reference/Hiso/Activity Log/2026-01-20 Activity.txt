@@ -1,0 +1,2 @@
+02:40:08---CheckAWSIsEnabled on Practice .... 901
+02:40:08---IsAWS .... True

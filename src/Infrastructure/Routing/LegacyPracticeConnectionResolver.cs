@@ -31,4 +31,20 @@ public sealed class LegacyPracticeConnectionResolver : ILegacyPracticeConnection
 
         return $"Server={route.DbServerHost};Database={route.DbName};{credential};TrustServerCertificate=True;";
     }
+
+    public async Task<string> ResolveSecondNodeAsync(CancellationToken ct = default)
+    {
+        var connectionString = await _secretProvider.GetSecretAsync("Hiso:SecondNodeConnectionString", ct);
+        return string.IsNullOrWhiteSpace(connectionString)
+            ? throw new NotFoundException("HISO second database node is not configured yet (Hiso:SecondNodeConnectionString).")
+            : connectionString;
+    }
+
+    public async Task<string> ResolveIndiciMasterAsync(CancellationToken ct = default)
+    {
+        var connectionString = await _secretProvider.GetSecretAsync("Hiso:IndiciMasterConnectionString", ct);
+        return string.IsNullOrWhiteSpace(connectionString)
+            ? throw new NotFoundException("HISO Indici Master database is not configured yet (Hiso:IndiciMasterConnectionString).")
+            : connectionString;
+    }
 }

@@ -1,5 +1,6 @@
 using HekCoreApi.Application.Common.Interfaces;
 using HekCoreApi.Contracts.Admin;
+using HekCoreApi.Contracts.Security;
 using HekCoreApi.Domain.Entities;
 using HekCoreApi.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -11,13 +12,12 @@ namespace HekCoreApi.Infrastructure.Legacy.Admin;
 /// practice database - this is platform-owned data, not something routed via
 /// ILegacyPracticeConnectionResolver.
 ///
-/// FLAGGED RECONCILIATION: the OpenAPI PracticeInput contract has one field
-/// (`databaseServerId`), while Block 1's `PracticeRegistryEntry` entity (an inferred design, see
-/// ADR-012 Decision 7) has separate `DbServerHost`/`DbName`/`SourceSystem` columns. Mapped here as
-/// `databaseServerId` -> `DbServerHost`, with `DbName` defaulted to the same value and
-/// `SourceSystem` defaulted to "Unknown" (the contract has no field to source it from) - flagged
-/// for reconciliation once the registry schema is confirmed against a real design, not presented
-/// as settled.
+/// PROJECT_STATUS.md open items 24/31, resolved 2026-07-20: <see cref="PracticeInput"/> now carries
+/// the three real fields <see cref="PracticeRegistryEntry"/> needs (`DbServerHost`/`DbName`/
+/// `SourceSystem`) directly, one-to-one, instead of collapsing them into one ambiguous field. The
+/// earlier version of this mapping duplicated a single `databaseServerId` value into both
+/// `DbServerHost` and `DbName` - a real bug, not just an inference gap, since a practice's database
+/// name is never actually equal to its server hostname.
 /// </summary>
 public sealed class PracticeAdminRepository : IPracticeAdminRepository
 {
@@ -37,9 +37,9 @@ public sealed class PracticeAdminRepository : IPracticeAdminRepository
         {
             PracticeId = practiceId,
             PracticeName = input.Name,
-            SourceSystem = "Unknown",
-            DbServerHost = input.DatabaseServerId,
-            DbName = input.DatabaseServerId,
+            SourceSystem = input.SourceSystem.ToString(),
+            DbServerHost = input.DbServerHost,
+            DbName = input.DbName,
             RowLevelSecurityEnabled = false,
             IsActive = true,
             CreatedAtUtc = now,
@@ -53,7 +53,7 @@ public sealed class PracticeAdminRepository : IPracticeAdminRepository
     public async Task<Practice?> GetAsync(string practiceId, CancellationToken ct = default)
     {
         var entry = await _db.Practices.AsNoTracking().SingleOrDefaultAsync(p => p.PracticeId == practiceId && p.IsActive, ct);
-        return entry is null ? null : new Practice(entry.PracticeId, entry.PracticeName, null, entry.DbServerHost);
+        return entry is null ? null : new Practice(entry.PracticeId, entry.PracticeName, null, entry.DbServerHost, entry.DbName, Enum.Parse<OriginScope>(entry.SourceSystem));
     }
 
     public async Task<Practice?> UpdateAsync(string practiceId, PracticeInput input, CancellationToken ct = default)
@@ -65,8 +65,9 @@ public sealed class PracticeAdminRepository : IPracticeAdminRepository
         }
 
         entry.PracticeName = input.Name;
-        entry.DbServerHost = input.DatabaseServerId;
-        entry.DbName = input.DatabaseServerId;
+        entry.SourceSystem = input.SourceSystem.ToString();
+        entry.DbServerHost = input.DbServerHost;
+        entry.DbName = input.DbName;
         entry.UpdatedAtUtc = DateTimeOffset.UtcNow;
 
         await _db.SaveChangesAsync(ct);

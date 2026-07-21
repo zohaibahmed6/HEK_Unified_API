@@ -14,8 +14,9 @@ public sealed record HealthLinkSession(
     string AppointmentId,
     string PracticeId,
     string? ReferenceId = null,
-    string? PracticeLocationId = null)
+    string? PracticeLocationId = null,
+    string? PracticeEdi = null)
 {
     public static HealthLinkSession FromSessionContext(HisoSessionContext context) =>
-        new(context.PatientId, context.ProviderId, context.AppointmentId, context.PracticeId);
+        new(context.PatientId, context.ProviderId, context.AppointmentId, context.PracticeId, PracticeEdi: context.PracticeEdi);
 }

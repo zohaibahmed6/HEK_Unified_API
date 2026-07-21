@@ -6,21 +6,20 @@ using Microsoft.Data.SqlClient;
 namespace HekCoreApi.Infrastructure.Legacy.Demographics;
 
 /// <summary>
-/// FLAGGED INFERENCES throughout this class, since no live DB/stored-procedure schema access is
-/// available (SRS: "the actual T-SQL definitions... were not available"):
-/// - HISO: procedure name `Hiso.uspGetPatient_Demographics` follows the `Hiso.uspGetPatient_X`
-///   naming pattern confirmed for other procedures (DBMessages.cs's AWS-enabled-procedure list) -
-///   not itself confirmed.
-/// - KARO: `[HSS].[uspGetDemographics]` IS a confirmed real stored procedure name
-///   (PROJECT_STATUS.md Section 2 - "identical stored-procedure names ([HSS] schema,
-///   uspGetDemographics etc.)").
-/// - ERMS/COL: `[HSS].[uspGetPatientData]` / `[HSS].[uspGetCurrentPatientData]` follow the same
-///   confirmed `[HSS]` schema convention (ERMS shares KARO's DAL/schema per ComparisonReport
-///   Section 2.1) but the exact names are not themselves confirmed.
-/// - Every result column name assumed below matches the OpenAPI response schema's field names
-///   exactly, since that is the only field-level detail available anywhere in this project's docs.
-/// All of the above needs verification against the live schema before this is trusted as correct -
-/// tracked in PROJECT_STATUS.md.
+/// - KARO (`GetKaroAsync`): **confirmed against real `PMS_NZ_V2` data (2026-07-20, patient
+///   2459731)**. `[HSS].[uspGetDemographics]` is a real, executable procedure and its real result
+///   columns are `Given`/`Family`/`BirthDate` for name/DOB - not `FirstName`/`LastName`/`DateOfBirth`
+///   as originally inferred (those column names DO exist too, but hold an unrelated composite
+///   internal-reference string like `554:1000111/1000310/1|&amp;|LnB`, not a usable value). Also
+///   confirmed the procedure returns empty string, not `DBNull`, for an unset enrolment date -
+///   handled explicitly (`ParseOptionalDate`). This is the only demographics source fully verified
+///   against live data so far; see PROJECT_STATUS.md open item 28.
+/// - HISO (`GetHisoAsync`): still an unconfirmed inference. `Hiso.uspGetPatient_Demographics`
+///   was tested against real `PMS_NZ_V2` data and does **not** exist under that name/schema there
+///   (SQL error 2812, "could not find stored procedure") - confirmed wrong, not yet replaced with a
+///   known-correct name.
+/// - ERMS/COL (`GetErmsAsync`/`GetColAsync`): still unconfirmed inferences. `[HSS].[uspGetPatientData]`
+///   was tested against real `PMS_NZ_V2` data and does not exist under that name either (same error).
 /// </summary>
 public sealed class DemographicsRepository : IDemographicsRepository
 {
@@ -68,12 +67,20 @@ public sealed class DemographicsRepository : IDemographicsRepository
         return new DemographicsKaro(
             patientId,
             practiceId,
-            row["FirstName"].ToString() ?? string.Empty,
-            row["LastName"].ToString() ?? string.Empty,
-            DateOnly.FromDateTime(Convert.ToDateTime(row["DateOfBirth"])),
-            row["DateOfEnrolment"] is DBNull ? null : DateOnly.FromDateTime(Convert.ToDateTime(row["DateOfEnrolment"])),
-            row["EndEnrolmentDate"] is DBNull ? null : DateOnly.FromDateTime(Convert.ToDateTime(row["EndEnrolmentDate"])));
+            row["Given"].ToString() ?? string.Empty,
+            row["Family"].ToString() ?? string.Empty,
+            DateOnly.FromDateTime(Convert.ToDateTime(row["BirthDate"])),
+            ParseOptionalDate(row["DateOfEnrolment"]),
+            ParseOptionalDate(row["EndEnrolmentDate"]));
     }
+
+    /// <summary>
+    /// Confirmed against real PMS_NZ_V2 data (2026-07-20, patient 2459731): [HSS].[uspGetDemographics]
+    /// returns empty string, not DBNull, for an unset date column - handled explicitly rather than
+    /// assuming DBNull is the only "no value" case.
+    /// </summary>
+    private static DateOnly? ParseOptionalDate(object value) =>
+        value is DBNull || string.IsNullOrWhiteSpace(value.ToString()) ? null : DateOnly.FromDateTime(Convert.ToDateTime(value));
 
     public async Task<DemographicsErms?> GetErmsAsync(int patientId, string practiceId, CancellationToken ct = default)
     {

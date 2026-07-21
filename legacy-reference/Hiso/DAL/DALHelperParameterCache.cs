@@ -1,0 +1,174 @@
+﻿using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Configuration;
+using System.Data;
+using System.Data.SqlClient;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Hiso
+{
+    public sealed class DALHelperParameterCache
+    {
+        private static Hashtable paramCache = Hashtable.Synchronized(new Hashtable());
+
+        private static bool mblnEncrypted = bool.Parse(Convert.ToString(ConfigurationManager.AppSettings["Encrypted"]));
+        private static string mstrEncryptionCommand1 = "OPEN SYMMETRIC KEY DBDX DECRYPTION BY PASSWORD = 'tcpepms*1'";
+
+        private DALHelperParameterCache()
+        {
+
+        }
+
+        public static void CacheParameterSet(string connectionString, string commandText, params SqlParameter[] commandParameters)
+        {
+            if ((connectionString == null) || (connectionString.Length == 0))
+            {
+                throw new ArgumentNullException("connectionString");
+            }
+            if ((commandText == null) || (commandText.Length == 0))
+            {
+                throw new ArgumentNullException("commandText");
+            }
+
+            string str = connectionString + ":" + commandText;
+            paramCache[str] = commandParameters;
+        }
+
+        private static SqlParameter[] CloneParameters(SqlParameter[] originalParameters)
+        {
+            SqlParameter[] parameterArray = new SqlParameter[originalParameters.Length];
+            int index = 0;
+
+            int length = originalParameters.Length;
+
+            while (index < length)
+            {
+                parameterArray[index] = (SqlParameter)((ICloneable)originalParameters[index]).Clone();
+                index++;
+            }
+            return parameterArray;
+        }
+
+        private static SqlParameter[] DiscoverSpParameterSet(SqlConnection connection, string spName, bool includeReturnValueParameter)
+        {
+            if (connection == null)
+            {
+                throw new ArgumentNullException("connection");
+            }
+            if ((spName == null) || (spName.Length == 0))
+            {
+                throw new ArgumentNullException("spName");
+            }
+
+            SqlCommand command = new SqlCommand(spName, connection);
+            command.CommandType = CommandType.StoredProcedure;
+            connection.Open();
+
+            if (mstrEncryptionCommand1 != string.Empty && mblnEncrypted)
+            {
+                SqlCommand cmd = new SqlCommand(mstrEncryptionCommand1, connection);
+                cmd.ExecuteNonQuery();
+            }
+
+            SqlCommandBuilder.DeriveParameters(command);
+            connection.Close();
+
+            if (!includeReturnValueParameter)
+            {
+                command.Parameters.RemoveAt(0);
+            }
+
+            SqlParameter[] array = new SqlParameter[command.Parameters.Count];
+            command.Parameters.CopyTo(array, 0);
+
+            foreach (SqlParameter parameter in array)
+            {
+                parameter.Value = DBNull.Value;
+            }
+            return array;
+        }
+
+        public static SqlParameter[] GetCachedParameterSet(string connectionString, string commandText)
+        {
+            if ((connectionString == null) || (connectionString.Length == 0))
+            {
+                throw new ArgumentNullException("connectionString");
+            }
+            if ((commandText == null) || (commandText.Length == 0))
+            {
+                throw new ArgumentNullException("commandText");
+            }
+            string str = connectionString + ":" + commandText;
+            SqlParameter[] originalParameters = paramCache[str] as SqlParameter[];
+            if (originalParameters == null)
+            {
+                return null;
+            }
+            return CloneParameters(originalParameters);
+        }
+
+        internal static SqlParameter[] GetSpParameterSet(SqlConnection connection, string spName)
+        {
+            return GetSpParameterSet(connection, spName, false);
+        }
+
+        public static SqlParameter[] GetSpParameterSet(string connectionString, string spName)
+        {
+            return GetSpParameterSet(connectionString, spName, false);
+        }
+
+        internal static SqlParameter[] GetSpParameterSet(SqlConnection connection, string spName, bool includeReturnValueParameter)
+        {
+            if (connection == null)
+            {
+                throw new ArgumentNullException("connection");
+            }
+            using (SqlConnection conn = (SqlConnection)((ICloneable)connection).Clone())
+            {
+                return GetSpParameterSetInternal(conn, spName, includeReturnValueParameter);
+            }
+        }
+
+        public static SqlParameter[] GetSpParameterSet(string connectionString, string spName, bool includeReturnValueParameter)
+        {
+            if ((connectionString == null) || (connectionString.Length == 0))
+            {
+                throw new ArgumentNullException("connectionString");
+            }
+            if ((spName == null) || (spName.Length == 0))
+            {
+                throw new ArgumentNullException("spName");
+            }
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                return GetSpParameterSetInternal(connection, spName, includeReturnValueParameter);
+            }
+        }
+
+        private static SqlParameter[] GetSpParameterSetInternal(SqlConnection connection, string spName, bool includeReturnValueParameter)
+        {
+            if (connection == null)
+            {
+                throw new ArgumentNullException("connection");
+            }
+            if ((spName == null) || (spName.Length == 0))
+            {
+                throw new ArgumentNullException("spName");
+            }
+            string str = connection.ConnectionString + ":" + spName + (includeReturnValueParameter ? ":include ReturnValue Parameter" : "");
+
+            SqlParameter[] originalParameters = paramCache[str] as SqlParameter[];
+
+            if (originalParameters == null)
+            {
+                SqlParameter[] param = DiscoverSpParameterSet(connection, spName, includeReturnValueParameter);
+                paramCache[str] = param;
+                originalParameters = param;
+            }
+            return CloneParameters(originalParameters);
+        }
+    }
+}

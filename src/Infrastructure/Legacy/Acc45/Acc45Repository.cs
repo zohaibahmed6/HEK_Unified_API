@@ -99,6 +99,11 @@ public sealed class Acc45Repository : IAcc45Repository
     public async Task<FormData> SaveFormAsync(Guid sessionKey, string formInstanceId, HealthLinkSession session, FormSaveInput input, CancellationToken ct = default)
     {
         // HISO-BR-12: render view to DMS, THEN persist the ACC45 definition, DMS GUID linked.
+        // TODO(Aspose): replace this block with the real Aspose HTML/image rendering once a valid
+        // company license is available (PROJECT_STATUS.md open item 30). Do not substitute a
+        // different rendering library - keep this aligned with what the legacy system did. Only the
+        // bytes/extension/description below need to change; the surrounding save/DMS sequencing
+        // (render first, then persist the definition with the returned DMS GUID) must stay as-is.
         var renderedJson = JsonSerializer.Serialize(input.DataContainer);
         var dmsGuid = await _dmsDocumentService.AddDocumentAsync(
             base64Content: Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(renderedJson)),
@@ -106,6 +111,7 @@ public sealed class Acc45Repository : IAcc45Repository
             fileName: $"acc45-{formInstanceId}.json",
             description: "ACC45 form view (Aspose rendering not available - JSON placeholder, see Acc45Repository remarks)",
             ct: ct);
+        // END TODO(Aspose)
 
         var connectionString = await _connectionResolver.ResolveAsync(session.PracticeId, ct);
         var parameters = new List<SqlParameter>
