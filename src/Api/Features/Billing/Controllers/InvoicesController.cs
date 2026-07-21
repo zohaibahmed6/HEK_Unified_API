@@ -1,4 +1,4 @@
-using HekCoreApi.Api.Controllers;
+﻿using HekCoreApi.Api.Controllers;
 using HekCoreApi.Application.Features.Billing.Commands;
 using HekCoreApi.Contracts.Billing;
 using HekCoreApi.Contracts.Idempotency;
@@ -18,6 +18,10 @@ namespace HekCoreApi.Api.Features.Billing.Controllers;
 /// `Program.cs`) in case a real scope-granting design is wanted later - just no longer applied here.
 /// </summary>
 [Route("patients/{patientId:int}/invoices")]
+// DISABLED (2026-07-22, per Zohaib): only the legacy compat APIs (HISO /hiso, KARO /karo,
+// ERMS /erms, COL /erms/col) are exposed. [NonController] removes this controller from routing
+// and Swagger without deleting code - remove the attribute to re-enable.
+[NonController]
 public sealed class InvoicesController : ResourceScopedControllerBase
 {
     private readonly IMediator _mediator;
@@ -38,3 +42,4 @@ public sealed class InvoicesController : ResourceScopedControllerBase
         return outcome.WasDuplicate ? Ok(outcome.Resource) : StatusCode(StatusCodes.Status201Created, outcome.Resource);
     }
 }
+

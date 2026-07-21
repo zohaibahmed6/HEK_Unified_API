@@ -1,4 +1,4 @@
-using HekCoreApi.Api.Controllers;
+﻿using HekCoreApi.Api.Controllers;
 using HekCoreApi.Application.Common.Models;
 using HekCoreApi.Application.Features.Acc45.Commands;
 using HekCoreApi.Application.Features.Acc45.Queries;
@@ -16,6 +16,10 @@ namespace HekCoreApi.Api.Features.Acc45.Controllers;
 /// identifier, not the auth mechanism (the caller already holds a token).
 /// </summary>
 [Route("acc45")]
+// DISABLED (2026-07-22, per Zohaib): only the legacy compat APIs (HISO /hiso, KARO /karo,
+// ERMS /erms, COL /erms/col) are exposed. [NonController] removes this controller from routing
+// and Swagger without deleting code - remove the attribute to re-enable.
+[NonController]
 public sealed class Acc45Controller : ResourceScopedControllerBase
 {
     private readonly IMediator _mediator;
@@ -84,3 +88,4 @@ public sealed class Acc45Controller : ResourceScopedControllerBase
     private HealthLinkSession CurrentHisoSession() =>
         new(CurrentScope.PatientId, string.Empty, CurrentScope.EncounterId ?? string.Empty, CurrentScope.PracticeId);
 }
+

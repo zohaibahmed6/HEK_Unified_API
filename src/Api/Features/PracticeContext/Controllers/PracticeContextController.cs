@@ -1,4 +1,4 @@
-using HekCoreApi.Api.Controllers;
+﻿using HekCoreApi.Api.Controllers;
 using HekCoreApi.Application.Features.PracticeContext.Queries;
 using HekCoreApi.Contracts.Security;
 using HekCoreApi.Domain.Exceptions;
@@ -8,6 +8,10 @@ using Microsoft.AspNetCore.Mvc;
 namespace HekCoreApi.Api.Features.PracticeContext.Controllers;
 
 [Route("practices/{practiceId}/context")]
+// DISABLED (2026-07-22, per Zohaib): only the legacy compat APIs (HISO /hiso, KARO /karo,
+// ERMS /erms, COL /erms/col) are exposed. [NonController] removes this controller from routing
+// and Swagger without deleting code - remove the attribute to re-enable.
+[NonController]
 public sealed class PracticeContextController : ResourceScopedControllerBase
 {
     private readonly IMediator _mediator;
@@ -30,3 +34,4 @@ public sealed class PracticeContextController : ResourceScopedControllerBase
         return result is null ? NotFound() : Ok(result);
     }
 }
+

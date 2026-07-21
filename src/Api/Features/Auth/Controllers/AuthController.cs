@@ -15,6 +15,10 @@ namespace HekCoreApi.Api.Features.Auth.Controllers;
 /// </summary>
 [ApiController]
 [Route("auth")]
+// DISABLED (2026-07-22, per Zohaib): only the legacy compat APIs (HISO /hiso, KARO /karo,
+// ERMS /erms, COL /erms/col) are exposed. [NonController] removes this controller from routing
+// and Swagger without deleting code - remove the attribute to re-enable.
+[NonController]
 public sealed class AuthController : ControllerBase
 {
     [HttpPost("token")]

@@ -1,4 +1,4 @@
-using HekCoreApi.Api.Controllers;
+﻿using HekCoreApi.Api.Controllers;
 using HekCoreApi.Application.Features.Documents.Commands;
 using HekCoreApi.Application.Features.Documents.Queries;
 using HekCoreApi.Contracts;
@@ -10,6 +10,10 @@ using Microsoft.AspNetCore.Mvc;
 namespace HekCoreApi.Api.Features.Documents.Controllers;
 
 [Route("patients/{patientId:int}/documents")]
+// DISABLED (2026-07-22, per Zohaib): only the legacy compat APIs (HISO /hiso, KARO /karo,
+// ERMS /erms, COL /erms/col) are exposed. [NonController] removes this controller from routing
+// and Swagger without deleting code - remove the attribute to re-enable.
+[NonController]
 public sealed class DocumentsController : ResourceScopedControllerBase
 {
     private readonly IMediator _mediator;
@@ -52,3 +56,4 @@ public sealed class DocumentsController : ResourceScopedControllerBase
             : CreatedAtAction(nameof(GetDetail), new { patientId, documentId = outcome.Resource.DocumentId }, outcome.Resource);
     }
 }
+

@@ -1,4 +1,4 @@
-using HekCoreApi.Api.Controllers;
+﻿using HekCoreApi.Api.Controllers;
 using HekCoreApi.Application.Common.Models;
 using HekCoreApi.Application.Features.Medications.Queries;
 using HekCoreApi.Contracts;
@@ -9,6 +9,10 @@ using MediatR;
 namespace HekCoreApi.Api.Features.Medications.Controllers;
 
 [Route("patients/{patientId:int}/encounters/{encounterId:int}/medications")]
+// DISABLED (2026-07-22, per Zohaib): only the legacy compat APIs (HISO /hiso, KARO /karo,
+// ERMS /erms, COL /erms/col) are exposed. [NonController] removes this controller from routing
+// and Swagger without deleting code - remove the attribute to re-enable.
+[NonController]
 public sealed class MedicationsController : ResourceScopedControllerBase
 {
     private readonly IMediator _mediator;
@@ -28,3 +32,4 @@ public sealed class MedicationsController : ResourceScopedControllerBase
         return Ok(new ListResponse<Medication>(medications));
     }
 }
+

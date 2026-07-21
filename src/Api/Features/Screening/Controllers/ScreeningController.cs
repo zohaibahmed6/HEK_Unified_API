@@ -1,4 +1,4 @@
-using HekCoreApi.Api.Controllers;
+﻿using HekCoreApi.Api.Controllers;
 using HekCoreApi.Application.Features.Screening.Commands;
 using HekCoreApi.Application.Features.Screening.Queries;
 using HekCoreApi.Contracts;
@@ -8,6 +8,10 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace HekCoreApi.Api.Features.Screening.Controllers;
 
+// DISABLED (2026-07-22, per Zohaib): only the legacy compat APIs (HISO /hiso, KARO /karo,
+// ERMS /erms, COL /erms/col) are exposed. [NonController] removes this controller from routing
+// and Swagger without deleting code - remove the attribute to re-enable.
+[NonController]
 public sealed class ScreeningController : ResourceScopedControllerBase
 {
     private readonly IMediator _mediator;
@@ -33,3 +37,4 @@ public sealed class ScreeningController : ResourceScopedControllerBase
         return StatusCode(StatusCodes.Status201Created, result);
     }
 }
+

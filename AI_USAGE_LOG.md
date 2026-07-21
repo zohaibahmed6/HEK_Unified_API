@@ -839,3 +839,181 @@ registry DB (`933` practice registered).
 lists), `processAction`'s `"addTask"`/`"save"` branches, `getFormView` (all built and unit-tested,
 not yet curl-tested against real data), `Indici_Master` connectivity (unreachable from this session's
 network - graceful no-op by design until reachable).
+
+---
+
+### 2026-07-21 (same day, continued) — KARO/HSS wire-compat rebuild started: Ping + Authenticate
+
+**Asked:** Zohaib asked to check current API status, then pivoted to wanting the same wire-compat
+treatment applied to KARO/HSS (mirroring HISO), one operation at a time starting with Ping and
+Authenticate. Explicitly required: KARO/HSS stays fully separate from HISO (no shared session/auth),
+and "do not change any endpoint and any result which was already implemented in legacy - I want the
+legacy KARO API in this new API. Implement what is left."
+
+**Did:**
+- Explored the codebase (2 parallel Explore agents) and found KARO/ERMS already had partial wire-compat
+  (Authenticate only, routed through the generic cross-system `AuthenticateCommand` pipeline rather than
+  real legacy logic) plus REST-only "improved" demographics endpoints - same pattern pre-compat HISO had.
+- Zohaib then supplied the complete real KARO/HSS legacy source
+  (`legacy-reference/hsswebapi/DevLocal/`) - full VS solution including the real controller
+  (`APIController.cs`), DAL (`HSSDA.cs`), and encryption layer (`EncryptionManager.cs`). Read the real
+  `Ping`/`Authenticate` implementation in full before planning.
+- Entered plan mode, wrote a scoped plan for this first slice, got explicit approval (with the two hard
+  requirements above folded in after an initial `ExitPlanMode` rejection).
+- Built: `IKaroEncryptionService`/`KaroEncryptionService` (Rijndael/AES-256 port, exact hardcoded key,
+  exact custom Base64 substitution - portable to .NET 8's `Aes` class with no external dependency),
+  `IKaroPracticeConnectionResolver`/`KaroPracticeConnectionResolver` (new routing model - KARO resolves
+  connections by `"ConnIndiciDB" + practiceSuffix` parsed from the caller's own `encounterId`, unlike
+  HISO's tenant-registry model), `IKaroAuthRepository`/`KaroAuthRepository` (real
+  `[HSS].[uspInsertAndValidateToken]` call), `KaroAuthenticateQuery`/Handler (the real encounterId-split/
+  decrypt/DB-call orchestration, including legacy's exact message-selection quirk where the DB's own
+  `StatusMessage` is discarded in favor of a fixed `"Authentication failed!"` whenever it's non-blank).
+  Rewrote `KaroCompatController` to use this real logic for `Authenticate` and added `GET /karo/ping`.
+  Removed `HssAuthenticateTranslator.cs` (dead code once the real logic replaced the generic pipeline).
+- Added a new unit test (`KaroEncryptionServiceTests`, 3 cases) proving the encryption round-trip.
+- **Verified end-to-end against the real production database**: `[HSS].[uspInsertAndValidateToken]`
+  confirmed to genuinely exist in `PMS_NZ_V2` (same server as HISO's), and a live test call proved the
+  full real pipeline - suffix parsing, connection routing, real proc call, and the exact legacy
+  message-selection quirk (DB returned real `"Invalid credentials!"`, app correctly returned
+  `"Authentication failed!"` instead, matching legacy exactly).
+- Full test suite: 14/14 (11 pre-existing + 3 new).
+
+**Key files this step:** `src/Application/Common/Interfaces/IKaroEncryptionService.cs` (new),
+`IKaroPracticeConnectionResolver.cs` (new), `IKaroAuthRepository.cs` (new),
+`src/Infrastructure/Legacy/Karo/KaroEncryptionService.cs` (new), `KaroPracticeConnectionResolver.cs`
+(new), `KaroAuthRepository.cs` (new), `src/Application/Features/Karo/Queries/KaroAuthenticateQuery.cs`
+(new), `src/Api/Features/Auth/Controllers/KaroCompatController.cs` (rewritten),
+`src/Adapters.Karo/Auth/HssAuthenticateResponse.cs` (rewritten to real shape),
+`src/Adapters.Karo/Auth/HssAuthenticateTranslator.cs` (deleted, dead code),
+`tests/Infrastructure.UnitTests/Legacy/KaroEncryptionServiceTests.cs` (new),
+`src/Api/appsettings.Development.local.json` (real KARO connection strings added, gitignored).
+
+**Next:** remaining ~13 documented KARO `APIController.cs` operations, one at a time (Zohaib's stated
+preference), then ERMS once KARO is done.
+
+---
+
+## 2026-07-21 - ERMS GetPatientData (single-op slice)
+
+**Built:** `GET /erms/GetPatientData` - exact port of legacy `APIController.cs:856`, plus the shared
+ERMS Get* building blocks (ErmsTokenValidator, ErmsDataTableMapper = ERMSDataTableToListHiso port with
+all quirks, 33 HISO wrapper DTOs + PatientData model, PrepareXml/SetToXml envelope helpers).
+`IErmsAuthRepository` gained the legacy `@pToken` parameter.
+
+**Verified:** build clean, 20/20 tests (6 new mapper tests). Live against real `PMS_NZ_V2`
+(`ConnIndiciDB_901_FZZ999-B`): malformed token -> real proc SQL error in legacy `<Error>` envelope
+(HTTP 200); well-formed invalid GUID token -> exact legacy `<Error><Message>Invalid token
+value!</Message></Error>` (HTTP 200). Success round-trip blocked on valid ERMS credentials
+(ermsdev rejected in PMS_NZ_V2; default 43.255.162.58 target unreachable) - needs Zohaib.
+
+**Key files:** `src/Application/Common/Interfaces/IErmsTokenValidator.cs` /
+`IErmsDemographicsRepository.cs` (new), `src/Infrastructure/Legacy/Erms/ErmsTokenValidator.cs` /
+`ErmsDemographicsRepository.cs` (new), `src/Adapters.Erms/Hiso/*` (new),
+`src/Application/Features/Erms/Queries/ErmsGetPatientDataQuery.cs` (new),
+`ErmsCompatController.cs` (GetPatientData action + envelope helpers),
+`tests/Adapters.UnitTests/Erms/ErmsDataTableMapperTests.cs` (new).
+
+**Next:** after Zohaib verifies GetPatientData with real credentials - remaining 18 ERMS Get* ops +
+SaveDocument (near-mechanical clones), then Claim Online.
+
+---
+
+## 2026-07-21 - ERMS next-9 Get* slice
+
+**Built:** GetPatientMeasurement, GetSmokingStatus, GetCurrentUser, GetNextOfKin,
+GetRegisteredPractitioners, GetAccidents, GetClassifications, GetConsultNotes, GetMedicalAllergies -
+exact legacy ports (all quirks: no-null-check NREs, case-sensitive order stamp, ConsultNotes 24-month
+default + commented-out min/max stamping, Accidents HTML strip, uspGetAllergies proc name).
+
+**New files:** Adapters.Erms/Hiso/ErmsReadModels.cs (+ ErmsHisoWrappers.cs extension),
+IErmsDataRepository + Infrastructure/Legacy/Erms/ErmsDataRepository.cs,
+Application/Features/Erms/Queries/ErmsReadQueries.cs (shared ErmsReadPipeline),
+9 actions + Render/RenderSingle/StampDated helpers on ErmsCompatController.
+Config: Erms:DateFormat = yyyy-MM-dd (local settings, from real Web.config).
+
+**Verified:** build clean, 20/20 tests; all 9 live against real PMS_NZ_V2 - exact legacy
+"Invalid token value!" HTTP-200 envelope for invalid tokens. Valid-token data pass = Zohaib via Swagger.
+
+**Next:** GetPrescribed/RegularMedications, 4 report lists + 4 detail ops (needs actualPracticeID
+parser extension), SaveDocument.
+
+---
+
+## 2026-07-21 - ERMS final-10 Get* slice (module reads complete)
+
+**Built:** GetPrescribedMedications, GetRegularMedications, GetLaboratoryReportList/Details,
+GetRadiologyReportList/Details, GetDischargeSummaryReportList/Details, GetScannedList/Details.
+Quirks: uspGetMedications @pIsLongTerm/@pShowStop; LaboratoryReport.Order serializes as element
+(legacy missing XmlAttribute); ConvertString2RTF exact port (ErmsRtfConverter) for lab/rad details;
+uspGetOtherDocs/uspGetDocResults non-AWS path only (AWSDoc DLL deferral, same as KARO/HISO);
+actualPracticeID Convert.ToInt32 before token validation via new pipeline preValidate hook +
+IErmsRequestParser RawSecondSegment.
+
+**Verified:** build clean, 20/20 tests; all 10 live vs real PMS_NZ_V2 - legacy invalid-token envelope
+HTTP 200; non-numeric segment FormatException envelope verified (1_abc). Real-data pass = Zohaib/Swagger.
+
+**Key files:** ErmsReportModels.cs, ErmsRtfConverter.cs (new); IErmsDataRepository/ErmsDataRepository,
+ErmsReadQueries.cs, ErmsRequestParser + IErmsRequestParser, ErmsCompatController (extended).
+
+**Next:** SaveDocument (last ERMS op), then Claim Online (6 ops + SaveInvoice).
+
+---
+
+## 2026-07-21 - ERMS SaveDocument (module complete)
+
+**Built:** POST /erms/SaveDocument - exact port of APIController.cs:1535. ReferralDocument XML model
+(real PatiendID typo kept), UpdateExistingDocument (errors swallowed) -> SaveToDMS (uspDocumentSave on
+DMS connection, quirky DocumentTypeID lookup, @pDescription=referralId) -> InsertDocument
+(@pDataSourceId "23", @pEnounterId misspelling). Error contract: HTTP 400 body "BadRequest"; success:
+scrubbed ReferralDocument echo at 200.
+
+**New:** ErmsReferralDocument.cs, IErmsDmsConnectionResolver/ErmsDmsConnectionResolver,
+IErmsWriteRepository/ErmsWriteRepository, ErmsSaveDocumentCommand.cs, controller action.
+Config: Erms:DMSDocTypes, Erms:DbCredentials:ConnDMSDB_901_FZZ999-B (local settings).
+
+**Verified:** build clean, 20/20 tests; live - invalid token and malformed XML both return legacy-exact
+"BadRequest" HTTP 400. Write round-trip = Zohaib via Swagger (real uspDocumentSave has a known
+pre-existing ROLLBACK issue in this environment, per KARO session).
+
+**ERMS COMPLETE (22/22 real ops). Next: Claim Online (5 PHCO reads + SaveInvoice).**
+
+---
+
+## 2026-07-21 - Claim Online (COL) module built - all 7 real operations
+
+**Built (from real COLController.cs + DAL/Pegasus/PHCO.cs, now confirmed source):** POST
+/erms/col/authenticate (real JSON Credential - prior inferred ColCredential shape confirmed exact;
+UserAuthenticate reply with lowercase "error", always 200), GetCurrentPatientData
+(OnlineClaim.uspGetPatientData), GetSessionData (**legacy bug preserved: empty proc name - always
+fails, SQL error text is the body**), GetProviderData (uspGetProvider), GetSurgeryData
+(uspGetSurgeryData), GetDiagnosisData (uspGetConditions, pmsOrder passed raw - no ToUpper),
+SaveInvoice (OnlineClaim.uspInsertUpdateService, masterServiceName "COL", sentinels: -3 -> the real
+BROKEN JSON {"status":"success","message":" Invoice Already exist.} , >0 -> success id, else
+"Invalid values passed!"). COL quirks: NO base64 step; 3rd encounter segment OVERWRITES the practice
+suffix; errors returned as RAW text bodies with HTTP 200 + application/json.
+
+**New:** IColRequestParser/ColRequestParser, ColModels.cs + ColDataTableMapper (exact
+Utility.DataTableToList port), IColDataRepository/ColDataRepository,
+Application/Features/Col/ColQueries.cs; ColCompatController rewritten off the canonical
+AuthenticateCommand onto the real pipeline; ColCredentialTranslator deleted (dead).
+
+**Verified:** build clean, 20/20 tests; live vs real PMS DB (suffix _128): reads -> legacy-exact
+"Invalid token value!" raw-text 200; authenticate -> real proc rejection {"error":"Authentication
+failed!"}; 3-segment encounterId correctly resolves the overwritten (unconfigured) suffix exactly as
+legacy would. Real-data pass = Zohaib via Swagger.
+
+**ALL FOUR MODULES NOW COMPLETE: HISO, KARO, ERMS, Claim Online.**
+
+---
+
+## 2026-07-22 - Non-legacy REST surface parked ([NonController])
+
+**Decision (Zohaib):** only the legacy compat APIs stay exposed. Piloted on AuthController
+(POST /auth/token -> 404, verified), then rolled out to the other 16 modern controllers
+(Demographics, ClinicalNotes, Conditions, Medications, Reports, Documents, Observations, Acc45,
+EncounterSummary, Tasks, Recalls, Screening, Providers, PracticeContext, PracticesAdmin, Invoices).
+Mechanism: one [NonController] attribute + comment per class - removes routing + Swagger, no code
+deleted, remove the attribute to re-enable.
+
+**Verified:** build clean, 20/20 tests; disabled routes return 404 (spot-checked 6); /erms/ping and
+/karo/ping still 200; Swagger now lists ONLY /erms (30 paths incl. /erms/col), /karo (18), /hiso (6).

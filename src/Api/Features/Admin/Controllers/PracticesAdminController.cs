@@ -1,4 +1,4 @@
-using HekCoreApi.Api.Security;
+﻿using HekCoreApi.Api.Security;
 using HekCoreApi.Application.Features.Admin.Commands;
 using HekCoreApi.Application.Features.Admin.Queries;
 using HekCoreApi.Contracts.Admin;
@@ -15,6 +15,10 @@ namespace HekCoreApi.Api.Features.Admin.Controllers;
 [ApiController]
 [Route("admin/practices")]
 [Authorize(Policy = AuthorizationPolicyNames.PlatformAdmin)]
+// DISABLED (2026-07-22, per Zohaib): only the legacy compat APIs (HISO /hiso, KARO /karo,
+// ERMS /erms, COL /erms/col) are exposed. [NonController] removes this controller from routing
+// and Swagger without deleting code - remove the attribute to re-enable.
+[NonController]
 public sealed class PracticesAdminController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -45,3 +49,4 @@ public sealed class PracticesAdminController : ControllerBase
         return practice is null ? NotFound() : Ok(practice);
     }
 }
+

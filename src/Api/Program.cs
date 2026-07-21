@@ -160,7 +160,8 @@ try
             name: "tenant-registry-sql",
             tags: ["ready"]);
 
-    builder.Services.AddControllers();
+    builder.Services.AddControllers(options =>
+        options.InputFormatters.Insert(0, new HekCoreApi.Api.Formatters.PlainTextInputFormatter()));
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(options =>
     {

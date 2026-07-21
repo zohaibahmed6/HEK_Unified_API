@@ -1,4 +1,4 @@
-using HekCoreApi.Api.Controllers;
+﻿using HekCoreApi.Api.Controllers;
 using HekCoreApi.Application.Features.EncounterSummary.Commands;
 using HekCoreApi.Application.Features.EncounterSummary.Queries;
 using MediatR;
@@ -6,6 +6,10 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace HekCoreApi.Api.Features.EncounterSummary.Controllers;
 
+// DISABLED (2026-07-22, per Zohaib): only the legacy compat APIs (HISO /hiso, KARO /karo,
+// ERMS /erms, COL /erms/col) are exposed. [NonController] removes this controller from routing
+// and Swagger without deleting code - remove the attribute to re-enable.
+[NonController]
 public sealed class EncounterSummaryController : ResourceScopedControllerBase
 {
     private readonly IMediator _mediator;
@@ -40,3 +44,4 @@ public sealed class EncounterSummaryController : ResourceScopedControllerBase
         return CreatedAtAction(nameof(GetSummary), new { patientId, encounterId, identifier = result.Identifier }, result);
     }
 }
+

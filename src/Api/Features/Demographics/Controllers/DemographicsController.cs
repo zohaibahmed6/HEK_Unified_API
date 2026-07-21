@@ -1,4 +1,4 @@
-using HekCoreApi.Api.Controllers;
+﻿using HekCoreApi.Api.Controllers;
 using HekCoreApi.Application.Common.Models;
 using HekCoreApi.Application.Features.Demographics.Queries;
 using HekCoreApi.Contracts.Security;
@@ -13,6 +13,10 @@ namespace HekCoreApi.Api.Features.Demographics.Controllers;
 /// matches it.
 /// </summary>
 [Route("patients/{patientId:int}/demographics")]
+// DISABLED (2026-07-22, per Zohaib): only the legacy compat APIs (HISO /hiso, KARO /karo,
+// ERMS /erms, COL /erms/col) are exposed. [NonController] removes this controller from routing
+// and Swagger without deleting code - remove the attribute to re-enable.
+[NonController]
 public sealed class DemographicsController : ResourceScopedControllerBase
 {
     private readonly IMediator _mediator;
@@ -70,3 +74,4 @@ public sealed class DemographicsController : ResourceScopedControllerBase
         return result is null ? NotFound() : Ok(result);
     }
 }
+
