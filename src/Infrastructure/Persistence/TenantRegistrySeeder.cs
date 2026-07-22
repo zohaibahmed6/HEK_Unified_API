@@ -19,51 +19,60 @@ public static class TenantRegistrySeeder
             return;
         }
 
-        var now = DateTimeOffset.UtcNow;
+        var now = DateTimeOffset.Now;
+        const string unscoped = Application.Common.Models.RoutingContext.Unscoped;
         db.Practices.AddRange(
             new PracticeRegistryEntry
             {
                 PracticeId = "HISO-DEV-001",
+                PracticeCode = unscoped,
+                Environment = unscoped,
                 PracticeName = "HISO Dev Practice",
                 SourceSystem = "Hiso",
                 DbServerHost = "localhost",
                 DbName = "HekDev_Hiso",
                 RowLevelSecurityEnabled = false,
-                CreatedAtUtc = now,
-                UpdatedAtUtc = now
+                CreatedAt = now,
+                UpdatedAt = now
             },
             new PracticeRegistryEntry
             {
                 PracticeId = "KARO-DEV-001",
+                PracticeCode = unscoped,
+                Environment = unscoped,
                 PracticeName = "KARO Dev Practice",
                 SourceSystem = "Karo",
                 DbServerHost = "localhost",
                 DbName = "HekDev_Karo",
                 RowLevelSecurityEnabled = false,
-                CreatedAtUtc = now,
-                UpdatedAtUtc = now
+                CreatedAt = now,
+                UpdatedAt = now
             },
             new PracticeRegistryEntry
             {
                 PracticeId = "ERMS-DEV-001",
+                PracticeCode = unscoped,
+                Environment = unscoped,
                 PracticeName = "ERMS Dev Practice",
                 SourceSystem = "Erms",
                 DbServerHost = "localhost",
                 DbName = "HekDev_Erms",
                 RowLevelSecurityEnabled = false,
-                CreatedAtUtc = now,
-                UpdatedAtUtc = now
+                CreatedAt = now,
+                UpdatedAt = now
             },
             new PracticeRegistryEntry
             {
                 PracticeId = "COL-DEV-001",
+                PracticeCode = unscoped,
+                Environment = unscoped,
                 PracticeName = "COL/Pegasus Dev Practice",
                 SourceSystem = "Col",
                 DbServerHost = "localhost",
                 DbName = "HekDev_Erms",
                 RowLevelSecurityEnabled = false,
-                CreatedAtUtc = now,
-                UpdatedAtUtc = now
+                CreatedAt = now,
+                UpdatedAt = now
             });
 
         await db.SaveChangesAsync(ct);

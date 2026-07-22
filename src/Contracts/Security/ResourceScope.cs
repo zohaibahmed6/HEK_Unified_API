@@ -8,4 +8,6 @@ public sealed record ResourceScope(
     string PatientId,
     string? EncounterId,
     string PracticeId,
-    OriginScope OriginScope);
+    OriginScope OriginScope,
+    string? PracticeCode = null,
+    string? Environment = null);

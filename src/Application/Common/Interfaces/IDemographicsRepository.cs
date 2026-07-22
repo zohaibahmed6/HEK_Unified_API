@@ -11,9 +11,9 @@ public interface IDemographicsRepository
 {
     Task<DemographicsHiso?> GetHisoAsync(int patientId, HealthLinkSession session, CancellationToken ct = default);
 
-    Task<DemographicsKaro?> GetKaroAsync(int patientId, string practiceId, CancellationToken ct = default);
+    Task<DemographicsKaro?> GetKaroAsync(int patientId, RoutingContext routing, CancellationToken ct = default);
 
-    Task<DemographicsErms?> GetErmsAsync(int patientId, string practiceId, CancellationToken ct = default);
+    Task<DemographicsErms?> GetErmsAsync(int patientId, RoutingContext routing, CancellationToken ct = default);
 
     Task<DemographicsCol?> GetColAsync(int patientId, string practiceId, CancellationToken ct = default);
 }

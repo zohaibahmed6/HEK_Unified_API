@@ -8,9 +8,13 @@ namespace HekCoreApi.Infrastructure.Persistence.Hiso;
 /// Calls the real legacy `[Appointment].[usptblHealthLinkSession_GetByGUID]` (confirmed against the
 /// real PMS_NZ_V2 database, 2026-07-21: returns AppointmentID/PatientID/ProviderID/PracticeID/
 /// PMSReferenceID/SessionGUID/PracticeLocationID/EDIAccount - EDIAccount is proc-computed, not a raw
-/// column on `tblHealthLinkSession`). No schema changes. Connection string is resolved per server
-/// address via ISecretProvider, never hardcoded - direct replacement for the legacy pattern this
-/// project exists to retire (SRS Section 12.10). Always parameterized - never string concatenation.
+/// column on `tblHealthLinkSession`). No schema changes. Always parameterized - never string
+/// concatenation.
+///
+/// Connection routing itself (which server this GUID's practice lives on) is decided upstream by
+/// <c>ResolveHisoSessionQueryHandler</c> via the central HISO session registry + tenant registry
+/// (2026-07-22, superseding the earlier Host-header/`Hiso:ConnectionStrings:{serverAddress}`
+/// mechanism) - this repository just executes against whatever connection string it's given.
 ///
 /// The real proc does not expose a session-creation timestamp, so the new 12-hour expiry (ADR-004,
 /// not part of legacy) is enforced via a second, minimal parameterized read of `InsertedAt` directly
@@ -19,21 +23,8 @@ namespace HekCoreApi.Infrastructure.Persistence.Hiso;
 /// </summary>
 public sealed class HisoSessionRepository : IHisoSessionRepository
 {
-    private readonly ISecretProvider _secretProvider;
-
-    public HisoSessionRepository(ISecretProvider secretProvider)
+    public async Task<HisoSessionContext?> FindBySessionGuidAsync(Guid sessionGuid, string connectionString, CancellationToken ct = default)
     {
-        _secretProvider = secretProvider;
-    }
-
-    public async Task<HisoSessionContext?> FindBySessionGuidAsync(Guid sessionGuid, string serverAddress, CancellationToken ct = default)
-    {
-        var connectionString = await _secretProvider.GetSecretAsync($"Hiso:ConnectionStrings:{serverAddress}", ct);
-        if (string.IsNullOrWhiteSpace(connectionString))
-        {
-            return null;
-        }
-
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync(ct);
 

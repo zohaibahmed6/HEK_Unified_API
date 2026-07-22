@@ -1,0 +1,235 @@
+22/07/2026 6:13:14 am >> getDeliveryOptions Call for session[REDACTED_SESSION_ID]
+22/07/2026 6:13:14 am >> getDeliveryOptions Call (Response):  <?xml version="1.0" encoding="utf-16"?>
+<getDeliveryOptionsResponse xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <return>
+    <URL xmlns="http://www.hiso.govt.nz/10014.2/1.0/formsession" />
+    <senderAccount xmlns="http://www.hiso.govt.nz/10014.2/1.0/formsession">tauranga</senderAccount>
+    <senderPassword xmlns="http://www.hiso.govt.nz/10014.2/1.0/formsession">[REDACTED_PASSWORD]</senderPassword>
+  </return>
+</getDeliveryOptionsResponse>
+22/07/2026 6:13:19 am >> getVersion Call
+22/07/2026 6:13:19 am >> getData call with session: [REDACTED_SESSION_ID]
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Started | Procedure: Hiso.uspGetPatient_RadiologyReport  | PracticeId: 294
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Creating SECOND NODE connection for procedure Hiso.uspGetPatient_RadiologyReport
+22/07/2026 6:13:20 am >> MapParamList
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Found HisoRequest for procedure Hiso.uspGetPatient_SocialHistory
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Retrieved 11 parameters for procedure Hiso.uspGetPatient_RadiologyReport
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] HisoRequest values extracted | FromDate=, ToDate=, MinVal=, MaxVal=, Rows=50000, StartIndex=0, Search=, SortBy=, PCode=, RefId=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] HisoRequest values extracted | FromDate=2026-01-20T00:00:00.000, ToDate=2026-07-22T23:59:59.999, MinVal=, MaxVal=, Rows=50000, StartIndex=0, Search=, SortBy=dateDescend, PCode=, RefId=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @pPatientId=[REDACTED_PATIENT_ID]
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] HisoRequest values extracted | FromDate=, ToDate=, MinVal=, MaxVal=, Rows=50000, StartIndex=0, Search=, SortBy=, PCode=, RefId=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @Search=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @MaximumRows=50000
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @MaximumRows=50000
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] HisoRequest values extracted | FromDate=, ToDate=, MinVal=, MaxVal=, Rows=50000, StartIndex=0, Search=, SortBy=, PCode=, RefId=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] No parameters defined for Hiso.uspGetPMS
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] AWS enabled: True | PracticeId=294
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Using connection: SECOND NODE
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] AWS enabled: True | PracticeId=294
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] AWS enabled: True | PracticeId=294
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Using connection: PRIMARY
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Using connection: PRIMARY
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Executing DB procedure | Procedure=Hiso.uspGetPatient_PastHistory | Params=11
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Procedure executed successfully | Procedure=Hiso.uspGetPMS
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Completed | Procedure=Hiso.uspGetPMS | Result=OK
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Started | Procedure: Hiso.uspGetPatient  | PracticeId: 294
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Creating PRIMARY connection for procedure Hiso.uspGetPatient
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Procedure executed successfully | Procedure=Hiso.uspGetCurrentUserOrganisation_PhysicalAddress
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Completed | Procedure=Hiso.uspGetCurrentUserOrganisation_PhysicalAddress | Result=OK
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Started | Procedure: Hiso.uspGetPatient_Accident  | PracticeId: 294
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Creating PRIMARY connection for procedure Hiso.uspGetPatient_Accident
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Procedure executed successfully | Procedure=Hiso.uspGetPatient_SocialHistory
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Completed | Procedure=Hiso.uspGetPatient_SocialHistory | Result=OK
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Started | Procedure: Hiso.uspGetPatient_Problem  | PracticeId: 294
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Creating SECOND NODE connection for procedure Hiso.uspGetPatient_Problem
+22/07/2026 6:13:20 am >> MapParamList
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Found HisoRequest for procedure Hiso.uspGetPatient_Accident
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] HisoRequest values extracted | FromDate=, ToDate=, MinVal=, MaxVal=, Rows=50000, StartIndex=0, Search=, SortBy=, PCode=, RefId=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @pACC45ID=0
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @FromDate=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @ToDate=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @StartRowIndex=0
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @MaximumRows=50000
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Using connection: PRIMARY
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @minValue=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @maxValue=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] AWS enabled: True | PracticeId=294
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Using connection: PRIMARY
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Executing DB procedure | Procedure=Hiso.uspGetPatient_Accident | Params=10
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Procedure executed successfully | Procedure=Hiso.uspGetPatient_Accident
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Completed | Procedure=Hiso.uspGetPatient_Accident | Result=OK
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Started | Procedure: Hiso.uspGetPatient_PostalAddress  | PracticeId: 294
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Creating PRIMARY connection for procedure Hiso.uspGetPatient_PostalAddress
+22/07/2026 6:13:20 am >> MapParamList
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Retrieved 12 parameters for procedure Hiso.uspGetPatient_Problem
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Found HisoRequest for procedure Hiso.uspGetPatient_Problem
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Started | Procedure: Hiso.uspGetCurrentUserOrganisation  | PracticeId: 294
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @FromDate=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @ToDate=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @StartRowIndex=0
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @MaximumRows=50000
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @Search=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @SortBy=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @minValue=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @maxValue=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @pConditionExists=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @pRequiredCodingSystem=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @AppointmentId=[REDACTED_APPOINTMENT_ID]
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] AWS enabled: True | PracticeId=294
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Using connection: SECOND NODE
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Executing DB procedure | Procedure=Hiso.uspGetPatient_Problem | Params=12
+22/07/2026 6:13:20 am >> MapParamList
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Retrieved 1 parameters for procedure Hiso.uspGetPatient_PostalAddress
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Found HisoRequest for procedure Hiso.uspGetPatient_PostalAddress
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] HisoRequest values extracted | FromDate=, ToDate=, MinVal=, MaxVal=, Rows=50000, StartIndex=0, Search=, SortBy=, PCode=, RefId=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @pPatientId=[REDACTED_PATIENT_ID]
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] AWS enabled: True | PracticeId=294
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Using connection: PRIMARY
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Executing DB procedure | Procedure=Hiso.uspGetPatient_PostalAddress | Params=1
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Procedure executed successfully | Procedure=Hiso.uspGetPatient_PostalAddress
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Retrieved 3 parameters for procedure Hiso.uspGetCurrentUserOrganisation
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Started | Procedure: Hiso.uspGetPatient_LaboratoryReport  | PracticeId: 294
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @pProviderId=5541421
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @pPracticeLocationId=2658
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @practiceid=294
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] AWS enabled: True | PracticeId=294
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Using connection: PRIMARY
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Executing DB procedure | Procedure=Hiso.uspGetCurrentUserOrganisation | Params=3
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Procedure executed successfully | Procedure=Hiso.uspGetCurrentUserOrganisation
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Completed | Procedure=Hiso.uspGetCurrentUserOrganisation | Result=OK
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Started | Procedure: Hiso.uspGetPatient_IncomingLetter  | PracticeId: 294
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Creating SECOND NODE connection for procedure Hiso.uspGetPatient_IncomingLetter
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Procedure executed successfully | Procedure=Hiso.uspGetPatient_RadiologyReport
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Completed | Procedure=Hiso.uspGetPatient_RadiologyReport | Result=OK
+22/07/2026 6:13:20 am >> MapParamList
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Retrieved 11 parameters for procedure Hiso.uspGetPatient_LaboratoryReport
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Found HisoRequest for procedure Hiso.uspGetPatient_LaboratoryReport
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] HisoRequest values extracted | FromDate=2026-01-20T00:00:00.000, ToDate=2026-07-22T23:59:59.999, MinVal=, MaxVal=, Rows=50000, StartIndex=0, Search=, SortBy=dateDescend, PCode=, RefId=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @pPatientId=[REDACTED_PATIENT_ID]
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @AppointmentId=[REDACTED_APPOINTMENT_ID]
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @FromDate=2026-01-20T00:00:00.000
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @ToDate=2026-07-22T23:59:59.999
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @StartRowIndex=0
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @MaximumRows=50000
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @Search=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @SortBy=dateDescend
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @minValue=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @maxValue=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @ReferenceID=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] AWS enabled: True | PracticeId=294
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Using connection: SECOND NODE
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Executing AWS flow | Procedure=Hiso.uspGetPatient_LaboratoryReport_AWS | RefId=
+22/07/2026 6:13:20 am >> Get record against referenceid/dmsid :
+22/07/2026 6:13:20 am >> MapParamList
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Creating PRIMARY connection for procedure Hiso.uspGetCurrentUser
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @FromDate=2026-01-20T00:00:00.000
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @ToDate=2026-07-22T23:59:59.999
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @StartRowIndex=0
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @MaximumRows=50000
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @Search=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @SortBy=dateDescend
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @minValue=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @maxValue=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @ReferenceID=
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] AWS enabled: True | PracticeId=294
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Using connection: SECOND NODE
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Executing AWS flow | Procedure=Hiso.uspGetPatient_IncomingLetter_AWS | RefId=
+22/07/2026 6:13:20 am >> Get record against referenceid/dmsid :
+22/07/2026 6:13:20 am >> [EnsureColumnExists] Checking column Patient_LaboratoryReport_Content in DataTable.
+22/07/2026 6:13:20 am >> [EnsureColumnExists] Column Patient_LaboratoryReport_Content exists but type=System.Int32, expected=System.Byte[]. Rebuilding...
+22/07/2026 6:13:20 am >> [EnsureColumnExists] Column Patient_LaboratoryReport_Content recreated as Byte[].
+22/07/2026 6:13:20 am >> [EnsureColumnExists] Checking column Patient_LaboratoryReport_Size in DataTable.
+22/07/2026 6:13:20 am >> [EnsureColumnExists] Column Patient_LaboratoryReport_Size exists but type=System.Int32, expected=System.Int64. Rebuilding...
+22/07/2026 6:13:20 am >> [EnsureColumnExists] Column Patient_LaboratoryReport_Size recreated as Int64.
+22/07/2026 6:13:20 am >> [EnsureColumnExists] Checking column Patient_LaboratoryReport_Filename in DataTable.
+22/07/2026 6:13:20 am >> [EnsureColumnExists] Column Patient_LaboratoryReport_Filename exists but type=System.Int32, expected=System.String. Rebuilding...
+22/07/2026 6:13:20 am >> [EnsureColumnExists] Column Patient_LaboratoryReport_Filename recreated as String.
+22/07/2026 6:13:20 am >> [EnsureColumnExists] Checking column Patient_LaboratoryReport_DataType in DataTable.
+22/07/2026 6:13:20 am >> [EnsureColumnExists] Column Patient_LaboratoryReport_DataType exists but type=System.Int32, expected=System.String. Rebuilding...
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Retrieved 3 parameters for procedure Hiso.uspGetCurrentUser
+22/07/2026 6:13:20 am >> [EnsureColumnExists] Column Patient_LaboratoryReport_Name already correct (String).
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Param mapped | @practiceid=294
+22/07/2026 6:13:20 am >> [EnsureColumnExists] Column Patient_LaboratoryReport_Format exists but type=System.Int32, expected=System.String. Rebuilding...
+22/07/2026 6:13:20 am >> [EnsureColumnExists] Column Patient_LaboratoryReport_Format recreated as String.
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] AWS enabled: True | PracticeId=294
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Using connection: PRIMARY
+22/07/2026 6:13:20 am >> [ExecuteHisoProcedure] Executing DB procedure | Procedure=Hiso.uspGetCurrentUser | Params=3
+22/07/2026 6:13:20 am >> [EnrichWithAWS] DocumentName=17072554
+22/07/2026 6:13:20 am >> [EnrichWithAWS] DocumentKey=FB2292E2-65BC-492D-AAEC-84AD1C205CCD | MimeType=text/html | Format=HTML
+22/07/2026 6:13:20 am >> [EnrichWithAWS] Processing DocumentKey=BE0D4263-2559-49E2-B011-6F0AF6988D92, PracticeID=294
+22/07/2026 6:13:21 am >> [ExecuteHisoProcedure] Procedure executed successfully | Procedure=Hiso.uspGetMeasurements
+22/07/2026 6:13:21 am >> [EnrichWithAWS] DocumentKey=BE0D4263-2559-49E2-B011-6F0AF6988D92 | MimeType=application/pdf | Format=PDF
+22/07/2026 6:13:21 am >> [ExecuteHisoProcedure] Procedure executed successfully | Procedure=Hiso.uspGetPatient_Problem
+22/07/2026 6:13:21 am >> [ExecuteHisoProcedure] Completed | Procedure=Hiso.uspGetPatient_Problem | Result=OK
+
+--- Sensitive fields extracted from FillXMLDetails / MapParamList trace (redacted) ---
+NodeName:Patient_FirstName -> [REDACTED_PATIENT_NAME]
+NodeName:Patient_Middlename -> [REDACTED_PATIENT_NAME]
+NodeName:Patient_Surname -> [REDACTED_PATIENT_NAME]
+NodeName:Patient_DateOfBirth -> [REDACTED_DOB]
+NodeName:Patient_ResidentialAddress_StreetName -> [REDACTED_ADDRESS]
+NodeName:Patient_ResidentialAddress_Suburb -> [REDACTED_ADDRESS]
+NodeName:Patient_ResidentialAddress_City -> [REDACTED_ADDRESS]
+NodeName:Patient_ResidentialAddress_Postcode -> [REDACTED_ADDRESS]
+NodeName:Patient_PostalAddress_StreetName -> [REDACTED_ADDRESS]
+NodeName:Patient_PostalAddress_Suburb -> [REDACTED_ADDRESS]
+NodeName:Patient_PostalAddress_City -> [REDACTED_ADDRESS]
+NodeName:Patient_PostalAddress_Postcode -> [REDACTED_ADDRESS]
+NodeName:Patient_ResidentialPhone -> [REDACTED_PHONE]
+NodeName:Patient_Mobile -> [REDACTED_PHONE]
+NodeName:Patient_PmsId -> [REDACTED_PATIENT_ID]
+NodeName:Patient_Accident_RegistrationNumber -> [REDACTED_ACC_NUMBER]  (WP71863 / XM78220 / HF56407 / MQ33368 / TP58837 / SY29006)
+NodeName:CurrentUser_FullName -> [REDACTED_PROVIDER_NAME]
+NodeName:CurrentUser_FirstName -> [REDACTED_PROVIDER_NAME]
+NodeName:CurrentUser_Surname -> [REDACTED_PROVIDER_NAME]
+NodeName:CurrentUser_PersonalHPI -> [REDACTED_HPI]
+NodeName:CurrentUser_WorkPhone -> [REDACTED_PHONE]
+NodeName:CurrentUser_ACCProviderNumber -> [REDACTED_HPI]
+NodeName:CurrentUserOrganisation_PhysicalAddress_StreetName -> [REDACTED_ADDRESS]
+NodeName:CurrentUserOrganisation_PhysicalAddress_Suburb -> [REDACTED_ADDRESS]
+NodeName:CurrentUserOrganisation_PhysicalAddress_City -> [REDACTED_ADDRESS]
+NodeName:CurrentUserOrganisation_PhysicalAddress_Postcode -> [REDACTED_ADDRESS]
+NodeName:CurrentUserOrganisation_FacilityHPI -> [REDACTED_FACILITY_HPI]
+NodeName:CurrentUserOrganisation_Fax -> [REDACTED_PHONE]
+NodeName:CurrentUser_RegistrationNumber -> [REDACTED_REG_NUMBER]
+NodeName:Patient_Attachment_Author -> [REDACTED_NAME] (Dr Joanne Mcknight / Shisarna Brewer)
+NodeName:Patient_IncomingLetter_Author -> [REDACTED_NAME]
+NodeName:Patient_Attachment_Comments -> "Emailed to mum [REDACTED_NAME] as per GP [REDACTED_NAME]"
+NodeName:Patient_IncomingLetter_Comments -> "Triage - > forwarded to South Sector Team and [REDACTED_NAME] (Eating Disorder Clinician) for further assessment and support with low weight [REDACTED_MEASUREMENT] and low mood and disrupted sleep [REDACTED_NAME]"
+
+--- FillXMLDetails After (patient.details / referrer.details sections, sanitized) ---
+<field name="patient.dateOfBirth" conceptName="Patient_DateOfBirth">[REDACTED_DOB]</field>
+<field name="patient.givenName" conceptName="Patient_FirstName">[REDACTED_PATIENT_NAME]</field>
+<field name="patient.secondName" conceptName="Patient_Middlename">[REDACTED_PATIENT_NAME]</field>
+<field name="patient.surname" conceptName="Patient_Surname">[REDACTED_PATIENT_NAME]</field>
+<field name="patient.gender" conceptName="Patient_Gender">F</field>
+<field name="referrer.fullName" conceptName="CurrentUser_FullName">[REDACTED_PROVIDER_NAME]</field>
+<field name="referrer.givenName" conceptName="CurrentUser_FirstName">[REDACTED_PROVIDER_NAME]</field>
+<field name="referrer.surname" conceptName="CurrentUser_Surname">[REDACTED_PROVIDER_NAME]</field>
+<field name="referrer.hpi" conceptName="CurrentUser_PersonalHPI">[REDACTED_HPI]</field>
+<field name="referrer.contacts.referrerEdi" conceptName="CurrentUserOrganisation_HealthlinkEDI">tauranga</field>
+<field name="referrer.organisation.alias" conceptName="CurrentUserOrganisation_Alias">Family Doctors</field>
+<field name="referrer.registrationNumber" conceptName="CurrentUser_RegistrationNumber">[REDACTED_REG_NUMBER]</field>
+<field name="referrer.contacts.telephone" conceptName="CurrentUser_WorkPhone">[REDACTED_PHONE]</field>
+<field name="referrer.accProviderNumber" conceptName="CurrentUser_ACCProviderNumber">[REDACTED_HPI]</field>
+<field name="referrer.organisation.name" conceptName="CurrentUserOrganisation_Name">Family Doctors</field>
+<field name="referrer.organisation.physical.streetAddress" conceptName="CurrentUserOrganisation_PhysicalAddress_StreetName">[REDACTED_ADDRESS]</field>
+<field name="referrer.organisation.physical.suburb" conceptName="CurrentUserOrganisation_PhysicalAddress_Suburb">[REDACTED_ADDRESS]</field>
+<field name="referrer.organisation.physical.city" conceptName="CurrentUserOrganisation_PhysicalAddress_City">[REDACTED_ADDRESS]</field>
+<field name="referrer.organisation.physical.postCode" conceptName="CurrentUserOrganisation_PhysicalAddress_Postcode">[REDACTED_ADDRESS]</field>
+<field name="referrer.organisation.facilityHpi" conceptName="CurrentUserOrganisation_FacilityHPI">[REDACTED_FACILITY_HPI]</field>
+<field name="referrer.contacts.fax" conceptName="CurrentUserOrganisation_Fax">[REDACTED_PHONE]</field>
+<field name="acc45Number" conceptName="Patient_Accident_RegistrationNumber">[REDACTED_ACC_NUMBER]</field>
+<field name="patient.contacts.telephoneEvening" conceptName="Patient_ResidentialPhone">[REDACTED_PHONE]</field>
+<field name="patient.contacts.telephoneCell" conceptName="Patient_Mobile">[REDACTED_PHONE]</field>
+<field name="patient.pmsId" conceptName="Patient_PmsId">[REDACTED_PATIENT_ID]</field>
+<field name="patient.residential.streetAddress" conceptName="Patient_ResidentialAddress_StreetName">[REDACTED_ADDRESS]</field>
+<field name="patient.residential.suburb" conceptName="Patient_ResidentialAddress_Suburb">[REDACTED_ADDRESS]</field>
+<field name="patient.residential.city" conceptName="Patient_ResidentialAddress_City">[REDACTED_ADDRESS]</field>
+<field name="patient.residential.postCode" conceptName="Patient_ResidentialAddress_Postcode">[REDACTED_ADDRESS]</field>
+<field name="patient.postal.streetAddress" conceptName="Patient_PostalAddress_StreetName">[REDACTED_ADDRESS]</field>
+<field name="patient.postal.suburb" conceptName="Patient_PostalAddress_Suburb">[REDACTED_ADDRESS]</field>
+<field name="patient.postal.city" conceptName="Patient_PostalAddress_City">[REDACTED_ADDRESS]</field>
+<field name="patient.postal.postCode" conceptName="Patient_PostalAddress_Postcode">[REDACTED_ADDRESS]</field>
+
+NOTE: The clinical/measurement structure (Patient_SocialHistory, Patient_PastHistory, Patient_Problem, Patient_Accident, Patient_LaboratoryReport, Patient_RadiologyReport, Patient_IncomingLetter, Patient_Attachment, measurements section with vitals/labs/immunisation flags) is preserved unchanged below the redacted identifiers, since it defines the API's data shape and contains no direct identifiers itself. Document GUIDs (DocumentKey values), lab test codes (e.g. 14647-2, 271649006), procedure names (Hiso.uspGet*), and PracticeId 294 were left as-is — they are internal system/reference identifiers, not personal data, and are needed to model the API correctly.

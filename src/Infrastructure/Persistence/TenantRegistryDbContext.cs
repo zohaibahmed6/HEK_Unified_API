@@ -16,6 +16,8 @@ public sealed class TenantRegistryDbContext : DbContext
 
     public DbSet<PracticeRegistryEntry> Practices => Set<PracticeRegistryEntry>();
 
+    public DbSet<HisoSessionRegistryEntry> HisoSessions => Set<HisoSessionRegistryEntry>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(TenantRegistryDbContext).Assembly);

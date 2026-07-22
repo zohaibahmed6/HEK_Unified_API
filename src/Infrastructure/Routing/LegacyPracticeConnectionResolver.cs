@@ -1,4 +1,5 @@
 using HekCoreApi.Application.Common.Interfaces;
+using HekCoreApi.Application.Common.Models;
 using HekCoreApi.Domain.Exceptions;
 
 namespace HekCoreApi.Infrastructure.Routing;
@@ -21,10 +22,13 @@ public sealed class LegacyPracticeConnectionResolver : ILegacyPracticeConnection
         _secretProvider = secretProvider;
     }
 
-    public async Task<string> ResolveAsync(string practiceId, CancellationToken ct = default)
+    public Task<string> ResolveAsync(string practiceId, CancellationToken ct = default) =>
+        ResolveAsync(RoutingContext.FromPracticeId(practiceId, default), ct);
+
+    public async Task<string> ResolveAsync(RoutingContext context, CancellationToken ct = default)
     {
-        var route = await _tenantRegistry.ResolveRouteAsync(practiceId, ct)
-            ?? throw new NotFoundException($"Practice '{practiceId}' is not registered.");
+        var route = await _tenantRegistry.ResolveRouteAsync(context, ct)
+            ?? throw new NotFoundException($"Practice '{context.PracticeId}' (code '{context.PracticeCode}', environment '{context.Environment}') is not registered.");
 
         var credentialSecretKey = $"Legacy:DbCredentials:{route.DbServerHost}";
         var credential = await _secretProvider.GetRequiredSecretAsync(credentialSecretKey, ct);

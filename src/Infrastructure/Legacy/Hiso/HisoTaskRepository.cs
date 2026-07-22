@@ -13,10 +13,10 @@ namespace HekCoreApi.Infrastructure.Legacy.Hiso;
 /// </summary>
 public sealed class HisoTaskRepository : IHisoTaskRepository
 {
-    private readonly ILegacyPracticeConnectionResolver _connectionResolver;
+    private readonly IHisoPracticeConnectionResolver _connectionResolver;
     private readonly ISecretProvider _secretProvider;
 
-    public HisoTaskRepository(ILegacyPracticeConnectionResolver connectionResolver, ISecretProvider secretProvider)
+    public HisoTaskRepository(IHisoPracticeConnectionResolver connectionResolver, ISecretProvider secretProvider)
     {
         _connectionResolver = connectionResolver;
         _secretProvider = secretProvider;

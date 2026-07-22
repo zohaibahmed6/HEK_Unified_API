@@ -12,16 +12,17 @@ namespace HekCoreApi.Infrastructure.Legacy.Hiso;
 /// there - `Microsoft.Extensions.Caching.Memory.IMemoryCache` here, same semantics: single-process,
 /// not distributed). Cache key is scoped per practice here (legacy had one single global connection,
 /// this project routes per practice via the tenant registry, so the concept dictionary can genuinely
-/// differ by practice's database).
+/// differ by practice's database). Routes via HekTenantRegistry.HisoSessions (2026-07-22 correction),
+/// never Practices.
 /// </summary>
 public sealed class HisoConceptDictionary : IHisoConceptDictionary
 {
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(10);
 
-    private readonly ILegacyPracticeConnectionResolver _connectionResolver;
+    private readonly IHisoPracticeConnectionResolver _connectionResolver;
     private readonly IMemoryCache _cache;
 
-    public HisoConceptDictionary(ILegacyPracticeConnectionResolver connectionResolver, IMemoryCache cache)
+    public HisoConceptDictionary(IHisoPracticeConnectionResolver connectionResolver, IMemoryCache cache)
     {
         _connectionResolver = connectionResolver;
         _cache = cache;

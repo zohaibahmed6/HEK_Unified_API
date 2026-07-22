@@ -16,6 +16,20 @@
 | Version | Date | Change |
 |---|---|---|
 | 1.0 | 2026-07-19 | Initial plan, agreed in chat 2026-07-19 |
+| 1.1 | 2026-07-22 | Added spec-alignment cross-reference; see PROJECT_STATUS.md / DOCUMENT_INDEX.md |
+
+### Alignment with HEK_UNIFIED_API_SPEC.md (2026-07-22)
+
+| Spec Requirement | Where addressed in this doc | Status |
+|---|---|---|
+| FR-4/FR-5 (selective retrieval, per-consumer field scoping) | Not planned as an explicit Day-1 task in the sections reviewed — Block 0 covers scaffolding/logging/secrets, not field-scoping middleware | Gap in this plan's task list — the capability was ultimately built (`FieldSelector.cs`, `CanonicalDemographicsController`) but not as a named line item here |
+| FR-6 (audit logging) | Block 0 "Logging (folds in Phase 9)" covers Serilog + correlation IDs generally, not a named audit-logging task for exact-fields-returned | Partial — general logging planned, field-level audit not named |
+| FR-9 (simulation for demo) | Not addressed — this plan's "Day 1 build sprint / Hardening" framing predates the demo/simulation directive | Gap |
+| NFR-1 (.NET Core/ASP.NET Core) | §3 "Target framework: .NET 8 (LTS)" | Aligned |
+| NFR-2 (containerized, hosting-agnostic) | §3 "Hosting: own servers, Docker-based, cloud-agnostic"; Block 0 Docker task | Aligned |
+| NFR-5 (telemetry) | Block 0 folds in "Phase 9 Logging & Observability" as Serilog + correlation IDs + health endpoints — no OpenTelemetry/tracing/metrics task named | Partial — logging planned, full telemetry (traces/metrics) not explicitly scoped |
+| NFR-8 (minimal/clean code) | §3 "Solo developer... linear backlog" framing implicitly supports this but doesn't state it as a code-quality goal | Partial |
+| NFR-9 (Azure/AWS gateway-pattern research) | Not addressed — plan reasons from legacy-system constraints, no cloud-gateway-pattern research task exists | Gap |
 
 ---
 

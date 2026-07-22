@@ -15,6 +15,26 @@
 | Version | Date | Description | Author |
 |---|---|---|---|
 | 0.1 | 2026-07-18 | Initial draft generated from `docs/analysis/` Phase 1 (per-system), Phase 2 (`ComparisonReport.md`), and Phase 3 (`MigrationRecommendations.md`) reports | SRS Generator skill |
+| 0.2 | 2026-07-22 | Added spec-alignment cross-reference; see PROJECT_STATUS.md / DOCUMENT_INDEX.md | (session) |
+
+### Alignment with HEK_UNIFIED_API_SPEC.md (2026-07-22)
+
+This SRS predates the governing spec and was written bottom-up from legacy reverse-engineering, not
+top-down from Dr. Javad's directive. Cross-reference:
+
+| Spec Requirement | Where addressed in this doc | Status |
+|---|---|---|
+| FR-1/FR-2 (per-system data sets + unified model) | §6.1 domain decomposition; per-system field detail lives in the Phase 1 analysis reports this SRS is built from | Aligned |
+| FR-3 (single REST API, consumer states need) | §3.2, §6 scope framing | Aligned |
+| FR-4 (return only requested fields, no dump-everything endpoint) | Not addressed — this SRS's endpoint framing follows legacy per-capability endpoints, not a sparse-fieldset/selective-retrieval requirement | Gap — spec requires explicit field-selection behavior; this document doesn't state it |
+| FR-5 (per-consumer field scoping to own standard only) | §7 "Authorization is decided structurally" language exists in the EAD/ADRs, but this SRS itself frames access control as patient/encounter/practice scoping (ADR-003 style), not field-level scoping per consumer standard | Partial — structural-scoping principle present, field-level framing absent |
+| FR-6 (full audit: who/when/exact fields) | Logging/observability called out as one of the "one layer" consolidation goals (§3.2) but no field-level audit requirement is stated | Partial — general logging goal present, exact-fields audit not specified |
+| FR-7/FR-8 (extensibility, hub for future integrations) | §3.2 "enable practice onboarding without code redeployment" addresses tenant extensibility, not new-system/integration extensibility | Partial |
+| FR-9 (simulation proving parity per consumer) | Not addressed — this SRS has no demo/simulation requirement, it predates the demo directive | Gap — spec requires simulation capability; undiscussed here |
+| NFR-1 (.NET Core/ASP.NET Core) | Explicitly out of scope by design (§2: "does not propose... technology stack") | Gap by design — deferred to EAD, not a defect of this doc |
+| NFR-4 (field-level authz security) | §12 PHI/security requirements exist but are not framed as field-level | Partial |
+| NFR-5 (telemetry) | §3.2 logging/observability layer goal | Partial — telemetry specifically (traces/metrics) not named |
+| NFR-9 (Azure/AWS gateway pattern research) | Not addressed — this SRS is derived purely from legacy analysis, no gateway-pattern research is in scope per §2 | Gap — spec requires this research; not present in this document's lineage |
 
 ### Source Documents
 

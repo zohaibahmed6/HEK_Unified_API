@@ -5,6 +5,23 @@
 **Date:** 2026-07-19
 **Status:** Decisions below are stakeholder-approved based on direct conversation. Items marked "Open" in Section 7 still need confirmation before the Database Architecture / API Contract Design phases begin.
 
+### Revision History (added 2026-07-22)
+
+| Version | Date | Description |
+|---|---|---|
+| 1.0 | 2026-07-19 | Initial ADR log, per header above |
+| 1.1 | 2026-07-22 | Added spec-alignment cross-reference; see PROJECT_STATUS.md / DOCUMENT_INDEX.md |
+
+### Alignment with HEK_UNIFIED_API_SPEC.md (2026-07-22)
+
+| Spec Requirement | Where addressed in this doc | Status |
+|---|---|---|
+| FR-5 (per-consumer field scoping to own standard, never extra data) | ADR-003 "Resource-Scoped Tokens with Structurally-Determined Origin Scope" — origin is derived from credential/entry-point, never caller-supplied, and gates *which capabilities* a consumer reaches | Partial — this is the correct foundation for FR-5 but ADR-003 scopes access to capabilities/endpoints, not to individual fields within a shared canonical response; the actual field-level enforcement (`FieldSelector`) was built later, in code, and isn't reflected back into this ADR |
+| FR-6 (audit: who/when/exact fields) | ADR-001 mentions "audit logging added" for HISO sessions only | Gap — no ADR covers a general field-level audit mechanism |
+| FR-9 (simulation proving parity) | Not addressed — predates the demo directive | Gap |
+| NFR-4 (field-level authz security) | ADR-002 (managed identity), ADR-003 (structural origin scope) | Partial — strong on authn and origin-level authz, silent on field-level authz specifically |
+| NFR-9 (Azure/AWS gateway-pattern research) | Not addressed — ADR-002 evaluates identity vendors (Entra ID/Okta/Auth0) but no ADR evaluates API-gateway reference architectures | Gap |
+
 ---
 
 ## ADR-001: Pooled Multi-Tenancy Across Existing Sharded Database Servers, with Row-Level Security

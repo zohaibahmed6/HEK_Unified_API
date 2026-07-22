@@ -1,18 +1,24 @@
 namespace HekCoreApi.Domain.Entities;
 
 /// <summary>
-/// One row per practice in the new tenant/practice registry database (ADR-001), replacing HISO's
-/// fixed 4-connection model and KARO/ERMS's per-practice Web.config connection-string convention.
-///
-/// INFERRED SCHEMA - flagged, not a confirmed fact: no source document (SRS/EAD/ADR log/Contract
-/// Design doc) gives a literal column list for this registry, only ADR-001's prose description
-/// ("one row per practice with which physical database server it lives on"). This is a reasonable
-/// minimal design pending confirmation - see PROJECT_STATUS.md Block 1 change-log entry.
+/// One row per (PracticeId, PracticeCode, Environment) routing target in the tenant/practice
+/// registry (ADR-001). Rebuilt 2026-07-22 with a real surrogate key: the real KARO/ERMS
+/// <c>EncounterId</c> format (<c>{encId}__{practiceId}__{practiceCode}__{environment}</c>) encodes
+/// three distinct routing facts, not one flat practiceId - HISO and every other Block 2 repository
+/// that only ever had a flat practiceId use a fixed sentinel value ("-", RoutingContext.Unscoped in
+/// the Application layer) for <see cref="PracticeCode"/>/<see cref="Environment"/> and keep resolving by
+/// <see cref="PracticeId"/> alone.
 /// </summary>
 public sealed class PracticeRegistryEntry
 {
-    /// <summary>Matches the practiceId used in TokenRequest/ResourceScope and HISO's PracticeID column.</summary>
+    public int Id { get; set; }
+
     public required string PracticeId { get; set; }
+
+    public required string PracticeCode { get; set; }
+
+    /// <summary>Server/cluster selector (e.g. "SOUTH") - decides which physical DB a practice routes to.</summary>
+    public required string Environment { get; set; }
 
     public required string PracticeName { get; set; }
 
@@ -32,7 +38,8 @@ public sealed class PracticeRegistryEntry
 
     public bool IsActive { get; set; } = true;
 
-    public DateTimeOffset CreatedAtUtc { get; set; }
+    /// <summary>Local server time, not UTC - deliberate deviation from the rest of the codebase's UTC convention, scoped to this table only.</summary>
+    public DateTimeOffset CreatedAt { get; set; }
 
-    public DateTimeOffset UpdatedAtUtc { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
 }

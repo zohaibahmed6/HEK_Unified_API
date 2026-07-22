@@ -11,4 +11,10 @@ public static class HekClaimTypes
     public const string PracticeId = "hek:practiceId";
     public const string OriginScope = "hek:originScope";
     public const string Scope = "hek:scope";
+
+    /// <summary>KARO/ERMS routing (RoutingContext) - populated only for tokens resolved via a real EncounterId; absent otherwise.</summary>
+    public const string PracticeCode = "hek:practiceCode";
+
+    /// <summary>KARO/ERMS routing (RoutingContext) - server/cluster selector, e.g. "SOUTH".</summary>
+    public const string Environment = "hek:environment";
 }

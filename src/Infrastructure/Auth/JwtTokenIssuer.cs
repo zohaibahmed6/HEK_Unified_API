@@ -47,6 +47,16 @@ public sealed class JwtTokenIssuer : IJwtTokenIssuer
             claims.Add(new Claim(HekClaimTypes.EncounterId, scope.EncounterId));
         }
 
+        if (!string.IsNullOrEmpty(scope.PracticeCode))
+        {
+            claims.Add(new Claim(HekClaimTypes.PracticeCode, scope.PracticeCode));
+        }
+
+        if (!string.IsNullOrEmpty(scope.Environment))
+        {
+            claims.Add(new Claim(HekClaimTypes.Environment, scope.Environment));
+        }
+
         var token = new JwtSecurityToken(
             issuer: Issuer,
             audience: Audience,

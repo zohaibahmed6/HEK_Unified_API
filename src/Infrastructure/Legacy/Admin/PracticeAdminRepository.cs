@@ -31,19 +31,21 @@ public sealed class PracticeAdminRepository : IPracticeAdminRepository
     public async Task<Practice> RegisterAsync(PracticeInput input, CancellationToken ct = default)
     {
         var practiceId = Guid.NewGuid().ToString("N")[..12];
-        var now = DateTimeOffset.UtcNow;
+        var now = DateTimeOffset.Now;
 
         _db.Practices.Add(new PracticeRegistryEntry
         {
             PracticeId = practiceId,
+            PracticeCode = Application.Common.Models.RoutingContext.Unscoped,
+            Environment = Application.Common.Models.RoutingContext.Unscoped,
             PracticeName = input.Name,
             SourceSystem = input.SourceSystem.ToString(),
             DbServerHost = input.DbServerHost,
             DbName = input.DbName,
             RowLevelSecurityEnabled = false,
             IsActive = true,
-            CreatedAtUtc = now,
-            UpdatedAtUtc = now
+            CreatedAt = now,
+            UpdatedAt = now
         });
 
         await _db.SaveChangesAsync(ct);
@@ -68,7 +70,7 @@ public sealed class PracticeAdminRepository : IPracticeAdminRepository
         entry.SourceSystem = input.SourceSystem.ToString();
         entry.DbServerHost = input.DbServerHost;
         entry.DbName = input.DbName;
-        entry.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        entry.UpdatedAt = DateTimeOffset.Now;
 
         await _db.SaveChangesAsync(ct);
         return Practice.FromInput(practiceId, input);

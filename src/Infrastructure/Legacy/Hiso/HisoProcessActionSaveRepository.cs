@@ -16,12 +16,17 @@ namespace HekCoreApi.Infrastructure.Legacy.Hiso;
 /// </summary>
 public sealed class HisoProcessActionSaveRepository : IHisoProcessActionSaveRepository
 {
-    private readonly ILegacyPracticeConnectionResolver _connectionResolver;
+    private readonly IHisoPracticeConnectionResolver _connectionResolver;
+    private readonly ILegacyPracticeConnectionResolver _indiciMasterResolver;
     private readonly ISecretProvider _secretProvider;
 
-    public HisoProcessActionSaveRepository(ILegacyPracticeConnectionResolver connectionResolver, ISecretProvider secretProvider)
+    public HisoProcessActionSaveRepository(
+        IHisoPracticeConnectionResolver connectionResolver,
+        ILegacyPracticeConnectionResolver indiciMasterResolver,
+        ISecretProvider secretProvider)
     {
         _connectionResolver = connectionResolver;
+        _indiciMasterResolver = indiciMasterResolver;
         _secretProvider = secretProvider;
     }
 
@@ -304,7 +309,7 @@ public sealed class HisoProcessActionSaveRepository : IHisoProcessActionSaveRepo
         string connectionString;
         try
         {
-            connectionString = await _connectionResolver.ResolveIndiciMasterAsync(ct);
+            connectionString = await _indiciMasterResolver.ResolveIndiciMasterAsync(ct);
         }
         catch (NotFoundException)
         {

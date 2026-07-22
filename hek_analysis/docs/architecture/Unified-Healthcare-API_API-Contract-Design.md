@@ -17,6 +17,28 @@
 |---|---|---|
 | 1.0 | 2026-07-19 | Initial contract design, Phase 7 of the project lifecycle, following the completed (Phase 6 skipped by stakeholder decision) Enterprise Architecture phase |
 | 1.1 | 2026-07-19 | Stakeholder Q&A round: demographics kept separate per legacy system instead of merged (Section 4.2, 6.2); HISO's dead-code actions (`addInvoice`, `launchForm`, static mode) implemented rather than excluded (Section 4.9); KARO's `GetEncounterSummary`/`SaveScreeningCode` implemented for real rather than excluded (Section 4.10, 4.13); rate limiting confirmed as a built, config-toggled capability (Section 14); COL/Pegasus confirmed live, Azure mirror confirmed not live but retained (Section 16, 18). See Section 8, Decisions 4–6, and `PROJECT_STATUS.md` for full traceability of each stakeholder answer. |
+| 1.2 | 2026-07-22 | Added spec-alignment cross-reference; see PROJECT_STATUS.md / DOCUMENT_INDEX.md |
+
+### Alignment with HEK_UNIFIED_API_SPEC.md (2026-07-22)
+
+Note: this contract kept the four demographics endpoints **separate per legacy system** (v1.1,
+Section 4.2) rather than merged into one canonical shape — the opposite direction from the spec's
+FR-2/FR-3 "one unified/canonical model, single API" framing. The real implementation has since
+diverged again from this document: `CanonicalDemographicsController` (`src/Api/Features/Canonical/`)
+implements one merged, versioned endpoint with server-side field scoping, not the four-separate-
+endpoint shape this document specifies. This is a live drift between this document, the openapi.yaml
+it's meant to back, and actual code — flagged, not fixed, per task scope.
+
+| Spec Requirement | Where addressed in this doc | Status |
+|---|---|---|
+| FR-2 (unified/canonical model) | §4.2 explicitly reverses this for demographics — kept per-legacy-system, not merged | Gap — conflicts with spec's canonical-model requirement for this resource; contradicted by actual running code (see note above) |
+| FR-3 (single REST API) | §2 "single platform," §4 endpoint inventory | Aligned overall, Partial for demographics specifically |
+| FR-4 (return only requested fields) | Not addressed as a general contract rule — no sparse-fieldset/`?fields=` convention documented in this version | Gap — spec requires this; the real `CanonicalDemographicsController` implements `?fields=` but this contract doc doesn't document that convention |
+| FR-5 (per-consumer field scoping) | §3.3/§3.4 "resource-scoped authorization," "structurally-determined origin scope" (ADR-003) | Partial — scopes patient/encounter/practice access, not field-level filtering within a response |
+| FR-6 (audit: exact fields) | Not addressed in the reviewed sections | Gap |
+| FR-9 (simulation) | Not addressed — predates demo directive | Gap |
+| NFR-7 (systematic error handling) | §3 point 7, "meaningful HTTP status semantics," FR-HTTP-01 | Aligned |
+| NFR-9 (Azure/AWS gateway research) | Not addressed | Gap |
 
 ---
 

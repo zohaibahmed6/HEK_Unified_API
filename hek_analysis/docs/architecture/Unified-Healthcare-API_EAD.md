@@ -12,6 +12,30 @@
 | Companion document | `Unified-Healthcare-API_ADRs.md` (ADR-001 through ADR-011, full rationale) |
 | Status | Draft — 4 open items remain (Section 26); ready for Database Architecture / API Contract Design to begin against everything else |
 
+### Revision History (added 2026-07-22)
+
+| Version | Date | Description |
+|---|---|---|
+| 1.0 | 2026-07-19 | Initial EAD, per Document Control above |
+| 1.1 | 2026-07-22 | Added spec-alignment cross-reference; see PROJECT_STATUS.md / DOCUMENT_INDEX.md |
+
+### Alignment with HEK_UNIFIED_API_SPEC.md (2026-07-22)
+
+This EAD was written for a full migration/consolidation program, not the narrower demo-scoped hub
+the spec now describes. Cross-reference:
+
+| Spec Requirement | Where addressed in this doc | Status |
+|---|---|---|
+| FR-3 (single REST API) | §6 Target Architecture — "One unified API" | Aligned |
+| FR-5 (per-consumer field scoping to own standard) | §7 origin-scoping principle (ADR-003) governs *endpoint/capability* access by origin, not field-level scoping within a shared response | Partial — origin-scoping is the right primitive but this doc doesn't extend it to field-level filtering |
+| FR-6 (audit: who/when/exact fields) | §6 "audit logging added" to HISO session handling only; no general per-field audit design across all domains | Partial |
+| FR-7/FR-8 (extensibility for future integrations, hub becomes gateway) | §9 Module Boundaries names Tenant/Admin as extensible; the doc's frame is "consolidate 3 known systems," not "gateway for arbitrary future systems" | Partial — extensibility exists for tenants/practices, not explicitly for new source-system integrations |
+| FR-9 (simulation proving parity) | Not addressed — this EAD predates the demo/simulation directive | Gap |
+| NFR-2/NFR-3 (containerized, hosting-agnostic, scalable) | §6 "Docker-containerized service...fronted by a load balancer" (ADR-005) | Aligned |
+| NFR-4 (field-level authz) | §7 authorization principle is structural/origin-based, not field-level | Partial |
+| NFR-5 (telemetry) | Not explicitly addressed in the summarized sections; observability is treated as a Day-1 build task in the Implementation Plan rather than an EAD architecture concern | Gap in this doc specifically (present downstream in ImplementationPlan) |
+| NFR-9 (Azure/AWS gateway-pattern research) | Not addressed — this EAD reasons from the legacy systems' constraints (ADR-001 topology, ADR-002 identity), not from cloud API-gateway reference patterns | Gap — spec requires this research; not present in this document |
+
 ---
 
 ## 2. Executive Summary

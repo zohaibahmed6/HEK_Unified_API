@@ -10,11 +10,14 @@ public interface ILegacyPracticeConnectionResolver
     /// <summary>Throws <see cref="Domain.Exceptions.NotFoundException"/> if <paramref name="practiceId"/> is not a registered practice.</summary>
     Task<string> ResolveAsync(string practiceId, CancellationToken ct = default);
 
+    /// <summary>Resolves by the full (PracticeId, PracticeCode, Environment) triple (KARO/ERMS canonical routing).</summary>
+    Task<string> ResolveAsync(Models.RoutingContext context, CancellationToken ct = default);
+
     /// <summary>
     /// HISO's "second database node" (legacy `ConectionStringPMS_NZ_SecondNode`, confirmed from real
     /// source, legacy-reference/Hiso/DAL/DBMessages.cs) - a single global second connection legacy
     /// routed six specific procedures to (lab/radiology/attachment/incoming-letter/outgoing-letter/
-    /// problem), not a per-practice tenant-registry entry like <see cref="ResolveAsync"/>. Zohaib will
+    /// problem), not a per-practice tenant-registry entry like <see cref="ResolveAsync(string, CancellationToken)"/>. Zohaib will
     /// supply the real target later (PROJECT_STATUS.md, HISO wire-compat rebuild) - throws
     /// <see cref="Domain.Exceptions.NotFoundException"/> until the `Hiso:SecondNodeConnectionString`
     /// secret is configured, rather than silently falling back to the primary connection.

@@ -23,8 +23,8 @@ public sealed class AuthenticateCommandHandlerTests
         tokenIssuer.IssueAsync(Arg.Any<ResourceScope>(), Arg.Any<CancellationToken>()).Returns(expectedToken);
 
         var secretProvider = Substitute.For<ISecretProvider>();
-        var handler = new AuthenticateCommandHandler(identityValidator, tokenIssuer, secretProvider, Options.Create(new LegacyPracticeResolutionOptions()));
-        var request = new TokenRequest("staginghss", "secret", 1950057, null, "demo");
+        var handler = new AuthenticateCommandHandler(identityValidator, tokenIssuer, secretProvider, Options.Create(new LegacyPracticeResolutionOptions()), Substitute.For<IKaroRoutingResolver>(), Substitute.For<IErmsRoutingResolver>());
+        var request = new TokenRequest("staginghss", "secret", OriginScope.Karo, 1950057, null, "demo");
 
         var result = await handler.Handle(new AuthenticateCommand(request, OriginScope.Karo), CancellationToken.None);
 
@@ -46,8 +46,8 @@ public sealed class AuthenticateCommandHandlerTests
         var secretProvider = Substitute.For<ISecretProvider>();
         secretProvider.GetSecretAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns("901");
 
-        var handler = new AuthenticateCommandHandler(identityValidator, tokenIssuer, secretProvider, Options.Create(new LegacyPracticeResolutionOptions { Enabled = false }));
-        var request = new TokenRequest("staginghss", "secret", 1950057, null, null);
+        var handler = new AuthenticateCommandHandler(identityValidator, tokenIssuer, secretProvider, Options.Create(new LegacyPracticeResolutionOptions { Enabled = false }), Substitute.For<IKaroRoutingResolver>(), Substitute.For<IErmsRoutingResolver>());
+        var request = new TokenRequest("staginghss", "secret", OriginScope.Karo, 1950057, null, null);
 
         await handler.Handle(new AuthenticateCommand(request, OriginScope.Karo), CancellationToken.None);
 
@@ -66,8 +66,8 @@ public sealed class AuthenticateCommandHandlerTests
         var secretProvider = Substitute.For<ISecretProvider>();
         secretProvider.GetSecretAsync("Auth:LegacyPracticeMappings:staginghss", Arg.Any<CancellationToken>()).Returns("901");
 
-        var handler = new AuthenticateCommandHandler(identityValidator, tokenIssuer, secretProvider, Options.Create(new LegacyPracticeResolutionOptions { Enabled = true }));
-        var request = new TokenRequest("staginghss", "secret", 1950057, null, null);
+        var handler = new AuthenticateCommandHandler(identityValidator, tokenIssuer, secretProvider, Options.Create(new LegacyPracticeResolutionOptions { Enabled = true }), Substitute.For<IKaroRoutingResolver>(), Substitute.For<IErmsRoutingResolver>());
+        var request = new TokenRequest("staginghss", "secret", OriginScope.Karo, 1950057, null, null);
 
         await handler.Handle(new AuthenticateCommand(request, OriginScope.Karo), CancellationToken.None);
 
@@ -83,8 +83,8 @@ public sealed class AuthenticateCommandHandlerTests
 
         var tokenIssuer = Substitute.For<IJwtTokenIssuer>();
         var secretProvider = Substitute.For<ISecretProvider>();
-        var handler = new AuthenticateCommandHandler(identityValidator, tokenIssuer, secretProvider, Options.Create(new LegacyPracticeResolutionOptions()));
-        var request = new TokenRequest("bad", "bad", null, null, null);
+        var handler = new AuthenticateCommandHandler(identityValidator, tokenIssuer, secretProvider, Options.Create(new LegacyPracticeResolutionOptions()), Substitute.For<IKaroRoutingResolver>(), Substitute.For<IErmsRoutingResolver>());
+        var request = new TokenRequest("bad", "bad", OriginScope.Erms, null, null, null);
 
         var result = await handler.Handle(new AuthenticateCommand(request, OriginScope.Erms), CancellationToken.None);
 

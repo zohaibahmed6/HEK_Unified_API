@@ -12,7 +12,8 @@ namespace HekCoreApi.Infrastructure.Legacy.Hiso;
 /// live, foundational plumbing most HISO-sourced Block 2 read endpoints call through.
 ///
 /// Deviations from the legacy source, all flagged:
-/// - Connection resolution goes through <see cref="ILegacyPracticeConnectionResolver"/> (ADR-001
+/// - Connection resolution goes through <see cref="IHisoPracticeConnectionResolver"/> (HekTenantRegistry.HisoSessions,
+///   2026-07-22 correction - never Practices) (ADR-001
 ///   tenant registry) instead of a fixed `ConectionStringPMS_NZ` app setting.
 /// - The legacy "second database node" routing for specific report/attachment/letter/problem
 ///   procedures (HISO-BR-05) is NOT implemented - no source document describes how the tenant
@@ -39,10 +40,10 @@ public sealed class HisoConceptExecutor : IHisoConceptExecutor
         "Hiso.uspGetPatient_RadiologyReport"
     };
 
-    private readonly ILegacyPracticeConnectionResolver _connectionResolver;
+    private readonly IHisoPracticeConnectionResolver _connectionResolver;
     private readonly ILogger<HisoConceptExecutor> _logger;
 
-    public HisoConceptExecutor(ILegacyPracticeConnectionResolver connectionResolver, ILogger<HisoConceptExecutor> logger)
+    public HisoConceptExecutor(IHisoPracticeConnectionResolver connectionResolver, ILogger<HisoConceptExecutor> logger)
     {
         _connectionResolver = connectionResolver;
         _logger = logger;

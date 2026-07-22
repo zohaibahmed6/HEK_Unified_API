@@ -13,10 +13,10 @@ namespace HekCoreApi.Infrastructure.Legacy.Hiso;
 /// </summary>
 public sealed class Acc45DefinitionRepository : IAcc45DefinitionRepository
 {
-    private readonly ILegacyPracticeConnectionResolver _connectionResolver;
+    private readonly IHisoPracticeConnectionResolver _connectionResolver;
     private readonly ISecretProvider _secretProvider;
 
-    public Acc45DefinitionRepository(ILegacyPracticeConnectionResolver connectionResolver, ISecretProvider secretProvider)
+    public Acc45DefinitionRepository(IHisoPracticeConnectionResolver connectionResolver, ISecretProvider secretProvider)
     {
         _connectionResolver = connectionResolver;
         _secretProvider = secretProvider;

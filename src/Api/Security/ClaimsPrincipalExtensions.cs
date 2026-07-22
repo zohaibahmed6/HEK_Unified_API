@@ -14,10 +14,12 @@ public static class ClaimsPrincipalExtensions
         var patientId = user.FindFirst(HekClaimTypes.PatientId)?.Value ?? string.Empty;
         var encounterId = user.FindFirst(HekClaimTypes.EncounterId)?.Value;
         var practiceId = user.FindFirst(HekClaimTypes.PracticeId)?.Value ?? string.Empty;
+        var practiceCode = user.FindFirst(HekClaimTypes.PracticeCode)?.Value;
+        var environment = user.FindFirst(HekClaimTypes.Environment)?.Value;
         var originScope = Enum.TryParse<OriginScope>(user.FindFirst(HekClaimTypes.OriginScope)?.Value, out var scope)
             ? scope
             : throw new InvalidOperationException("Authenticated principal is missing a valid originScope claim.");
 
-        return new ResourceScope(patientId, encounterId, practiceId, originScope);
+        return new ResourceScope(patientId, encounterId, practiceId, originScope, practiceCode, environment);
     }
 }
