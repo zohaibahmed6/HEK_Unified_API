@@ -41,17 +41,22 @@ public sealed class ResolveHisoSessionQueryHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhenCentralRegistryRouteOlderThanExpiryWindow_ReturnsExpired()
+    public async Task Handle_WhenCentralRegistryRouteOlderThanFormerExpiryWindow_StillResolvesFromPracticeSessionTable()
     {
+        // Per ADR-004 follow-through (2026-07-24): HISO's real SessionGUID mechanism has no expiry -
+        // a stale-by-age registry route is still valid as long as its own session table has the row.
         var sessionRegistry = Substitute.For<IHisoSessionRegistryRepository>();
         var staleRoute = new HisoSessionRoute("901", "local", "dbserver-local", "PMS_NZ_V2", DateTimeOffset.Now.AddHours(-13));
         sessionRegistry.FindAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(staleRoute);
+
         var repository = Substitute.For<IHisoSessionRepository>();
+        var session = new HisoSessionContext("provider-1", "patient-1", "appt-1", "901", DateTimeOffset.Now.AddHours(-13));
+        repository.FindBySessionGuidAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(session);
 
         var result = await CreateHandler(sessionRegistry, repository, expiryHours: 12).Handle(new ResolveHisoSessionQuery(Guid.NewGuid(), "server-a"), CancellationToken.None);
 
-        result.Status.Should().Be(HisoSessionLookupStatus.Expired);
-        result.Context.Should().BeNull();
+        result.Status.Should().Be(HisoSessionLookupStatus.Success);
+        result.Context.Should().Be(session);
     }
 
     [Fact]
