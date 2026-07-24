@@ -4,6 +4,7 @@ using HekCoreApi.Adapters.Hiso.GetFormView;
 using HekCoreApi.Adapters.Hiso.GetVersion;
 using HekCoreApi.Adapters.Hiso.ProcessAction;
 using HekCoreApi.Adapters.Hiso.SaveContainer;
+using HekCoreApi.Api.Telemetry;
 using HekCoreApi.Application.Features.Hiso.Commands;
 using HekCoreApi.Application.Features.Hiso.Queries;
 using MediatR;
@@ -27,19 +28,29 @@ namespace HekCoreApi.Api.Features.Hiso.Controllers;
 public sealed class HisoCompatController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly ILogger<HisoCompatController> _logger;
+    private readonly LegacyOperationObserver _observer;
 
-    public HisoCompatController(IMediator mediator)
+    public HisoCompatController(IMediator mediator, ILogger<HisoCompatController> logger, LegacyOperationObserver observer)
     {
         _mediator = mediator;
+        _logger = logger;
+        _observer = observer;
     }
 
     [HttpPost("getData")]
     public async Task<IActionResult> GetData([FromBody] GetDataRequest request, CancellationToken ct)
     {
         var calledServerAddress = HttpContext.Request.Host.Value;
-        var result = await _mediator.Send(
-            new GetDataQuery(request.SessionKey, calledServerAddress, request.DataContainer.FormMetaData.FormInstanceOperationMode, request.DataContainer.SubmittedDataXml),
-            ct);
+        var context = new Dictionary<string, object?> { ["FormInstanceOperationMode"] = request.DataContainer.FormMetaData.FormInstanceOperationMode };
+
+        var result = await _observer.ObserveAsync(
+            _logger, "hiso", "getData", context,
+            () => _mediator.Send(
+                new GetDataQuery(request.SessionKey, calledServerAddress, request.DataContainer.FormMetaData.FormInstanceOperationMode, request.DataContainer.SubmittedDataXml),
+                ct),
+            isExpectedFailure: r => !r.SessionResolved,
+            expectedFailureReason: "InvalidSessionKey");
 
         // Legacy: FaultException("Invalid Session Key") - reproduced as the literal message text,
         // matching the real fault string exactly rather than a generic 401.
@@ -62,7 +73,13 @@ public sealed class HisoCompatController : ControllerBase
     public async Task<IActionResult> GetVersion([FromBody] GetVersionRequest request, CancellationToken ct)
     {
         var calledServerAddress = HttpContext.Request.Host.Value;
-        var sessionResolved = await _mediator.Send(new GetVersionQuery(request.SessionKey, calledServerAddress), ct);
+        var context = new Dictionary<string, object?>();
+
+        var sessionResolved = await _observer.ObserveAsync(
+            _logger, "hiso", "getVersion", context,
+            () => _mediator.Send(new GetVersionQuery(request.SessionKey, calledServerAddress), ct),
+            isExpectedFailure: resolved => !resolved,
+            expectedFailureReason: "InvalidSessionKey");
 
         return sessionResolved ? Ok(GetVersionResponse.Real()) : Unauthorized(new { message = "Invalid Session Key" });
     }
@@ -71,7 +88,13 @@ public sealed class HisoCompatController : ControllerBase
     public async Task<IActionResult> GetDeliveryOptions([FromBody] GetDeliveryOptionsRequest request, CancellationToken ct)
     {
         var calledServerAddress = HttpContext.Request.Host.Value;
-        var result = await _mediator.Send(new GetDeliveryOptionsQuery(request.SessionKey, calledServerAddress), ct);
+        var context = new Dictionary<string, object?>();
+
+        var result = await _observer.ObserveAsync(
+            _logger, "hiso", "getDeliveryOptions", context,
+            () => _mediator.Send(new GetDeliveryOptionsQuery(request.SessionKey, calledServerAddress), ct),
+            isExpectedFailure: r => !r.SessionResolved,
+            expectedFailureReason: "InvalidSessionKey");
 
         if (!result.SessionResolved)
         {
@@ -85,7 +108,13 @@ public sealed class HisoCompatController : ControllerBase
     public async Task<IActionResult> ProcessAction([FromBody] ProcessActionRequest request, CancellationToken ct)
     {
         var calledServerAddress = HttpContext.Request.Host.Value;
-        var result = await _mediator.Send(new ProcessActionCommand(request.SessionKey, calledServerAddress, request.ActionId, request.ActionContainer, request.ActionContainerXml), ct);
+        var context = new Dictionary<string, object?> { ["ActionId"] = request.ActionId };
+
+        var result = await _observer.ObserveAsync(
+            _logger, "hiso", "processAction", context,
+            () => _mediator.Send(new ProcessActionCommand(request.SessionKey, calledServerAddress, request.ActionId, request.ActionContainer, request.ActionContainerXml), ct),
+            isExpectedFailure: r => !r.SessionResolved,
+            expectedFailureReason: "InvalidSessionKey");
 
         return result.SessionResolved
             ? Ok(ProcessActionResponse.From(result.Processed))
@@ -100,10 +129,15 @@ public sealed class HisoCompatController : ControllerBase
             request.FormMetaData.FormInstanceId, request.FormMetaData.FormInstanceVersion, request.FormMetaData.FormEngineId,
             request.FormMetaData.FormInstanceOperationMode, request.FormMetaData.FormDefinitionId,
             request.FormMetaData.FormDefinitionVersion, request.FormMetaData.FormDefinitionTitle);
+        var context = new Dictionary<string, object?> { ["FormInstanceId"] = request.FormMetaData.FormInstanceId };
 
-        var result = await _mediator.Send(
-            new SaveContainerCommand(request.SessionKey, calledServerAddress, metaData, request.ResumePath, request.View, request.ViewType, request.ViewSignature, request.Completed, request.SubmittedDataXml),
-            ct);
+        var result = await _observer.ObserveAsync(
+            _logger, "hiso", "saveContainer", context,
+            () => _mediator.Send(
+                new SaveContainerCommand(request.SessionKey, calledServerAddress, metaData, request.ResumePath, request.View, request.ViewType, request.ViewSignature, request.Completed, request.SubmittedDataXml),
+                ct),
+            isExpectedFailure: r => !r.SessionResolved,
+            expectedFailureReason: "InvalidSessionKey");
 
         return result.SessionResolved
             ? Ok(SaveContainerResponse.From(result.Response))
@@ -114,7 +148,13 @@ public sealed class HisoCompatController : ControllerBase
     public async Task<IActionResult> GetFormView([FromBody] GetFormViewRequest request, CancellationToken ct)
     {
         var calledServerAddress = HttpContext.Request.Host.Value;
-        var result = await _mediator.Send(new GetFormViewQuery(request.SessionKey, calledServerAddress), ct);
+        var context = new Dictionary<string, object?>();
+
+        var result = await _observer.ObserveAsync(
+            _logger, "hiso", "getFormView", context,
+            () => _mediator.Send(new GetFormViewQuery(request.SessionKey, calledServerAddress), ct),
+            isExpectedFailure: r => !r.SessionResolved,
+            expectedFailureReason: "InvalidSessionKey");
 
         return result.SessionResolved
             ? Ok(GetFormViewResponse.From(result.ResumePath, result.ViewType, result.View))

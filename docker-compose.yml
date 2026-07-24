@@ -20,15 +20,62 @@ services:
       context: .
       dockerfile: src/Api/Dockerfile
     environment:
-      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
-      ConnectionStrings__TenantRegistry: "Server=sqlserver,1433;Database=HekTenantRegistry;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=True;"
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ConnectionStrings__TenantRegistry: "Server=host.docker.internal,1433;Database=HekTenantRegistry;User Id=hek_dev;Password=${HOST_DB_PASSWORD};TrustServerCertificate=True;"
       Auth__Enabled: ${AUTH_ENABLED:-false}
       Auth__JwtSigningKey: ${AUTH_JWT_SIGNING_KEY:?AUTH_JWT_SIGNING_KEY must be set - see .env.example}
+      Otel__OtlpEndpoint: "http://aspire-dashboard:18889"
+      Legacy__DbCredentials__dbserver-local: ${LEGACY_DBCREDENTIALS_DBSERVER_LOCAL}
+      # v1.1 spec follow-through Step 8: these previously only lived in the gitignored
+      # appsettings.Development.local.json, which is correctly excluded from the Docker image
+      # (.dockerignore fix, earlier this session) - that fix also silently dropped KARO's working
+      # dev credential from the container. Restored here properly, via env var, not the excluded file.
+      Karo__DbCredentials__ConnIndiciDB901: ${KARO_DBCREDENTIALS_CONNINDICIDB901}
+      Karo__DbCredentials__ConnIndiciDB_901_FZZ999-B: ${KARO_DBCREDENTIALS_CONNINDICIDB_901_FZZ999B}
+      Erms__DbCredentials__ConnIndiciDB_901: ${ERMS_DBCREDENTIALS_CONNINDICIDB_901}
+      Erms__DbCredentials__ConnIndiciDB_FZZ999-B: ${ERMS_DBCREDENTIALS_CONNINDICIDB_FZZ999B}
+      Erms__DbCredentials__ConnIndiciDB_901_FZZ999-B: ${ERMS_DBCREDENTIALS_CONNINDICIDB_901_FZZ999B}
+      # Real AWS document content lives in a separate DMS_PMS database (confirmed from the real
+      # concept dictionary: Patient_Attachment_Content -> DMS_PMS.dbo.tblDocumentDetail), not the
+      # PMS_NZ_V2 connection used everywhere else - AWS enrichment (2026-07-24) needs this explicitly.
+      Hiso__DmsConnectionString: ${HISO_DMS_CONNECTION_STRING}
+      # Real AWS S3 content-fetch API - confirmed via DLL reflection (AWSDocCore.DocumentManager) that
+      # this is the .NET Core replacement for the old AWSDoc.dll's App.config <appSettings> values.
+      Hiso__DmsAwsBaseUrl: ${HISO_DMS_AWS_BASE_URL}
+      Hiso__DmsAwsSecretKey: ${HISO_DMS_AWS_SECRET_KEY}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "dbserver-local:192.168.5.9"
     ports:
       - "8080:8080"
     depends_on:
-      sqlserver:
-        condition: service_healthy
+      aspire-dashboard:
+        condition: service_started
+
+  # v1.1 spec follow-through Step 15: fully separate from the API (confirmed architecture) - own
+  # image, calls the API over plain HTTP from the browser (VITE_API_BASE_URL is the host-exposed
+  # api port, not an internal Docker service name, since this runs client-side in the user's browser).
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:8080
+    ports:
+      - "5174:80"
+    depends_on:
+      - api
+
+  # NFR-5 telemetry viewer: receives OpenTelemetry traces/metrics over OTLP from `api` and renders
+  # them as a live web UI - one container instead of standing up Jaeger + Prometheus + Grafana
+  # separately. No auth needed for the demo (DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=true).
+  aspire-dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:8.0
+    environment:
+      DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
+    ports:
+      - "18888:18888" # dashboard UI - http://localhost:18888
+      - "18889:18889" # OTLP gRPC receiver
 
 volumes:
   sqlserver-data:

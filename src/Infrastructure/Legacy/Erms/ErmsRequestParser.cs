@@ -19,7 +19,9 @@ public sealed class ErmsRequestParser : IErmsRequestParser
             return value;
         }
 
-        if (int.TryParse(value, out _))
+        // Real Indici IDs (patientId/appointmentId) are `long`, not `int` - see Decrypt() below for
+        // the same fix and full rationale (2026-07-24, confirmed real bug, not a legacy quirk).
+        if (long.TryParse(value, out _))
         {
             return value;
         }
@@ -41,7 +43,11 @@ public sealed class ErmsRequestParser : IErmsRequestParser
             return value;
         }
 
-        return int.TryParse(value, out _) ? value : _encryption.Decrypt(value);
+        // Real Indici IDs (patientId/appointmentId) are `long`, not `int` - a plain int.TryParse
+        // silently overflows on real values above Int32.MaxValue (2,147,483,647), wrongly falling
+        // through to Decrypt() and returning an empty string. Confirmed real bug (2026-07-24), not a
+        // legacy quirk to preserve - fixed per Zohaib's direction ("in indici appointmentids type is long").
+        return long.TryParse(value, out _) ? value : _encryption.Decrypt(value);
     }
 
     public (string? EncounterId, string PracticeSuffix, string? Pho, string? RawSecondSegment) ParseEncounterId(string? encounterId)

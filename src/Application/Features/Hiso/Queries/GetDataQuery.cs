@@ -3,6 +3,7 @@ using HekCoreApi.Application.Common.Interfaces;
 using HekCoreApi.Application.Common.Options;
 using HekCoreApi.Application.Features.Auth.Hiso;
 using MediatR;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace HekCoreApi.Application.Features.Hiso.Queries;
@@ -32,24 +33,28 @@ public sealed class GetDataQueryHandler : IRequestHandler<GetDataQuery, GetDataQ
     private readonly IHisoConceptDictionary _conceptDictionary;
     private readonly IHisoRequestEngine _requestEngine;
     private readonly HisoGetDataOptions _options;
+    private readonly ILogger<GetDataQueryHandler> _logger;
 
     public GetDataQueryHandler(
         IMediator mediator,
         IHisoConceptExecutor hisoExecutor,
         IHisoConceptDictionary conceptDictionary,
         IHisoRequestEngine requestEngine,
-        IOptions<HisoGetDataOptions> options)
+        IOptions<HisoGetDataOptions> options,
+        ILogger<GetDataQueryHandler> logger)
     {
         _mediator = mediator;
         _hisoExecutor = hisoExecutor;
         _conceptDictionary = conceptDictionary;
         _requestEngine = requestEngine;
         _options = options.Value;
+        _logger = logger;
     }
 
     public async Task<GetDataQueryResult> Handle(GetDataQuery request, CancellationToken cancellationToken)
     {
         var lookup = await _mediator.Send(new ResolveHisoSessionQuery(request.SessionKey, request.CalledServerAddress), cancellationToken);
+        _logger.LogDebug("GetData: session lookup returned {Status}", lookup.Status);
         if (lookup.Status != HisoSessionLookupStatus.Success || lookup.Context is null)
         {
             return new GetDataQueryResult(false, null);
@@ -59,6 +64,9 @@ public sealed class GetDataQueryHandler : IRequestHandler<GetDataQuery, GetDataQ
         // combination is a genuine empty stub in legacy too (static mode; parked/resume mode).
         if (!_options.IsDynamic || request.FormInstanceOperationMode != "N" || string.IsNullOrWhiteSpace(request.SubmittedDataXml))
         {
+            _logger.LogDebug(
+                "GetData: static/non-dynamic branch, returning stub response (IsDynamic={IsDynamic}, Mode={Mode})",
+                _options.IsDynamic, request.FormInstanceOperationMode);
             return new GetDataQueryResult(true, null);
         }
 

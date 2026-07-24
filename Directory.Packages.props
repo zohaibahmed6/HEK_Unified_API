@@ -1,49 +1,73 @@
 <Project>
-
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
-
   <ItemGroup>
     <!-- Logging -->
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageVersion Include="Serilog.AspNetCore" Version="8.0.3" />
     <PackageVersion Include="Serilog.Sinks.Console" Version="6.0.0" />
     <PackageVersion Include="Serilog.Sinks.File" Version="6.0.0" />
     <PackageVersion Include="Serilog.Enrichers.Environment" Version="3.0.1" />
-
     <!-- Validation / CQRS -->
     <PackageVersion Include="FluentValidation" Version="11.10.0" />
     <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="11.10.0" />
     <PackageVersion Include="MediatR" Version="12.4.1" />
-
     <!-- Cross-cutting abstractions permitted in Application (logging/options interfaces only, no
          concrete infrastructure - see ADR-012 for the documented interpretation). -->
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
     <PackageVersion Include="Microsoft.Extensions.Options" Version="8.0.2" />
-
     <!-- EF Core / SQL Server -->
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="8.0.10" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.10" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.10" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.10" />
-
+    <!-- Pinned above what EF Core 8.0.10 pulls transitively (5.2.0, built 2024-02-28) - that exact
+         version has a documented Linux-container connectivity bug (TCP Provider error 40 on every
+         connection attempt, regardless of target server) that plain Socket/TcpClient connections to
+         the same host:port do not exhibit - confirmed via a live A/B test in this container (2026-07-23,
+         see docker-compose.yml/deployment.md). Fixed in later 5.x patch releases. -->
+    <!-- v1.1 spec follow-through Step 5 (2026-07-24): bumped 5.2.2 -> 6.0.0 because the real
+         AWSDocCore.dll Zohaib supplied is strong-name-bound to exactly Microsoft.Data.SqlClient
+         6.0.0.0 - a plain <Reference> to a third-party DLL doesn't get .NET's usual NuGet version
+         unification, so a version mismatch throws FileNotFoundException at runtime (confirmed live:
+         every AWS-eligible HISO procedure call failed this way, silently swallowed by
+         HisoConceptExecutor's try/catch, masquerading as "no data" rather than a visible error).
+         Re-verify the container-networking bug noted below doesn't regress on 6.0.0 before relying on
+         this in production - smoke-tested broadly (tenant registry, HISO/KARO/ERMS) after this bump,
+         not just the AWS path, precisely because this pin used to guard against a real prior incident. -->
+    <PackageVersion Include="Microsoft.Data.SqlClient" Version="6.0.0" />
     <!-- Auth / Identity -->
     <!-- MSAL.NET: validates legacy service-account credentials against Microsoft Entra ID (ADR-002). -->
     <PackageVersion Include="Microsoft.Identity.Client" Version="4.66.2" />
+    <PackageVersion Include="SoapCore" Version="1.2.1.14" />
     <!-- Mints and validates HEK Core API's own resource-scoped JWTs (ADR-003) - distinct from Entra ID's tokens. -->
-    <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.2.1" />
+    <!-- v1.1 spec follow-through (2026-07-24): bumped 8.2.1 -> 8.14.0 because the real AWSDocCore.dll
+         is strong-name-bound to exactly Microsoft.IdentityModel.Tokens/System.IdentityModel.Tokens.Jwt
+         8.14.0.0 (confirmed via assembly-reference reflection) - same class of issue as the
+         Microsoft.Data.SqlClient/Newtonsoft.Json pins above: a mismatched version on a plain
+         <Reference> to a third-party DLL throws at runtime instead of resolving via NuGet unification.
+         Here it's silently swallowed by the vendor DLL's own try/catch (Helpers.GeneratePayload),
+         masquerading as an empty JWT/"invalid jwt" server response rather than a visible exception. -->
+    <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.14.0" />
+    <PackageVersion Include="Microsoft.IdentityModel.Tokens" Version="8.14.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.10" />
-
     <!-- Health checks -->
     <PackageVersion Include="AspNetCore.HealthChecks.SqlServer" Version="8.0.2" />
     <PackageVersion Include="AspNetCore.HealthChecks.UI.Client" Version="8.0.1" />
-
     <!-- Idempotency store (Day-1 in-memory implementation, see IIdempotencyStore remarks) -->
     <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="8.0.1" />
-
     <!-- OpenAPI (contract verification, Block 3, referenced here for CPM consistency) -->
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="6.9.0" />
-
+    <!-- Telemetry (NFR-5) - traces + metrics via OpenTelemetry, exported OTLP to the Aspire
+         Dashboard container added in docker-compose.yml. Additive to Serilog, does not replace it. -->
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.9.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.9.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.9.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.9.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.SqlClient" Version="1.9.0-beta.1" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.11.1" />
+    <PackageVersion Include="OpenTelemetry.Exporter.Console" Version="1.9.0" />
     <!-- Ported dormant DAL module (DMSDA.cs) - faithfully reproduces the legacy TIFF/BMP->PDF
          conversion. System.Drawing.Common is Windows-only since .NET 6 (throws
          PlatformNotSupportedException on Linux); the legacy code's own catch-all fallback (return
@@ -51,7 +75,6 @@
          break, just reduced capability on Linux containers (ADR-005). See ADR-012 for detail. -->
     <PackageVersion Include="System.Drawing.Common" Version="8.0.10" />
     <PackageVersion Include="PdfSharp" Version="6.1.1" />
-
     <!-- Testing -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageVersion Include="xunit" Version="2.9.2" />
@@ -62,5 +85,4 @@
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.10" />
     <PackageVersion Include="coverlet.collector" Version="6.0.2" />
   </ItemGroup>
-
 </Project>

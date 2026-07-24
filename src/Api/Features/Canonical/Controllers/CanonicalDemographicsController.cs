@@ -1,4 +1,5 @@
 using HekCoreApi.Api.Controllers;
+using HekCoreApi.Api.Telemetry;
 using HekCoreApi.Application.Common.Interfaces;
 using HekCoreApi.Application.Common.Models;
 using HekCoreApi.Contracts.Demographics;
@@ -34,11 +35,13 @@ public sealed class CanonicalDemographicsController : ResourceScopedControllerBa
 
     private readonly IDemographicsRepository _repository;
     private readonly ILogger<CanonicalDemographicsController> _logger;
+    private readonly HekTelemetry _telemetry;
 
-    public CanonicalDemographicsController(IDemographicsRepository repository, ILogger<CanonicalDemographicsController> logger)
+    public CanonicalDemographicsController(IDemographicsRepository repository, ILogger<CanonicalDemographicsController> logger, HekTelemetry telemetry)
     {
         _repository = repository;
         _logger = logger;
+        _telemetry = telemetry;
     }
 
     [HttpGet]
@@ -58,6 +61,14 @@ public sealed class CanonicalDemographicsController : ResourceScopedControllerBa
 
         var allowedFields = AllowedFieldsByOrigin[CurrentScope.OriginScope];
         var projection = FieldSelector.Project(canonical, requestedFields, allowedFields);
+
+        // FR-5/FR-6 telemetry (NFR-5): how many fields this call actually returned vs. how many the
+        // caller asked for outside its own scope and got silently dropped - a live, graphable version
+        // of the same field-scoping guarantee the demo proves manually in CanonicalDemoScript.md.
+        var blockedCount = requestedFields is { Length: > 0 }
+            ? requestedFields.Count(f => !allowedFields.Contains(f, StringComparer.OrdinalIgnoreCase))
+            : 0;
+        _telemetry.RecordFieldScoping(CurrentScope.OriginScope.ToString(), Request.Path, projection.Count, blockedCount);
 
         _logger.LogInformation(
             "CanonicalDemographicsAccess consumer={OriginScope} practiceId={PracticeId} patientId={PatientId} endpoint={Endpoint} fieldsReturned={FieldsReturned}",

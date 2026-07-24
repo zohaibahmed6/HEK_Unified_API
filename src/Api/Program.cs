@@ -21,8 +21,13 @@ using HekCoreApi.Infrastructure.Secrets;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using HekCoreApi.Api.Telemetry;
 using Microsoft.OpenApi.Models;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Serilog;
+using SoapCore;
 
 // Bootstrap logger - captures anything that happens before the full Serilog pipeline is configured
 // from appsettings (host-building failures, etc.).
@@ -56,9 +61,18 @@ try
     builder.Services.Configure<LegacyPracticeResolutionOptions>(builder.Configuration.GetSection(LegacyPracticeResolutionOptions.SectionName));
     builder.Services.Configure<HisoConceptMappingOptions>(builder.Configuration.GetSection(HisoConceptMappingOptions.SectionName));
     builder.Services.Configure<HisoGetDataOptions>(builder.Configuration.GetSection(HisoGetDataOptions.SectionName));
+    builder.Services.Configure<LegacyHostRoutingOptions>(builder.Configuration.GetSection(LegacyHostRoutingOptions.SectionName));
 
     // ---- Secrets (Block 0 vertical slice) ----
     builder.Services.AddSingleton<ISecretProvider, EnvironmentVariableSecretProvider>();
+
+    // ---- v1.1 spec follow-through Step 5: real AWSDoc.IndiciDMS (was a dormant no-op stub) ----
+    builder.Services.AddScoped<IAwsDocumentService, HekCoreApi.Infrastructure.Legacy.Hiso.AwsDocumentService>();
+
+    // ---- v1.1 spec follow-through Step 4: real HISO SOAP endpoint (SoapCore), see Features/Hiso/Soap ----
+    builder.Services.AddHttpContextAccessor();
+    builder.Services.AddSoapCore();
+    builder.Services.AddScoped<HekCoreApi.Api.Features.Hiso.Soap.IFormSessionService, HekCoreApi.Api.Features.Hiso.Soap.FormSessionService>();
 
     // ---- Dormant DAL module, SQL-injection-fixed (PROJECT_STATUS.md open item 23) ----
     // Registered so the fixed capability exists and is DI-resolvable, but no controller/endpoint
@@ -144,6 +158,48 @@ try
     builder.Services.AddCors(options => options.AddPolicy(CorsOptions.PolicyName, policy =>
         policy.WithOrigins(corsOptions.AllowedOrigins).AllowAnyHeader().AllowAnyMethod()));
 
+    // ---- Telemetry (NFR-5): OpenTelemetry traces + metrics, additive to Serilog (which keeps
+    // handling text logs unchanged). Exports via OTLP to the Aspire Dashboard container in
+    // docker-compose.yml when Otel:OtlpEndpoint is configured; otherwise falls back to the console
+    // exporter so `dotnet run` alone still shows traces/metrics without any collector running.
+    var otlpEndpoint = builder.Configuration["Otel:OtlpEndpoint"];
+    builder.Services.AddMetrics();
+    builder.Services.AddSingleton<HekTelemetry>();
+    builder.Services.AddSingleton<LegacyOperationObserver>();
+    builder.Services.AddOpenTelemetry()
+        .ConfigureResource(resource => resource.AddService(
+            serviceName: "HekCoreApi",
+            serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown"))
+        .WithTracing(tracing =>
+        {
+            tracing.AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddSqlClientInstrumentation(o => o.SetDbStatementForText = true);
+            if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+            {
+                tracing.AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint));
+            }
+            else
+            {
+                tracing.AddConsoleExporter();
+            }
+        })
+        .WithMetrics(metrics =>
+        {
+            metrics.AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddRuntimeInstrumentation()
+                .AddMeter(HekTelemetry.MeterName);
+            if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+            {
+                metrics.AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint));
+            }
+            else
+            {
+                metrics.AddConsoleExporter();
+            }
+        });
+
     // ---- Centralized exception handling (RFC 7807-inspired, Contract Design doc Section 10) ----
     builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
     builder.Services.AddProblemDetails();
@@ -185,6 +241,24 @@ try
 
     var app = builder.Build();
 
+    // v1.1 spec follow-through (2026-07-24): real `AWSDocCore.DocumentManager` global config - confirmed
+    // via reflection this is the .NET Core replacement for what the old .NET Framework AWSDoc.dll used
+    // to read from its own App.config `<appSettings>` (DMS_AWS_BaseURL/SecretKey/etc). Must be set once
+    // before any `DownloadFromAwsAsync` call - it's process-global static state inside the DLL, not
+    // per-request, so this runs once at startup rather than per HISO call.
+    {
+        using var awsConfigScope = app.Services.CreateScope();
+        var awsDocumentService = awsConfigScope.ServiceProvider.GetRequiredService<IAwsDocumentService>();
+        var awsBaseUrl = builder.Configuration["Hiso:DmsAwsBaseUrl"];
+        var awsSecretKey = builder.Configuration["Hiso:DmsAwsSecretKey"];
+        if (!string.IsNullOrEmpty(awsBaseUrl) && !string.IsNullOrEmpty(awsSecretKey))
+        {
+            var jwtExpiryMinutes = builder.Configuration.GetValue("Hiso:DmsAwsJwtTokenExpiryInMinutes", 2);
+            var s3TimeoutSeconds = builder.Configuration.GetValue("Hiso:DmsAwsS3BucketRequestTimeOut", 10);
+            awsDocumentService.ConfigureAws(awsBaseUrl, awsSecretKey, jwtExpiryMinutes, s3TimeoutSeconds);
+        }
+    }
+
     if (app.Environment.IsDevelopment())
     {
         app.UseSwagger();
@@ -195,9 +269,23 @@ try
         await TenantRegistrySeeder.SeedAsync(db);
     }
 
+    // v1.1 spec follow-through Step 4: real HISO SOAP endpoint, registered first (SoapCore's own raw
+    // path-matching middleware, independent of MVC routing) at the real address.
+    ((IApplicationBuilder)app).UseSoapEndpoint<HekCoreApi.Api.Features.Hiso.Soap.IFormSessionService>(
+        "/FormSessionService.svc",
+        new SoapEncoderOptions(),
+        SoapSerializer.XmlSerializer);
+
     // Correlation ID first - every downstream log line and the exception handler's traceId depend on it.
     app.UseCorrelationId();
     app.UseExceptionHandler();
+
+    // v1.1 spec follow-through Step 2: rewrite real external legacy paths (/api/..., /COL/...) onto
+    // this hub's existing internal routes before MVC routing runs - see LegacyHostRoutingMiddleware.
+    // Explicit UseRouting() is required here: without it, ASP.NET Core implicitly matches routes at
+    // the very start of the pipeline, before this rewrite would ever run.
+    app.UseLegacyHostRouting();
+    app.UseRouting();
 
     app.UseHttpsRedirection();
     app.UseCors(CorsOptions.PolicyName);

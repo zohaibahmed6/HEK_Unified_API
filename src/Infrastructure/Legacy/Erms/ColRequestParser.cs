@@ -19,7 +19,11 @@ public sealed class ColRequestParser : IColRequestParser
             return value;
         }
 
-        if (int.TryParse(value, out _))
+        // Real Indici IDs (patientId/appointmentId) are `long`, not `int` - a plain int.TryParse
+        // silently overflows on real values above Int32.MaxValue (2,147,483,647), wrongly falling
+        // through to Decrypt() and returning an empty string. Confirmed real bug (2026-07-24), not a
+        // legacy quirk to preserve - fixed per Zohaib's direction ("in indici appointmentids type is long").
+        if (long.TryParse(value, out _))
         {
             return value;
         }

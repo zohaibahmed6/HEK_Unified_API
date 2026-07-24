@@ -1,7 +1,9 @@
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using HekCoreApi.Adapters.Karo;
 using HekCoreApi.Adapters.Karo.Auth;
 using HekCoreApi.Adapters.Karo.Demographics;
+using HekCoreApi.Api.Telemetry;
 using HekCoreApi.Application.Features.Karo.Commands;
 using HekCoreApi.Application.Features.Karo.Queries;
 using MediatR;
@@ -22,10 +24,14 @@ namespace HekCoreApi.Api.Features.Auth.Controllers;
 public sealed class KaroCompatController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly ILogger<KaroCompatController> _logger;
+    private readonly LegacyOperationObserver _observer;
 
-    public KaroCompatController(IMediator mediator)
+    public KaroCompatController(IMediator mediator, ILogger<KaroCompatController> logger, LegacyOperationObserver observer)
     {
         _mediator = mediator;
+        _logger = logger;
+        _observer = observer;
     }
 
     /// <summary>Legacy: `GET /api/Ping` - no params, no auth, always returns exactly `{"status":"success"}`.</summary>
@@ -49,6 +55,12 @@ public sealed class KaroCompatController : ControllerBase
         var result = await _mediator.Send(
             new KaroAuthenticateQuery(request.Username, request.Password, request.PatientId, request.EncounterId, request.System, request.Pho), ct);
 
+        if (!result.Succeeded)
+        {
+            _observer.RecordExpectedFailure(_logger, "karo", nameof(AuthenticateAsync), result.ErrorMessage ?? "AuthenticationFailed",
+                new Dictionary<string, object?> { ["PatientId"] = request.PatientId, ["EncounterId"] = request.EncounterId });
+        }
+
         return Ok(result.Succeeded
             ? HssAuthenticateResponse.Success(result.Token, result.Expiry!.Value, result.PracticeId)
             : HssAuthenticateResponse.Fail(result.ErrorMessage ?? "Authentication failed!"));
@@ -63,6 +75,8 @@ public sealed class KaroCompatController : ControllerBase
 
         if (!result.Succeeded)
         {
+            _observer.RecordExpectedFailure(_logger, "karo", nameof(GetDemographics), result.ErrorMessage ?? "InvalidTokenValue",
+                new Dictionary<string, object?> { ["PatientId"] = patientId, ["EncounterId"] = encounterId });
             return Ok(KaroFailResponse.Of(result.ErrorMessage ?? "Invalid token value!"));
         }
 
@@ -217,15 +231,27 @@ public sealed class KaroCompatController : ControllerBase
         return WriteResult(await _mediator.Send(new KaroSaveSummaryCommand(patientId, encounterId, system, identifier, providerId, dateTimeRecorded, entriesJson, GetAuthorizationToken()), ct));
     }
 
-    private IActionResult WriteResult(KaroWriteResult result) =>
-        result.Succeeded
-            ? Ok(new { status = "success", message = result.SuccessMessage ?? string.Empty })
-            : Ok(KaroFailResponse.Of(result.ErrorMessage ?? "Invalid token value!"));
+    private IActionResult WriteResult(KaroWriteResult result, [CallerMemberName] string endpoint = "")
+    {
+        if (!result.Succeeded)
+        {
+            _observer.RecordExpectedFailure(_logger, "karo", endpoint, result.ErrorMessage ?? "InvalidTokenValue", new Dictionary<string, object?>());
+            return Ok(KaroFailResponse.Of(result.ErrorMessage ?? "Invalid token value!"));
+        }
 
-    private IActionResult RootOrFail<T>(Application.Features.Karo.Queries.KaroListResult<T> result, string resourceType) =>
-        result.Succeeded
-            ? Ok(new KaroRootResponse<T>(result.PatientId, resourceType, "hss", result.Entries ?? []))
-            : Ok(KaroFailResponse.Of(result.ErrorMessage ?? "Invalid token value!"));
+        return Ok(new { status = "success", message = result.SuccessMessage ?? string.Empty });
+    }
+
+    private IActionResult RootOrFail<T>(Application.Features.Karo.Queries.KaroListResult<T> result, string resourceType, [CallerMemberName] string endpoint = "")
+    {
+        if (!result.Succeeded)
+        {
+            _observer.RecordExpectedFailure(_logger, "karo", endpoint, result.ErrorMessage ?? "InvalidTokenValue", new Dictionary<string, object?> { ["PatientId"] = result.PatientId });
+            return Ok(KaroFailResponse.Of(result.ErrorMessage ?? "Invalid token value!"));
+        }
+
+        return Ok(new KaroRootResponse<T>(result.PatientId, resourceType, "hss", result.Entries ?? []));
+    }
 
     /// <summary>Legacy: `GetAuthorizationToken()` (`APIController.cs:1976`) - reads the `Bearer` token from the `Authorization` header.</summary>
     private string? GetAuthorizationToken()

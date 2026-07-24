@@ -1,7 +1,9 @@
+using System.Runtime.CompilerServices;
 using System.Xml;
 using System.Xml.Serialization;
 using HekCoreApi.Adapters.Erms.Auth;
 using HekCoreApi.Adapters.Erms.Hiso;
+using HekCoreApi.Api.Telemetry;
 using HekCoreApi.Application.Common.Interfaces;
 using HekCoreApi.Application.Features.Erms.Commands;
 using HekCoreApi.Application.Features.Erms.Queries;
@@ -22,11 +24,15 @@ public sealed class ErmsCompatController : ControllerBase
 {
     private readonly IMediator _mediator;
     private readonly ISecretProvider _secretProvider;
+    private readonly ILogger<ErmsCompatController> _logger;
+    private readonly LegacyOperationObserver _observer;
 
-    public ErmsCompatController(IMediator mediator, ISecretProvider secretProvider)
+    public ErmsCompatController(IMediator mediator, ISecretProvider secretProvider, ILogger<ErmsCompatController> logger, LegacyOperationObserver observer)
     {
         _mediator = mediator;
         _secretProvider = secretProvider;
+        _logger = logger;
+        _observer = observer;
     }
 
     /// <summary>Legacy: `GET /api/Ping` - real reply `&lt;Ping&gt;Success!&lt;/Ping&gt;`.</summary>
@@ -53,6 +59,7 @@ public sealed class ErmsCompatController : ControllerBase
 
         if (credential is null)
         {
+            _logger.LogWarning("Erms authenticate: request body failed to deserialize as {Type}", nameof(ErmsCredential));
             return XmlResult(new ErmsErrorResponse());
         }
 
@@ -74,25 +81,25 @@ public sealed class ErmsCompatController : ControllerBase
     {
         var result = string.Empty;
         var error = string.Empty;
+        var context = new Dictionary<string, object?> { ["PatientId"] = pmsPatientId, ["EncounterId"] = pmsEncounterId };
 
         var queryResult = await _mediator.Send(new ErmsGetPatientDataQuery(pmsPatientId, pmsEncounterId, GetAuthorizationToken()), ct);
         if (queryResult.Succeeded)
         {
-            try
+            var (mapped, mapError) = await _observer.ObserveSwallowedAsync(_logger, "erms", nameof(GetPatientData), context, () =>
             {
                 var listPatientData = ErmsDataTableMapper.ToListHiso<PatientData>(queryResult.Table!);
 
                 // Legacy quirk preserved: no null check - a null mapper result NREs here and the
                 // exception message becomes the <Error><Message> text, exactly as legacy behaves.
-                result = PrepareXml(listPatientData!.Count > 0 ? listPatientData[0] : new PatientData());
-            }
-            catch (Exception ex)
-            {
-                error = ex.Message;
-            }
+                return Task.FromResult(PrepareXml(listPatientData!.Count > 0 ? listPatientData[0] : new PatientData()));
+            });
+            result = mapped ?? string.Empty;
+            error = mapError ?? string.Empty;
         }
         else
         {
+            _observer.RecordExpectedFailure(_logger, "erms", nameof(GetPatientData), queryResult.ErrorMessage ?? "Unknown", context);
             error = queryResult.ErrorMessage ?? string.Empty;
         }
 
@@ -104,7 +111,7 @@ public sealed class ErmsCompatController : ControllerBase
     public async Task<IActionResult> GetPatientMeasurement(string? pmsPatientId, string? pmsEncounterId, CancellationToken ct)
     {
         var queryResult = await _mediator.Send(new ErmsGetPatientMeasurementQuery(pmsPatientId, pmsEncounterId, GetAuthorizationToken()), ct);
-        return RenderSingle<Measurement>(queryResult);
+        return await RenderSingle<Measurement>(queryResult);
     }
 
     /// <summary>Legacy: `GET GetSmokingStatus(pmsPatientId, pmsEncounterId)` (`APIController.cs:1476`) - `[HSS].[uspGetSmokingStatus]`; AddRange without a null check (legacy NRE quirk on mapper failure).</summary>
@@ -112,7 +119,7 @@ public sealed class ErmsCompatController : ControllerBase
     public async Task<IActionResult> GetSmokingStatus(string? pmsPatientId, string? pmsEncounterId, CancellationToken ct)
     {
         var queryResult = await _mediator.Send(new ErmsGetSmokingStatusQuery(pmsPatientId, pmsEncounterId, GetAuthorizationToken()), ct);
-        return Render(queryResult, table =>
+        return await Render(queryResult, table =>
         {
             var envelope = new SmokingStatus();
             envelope.Smoking.AddRange(ErmsDataTableMapper.ToListHiso<Smoking>(table)!);
@@ -125,7 +132,7 @@ public sealed class ErmsCompatController : ControllerBase
     public async Task<IActionResult> GetCurrentUser(string? pmsPatientId, string? pmsEncounterId, string LocationId = "", string pmsUserId = "", CancellationToken ct = default)
     {
         var queryResult = await _mediator.Send(new ErmsGetCurrentUserQuery(pmsPatientId, pmsEncounterId, LocationId, pmsUserId, GetAuthorizationToken()), ct);
-        return RenderSingle<CurrentUser>(queryResult);
+        return await RenderSingle<CurrentUser>(queryResult);
     }
 
     /// <summary>Legacy: `GET GetNextOfKin(pmsPatientId, pmsEncounterId)` (`APIController.cs:793`) - `[HSS].[uspGetNextOfKin]`, list envelope with null/count guard.</summary>
@@ -133,7 +140,7 @@ public sealed class ErmsCompatController : ControllerBase
     public async Task<IActionResult> GetNextOfKin(string? pmsPatientId, string? pmsEncounterId, CancellationToken ct)
     {
         var queryResult = await _mediator.Send(new ErmsGetNextOfKinQuery(pmsPatientId, pmsEncounterId, GetAuthorizationToken()), ct);
-        return Render(queryResult, table =>
+        return await Render(queryResult, table =>
         {
             var envelope = new NextOfKin();
             var list = ErmsDataTableMapper.ToListHiso<PatientNOK>(table);
@@ -151,7 +158,7 @@ public sealed class ErmsCompatController : ControllerBase
     public async Task<IActionResult> GetRegisteredPractitioners(string? pmsPatientId, string? pmsEncounterId, string pmsLocationId = "", CancellationToken ct = default)
     {
         var queryResult = await _mediator.Send(new ErmsGetRegisteredPractitionersQuery(pmsPatientId, pmsEncounterId, pmsLocationId, GetAuthorizationToken()), ct);
-        return Render(queryResult, table =>
+        return await Render(queryResult, table =>
         {
             var envelope = new RegisteredPractitioners();
             envelope.RegisteredPractitioner.AddRange(ErmsDataTableMapper.ToListHiso<RegisteredPractitioner>(table)!);
@@ -166,7 +173,7 @@ public sealed class ErmsCompatController : ControllerBase
     {
         var queryResult = await _mediator.Send(new ErmsGetAccidentsQuery(pmsPatientId, pmsEncounterId, pmsOrder, pmsMinDateTime, pmsMaxDateTime, GetAuthorizationToken()), ct);
         var dateFormat = await GetDateFormatAsync(ct);
-        return Render(queryResult, table =>
+        return await Render(queryResult, table =>
         {
             var envelope = new Accidents();
             var list = ErmsDataTableMapper.ToListHiso<Accident>(table);
@@ -191,7 +198,7 @@ public sealed class ErmsCompatController : ControllerBase
     {
         var queryResult = await _mediator.Send(new ErmsGetClassificationsQuery(pmsPatientId, pmsEncounterId, pmsOrder, pmsMinDateTime, pmsMaxDateTime, GetAuthorizationToken()), ct);
         var dateFormat = await GetDateFormatAsync(ct);
-        return Render(queryResult, table =>
+        return await Render(queryResult, table =>
         {
             var envelope = new Problems();
             var list = ErmsDataTableMapper.ToListHiso<PatientProblem>(table);
@@ -211,7 +218,7 @@ public sealed class ErmsCompatController : ControllerBase
         string pmsMinDateTime = "", string pmsMaxDateTime = "", CancellationToken ct = default)
     {
         var queryResult = await _mediator.Send(new ErmsGetConsultNotesQuery(pmsPatientId, pmsEncounterId, pmsOrder, pmsMinDateTime, pmsMaxDateTime, GetAuthorizationToken()), ct);
-        return Render(queryResult, table =>
+        return await Render(queryResult, table =>
         {
             var envelope = new ConsultNotes();
             var list = ErmsDataTableMapper.ToListHiso<Consult>(table);
@@ -232,7 +239,7 @@ public sealed class ErmsCompatController : ControllerBase
     {
         var queryResult = await _mediator.Send(new ErmsGetMedicalAllergiesQuery(pmsPatientId, pmsEncounterId, pmsOrder, pmsMinDateTime, pmsMaxDateTime, GetAuthorizationToken()), ct);
         var dateFormat = await GetDateFormatAsync(ct);
-        return Render(queryResult, table =>
+        return await Render(queryResult, table =>
         {
             var envelope = new MedicalWarnings();
             var list = ErmsDataTableMapper.ToListHiso<MedicalWarning>(table);
@@ -253,7 +260,7 @@ public sealed class ErmsCompatController : ControllerBase
     {
         var queryResult = await _mediator.Send(new ErmsGetPrescribedMedicationsQuery(pmsPatientId, pmsEncounterId, pmsOrder, pmsMinDateTime, pmsMaxDateTime, GetAuthorizationToken()), ct);
         var dateFormat = await GetDateFormatAsync(ct);
-        return Render(queryResult, table =>
+        return await Render(queryResult, table =>
         {
             var envelope = new PrescribedMedications();
             var list = ErmsDataTableMapper.ToListHiso<PrescribedMedication>(table);
@@ -274,7 +281,7 @@ public sealed class ErmsCompatController : ControllerBase
     {
         var queryResult = await _mediator.Send(new ErmsGetRegularMedicationsQuery(pmsPatientId, pmsEncounterId, pmsOrder, pmsMinDateTime, pmsMaxDateTime, GetAuthorizationToken()), ct);
         var dateFormat = await GetDateFormatAsync(ct);
-        return Render(queryResult, table =>
+        return await Render(queryResult, table =>
         {
             var envelope = new RegularMedications();
             var list = ErmsDataTableMapper.ToListHiso<RegularMedication>(table);
@@ -295,7 +302,7 @@ public sealed class ErmsCompatController : ControllerBase
     {
         var queryResult = await _mediator.Send(new ErmsGetLaboratoryReportListQuery(pmsPatientId, pmsEncounterId, pmsOrder, pmsMinDateTime, pmsMaxDateTime, GetAuthorizationToken()), ct);
         var dateFormat = await GetDateFormatAsync(ct);
-        return Render(queryResult, table =>
+        return await Render(queryResult, table =>
         {
             var envelope = new LaboratoryReports();
             var list = ErmsDataTableMapper.ToListHiso<LaboratoryReport>(table);
@@ -316,7 +323,7 @@ public sealed class ErmsCompatController : ControllerBase
     {
         var queryResult = await _mediator.Send(new ErmsGetRadiologyReportListQuery(pmsPatientId, pmsEncounterId, pmsOrder, pmsMinDateTime, pmsMaxDateTime, GetAuthorizationToken()), ct);
         var dateFormat = await GetDateFormatAsync(ct);
-        return Render(queryResult, table =>
+        return await Render(queryResult, table =>
         {
             var envelope = new RadiologyReports();
             var list = ErmsDataTableMapper.ToListHiso<RadiologyGroup>(table);
@@ -337,7 +344,7 @@ public sealed class ErmsCompatController : ControllerBase
     {
         var queryResult = await _mediator.Send(new ErmsGetDischargeSummaryReportListQuery(pmsPatientId, pmsEncounterId, pmsOrder, pmsMinDateTime, pmsMaxDateTime, GetAuthorizationToken()), ct);
         var dateFormat = await GetDateFormatAsync(ct);
-        return Render(queryResult, table =>
+        return await Render(queryResult, table =>
         {
             var envelope = new DischargeReports();
             var list = ErmsDataTableMapper.ToListHiso<Group>(table);
@@ -358,7 +365,7 @@ public sealed class ErmsCompatController : ControllerBase
     {
         var queryResult = await _mediator.Send(new ErmsGetScannedListQuery(pmsPatientId, pmsEncounterId, pmsOrder, pmsMinDateTime, pmsMaxDateTime, GetAuthorizationToken()), ct);
         var dateFormat = await GetDateFormatAsync(ct);
-        return Render(queryResult, table =>
+        return await Render(queryResult, table =>
         {
             var envelope = new ScanDocumentReports();
             var list = ErmsDataTableMapper.ToListHiso<ScannedGroup>(table);
@@ -377,7 +384,7 @@ public sealed class ErmsCompatController : ControllerBase
     public async Task<IActionResult> GetLaboratoryReportDetails(string? pmsPatientId, string? pmsEncounterId, string? pmsReferenceId, CancellationToken ct)
     {
         var queryResult = await _mediator.Send(new ErmsGetLaboratoryReportDetailsQuery(pmsPatientId, pmsEncounterId, pmsReferenceId, GetAuthorizationToken()), ct);
-        return Render(queryResult, table =>
+        return await Render(queryResult, table =>
         {
             var envelope = new LaboratoryReportsContent();
             var list = ErmsDataTableMapper.ToListHiso<LaboratoryReportContent>(table);
@@ -400,7 +407,7 @@ public sealed class ErmsCompatController : ControllerBase
     public async Task<IActionResult> GetRadiologyReportDetails(string? pmsPatientId, string? pmsEncounterId, string? pmsReferenceId, CancellationToken ct)
     {
         var queryResult = await _mediator.Send(new ErmsGetRadiologyReportDetailsQuery(pmsPatientId, pmsEncounterId, pmsReferenceId, GetAuthorizationToken()), ct);
-        return Render(queryResult, table =>
+        return await Render(queryResult, table =>
         {
             var envelope = new RadiologyReportContents();
             var list = ErmsDataTableMapper.ToListHiso<RadiologyReportContent>(table);
@@ -423,7 +430,7 @@ public sealed class ErmsCompatController : ControllerBase
     public async Task<IActionResult> GetDischargeSummaryDetails(string? pmsPatientId, string? pmsEncounterId, string? pmsReferenceId, CancellationToken ct)
     {
         var queryResult = await _mediator.Send(new ErmsGetDischargeSummaryDetailsQuery(pmsPatientId, pmsEncounterId, pmsReferenceId, GetAuthorizationToken()), ct);
-        return Render(queryResult, table =>
+        return await Render(queryResult, table =>
         {
             var envelope = new DischargeSummaryContents();
             var list = ErmsDataTableMapper.ToListHiso<DischargeSummaryContent>(table);
@@ -445,7 +452,7 @@ public sealed class ErmsCompatController : ControllerBase
     public async Task<IActionResult> GetScannedDetails(string? pmsPatientId, string? pmsEncounterId, string? pmsReferenceId, CancellationToken ct)
     {
         var queryResult = await _mediator.Send(new ErmsGetScannedDetailsQuery(pmsPatientId, pmsEncounterId, pmsReferenceId, GetAuthorizationToken()), ct);
-        return Render(queryResult, table =>
+        return await Render(queryResult, table =>
         {
             var envelope = new ScanReportContent();
             var list = ErmsDataTableMapper.ToListHiso<ScannedGroup>(table);
@@ -474,21 +481,31 @@ public sealed class ErmsCompatController : ControllerBase
     {
         var error = string.Empty;
         var objDocument = new ReferralDocument();
+        var context = new Dictionary<string, object?>();
 
         try
         {
             var serializer = new XmlSerializer(typeof(ReferralDocument));
             using var reader = new StringReader(rawXml);
             objDocument = (ReferralDocument)serializer.Deserialize(reader)!;
+            context["DocumentID"] = objDocument.DocumentID;
+            context["PatientId"] = objDocument.PatiendID;
+            context["EncounterId"] = objDocument.EncounterID;
 
             var result = await _mediator.Send(new ErmsSaveDocumentCommand(
                 objDocument.ID, objDocument.DocumentID, objDocument.PatiendID, objDocument.EncounterID,
                 objDocument.ProviderID, objDocument.Type, objDocument.ItemType, objDocument.CreatedDate,
                 objDocument.ContentType, objDocument.Content, GetAuthorizationToken()), ct);
             error = result.Error;
+
+            if (!string.IsNullOrEmpty(error))
+            {
+                _observer.RecordExpectedFailure(_logger, "erms", nameof(SaveDocument), error, context);
+            }
         }
         catch (Exception ex)
         {
+            _observer.RecordUnexpectedFailure(_logger, "erms", nameof(SaveDocument), ex, context);
             error = ex.Message;
         }
         finally
@@ -516,33 +533,30 @@ public sealed class ErmsCompatController : ControllerBase
     }
 
     /// <summary>Legacy single-object shape: `list[0]` else `new T()`, with the real no-null-check NRE quirk on mapper failure.</summary>
-    private IActionResult RenderSingle<T>(ErmsReadResult queryResult) where T : class, new() =>
+    private Task<IActionResult> RenderSingle<T>(ErmsReadResult queryResult, [CallerMemberName] string endpoint = "") where T : class, new() =>
         Render(queryResult, table =>
         {
             var list = ErmsDataTableMapper.ToListHiso<T>(table);
             return PrepareXml(list!.Count > 0 ? list[0] : new T());
-        });
+        }, endpoint);
 
     /// <summary>Shared tail of every legacy Get* operation: serialize on success, exception message into the error envelope, always HTTP 200 via `SetToXml`.</summary>
-    private static IActionResult Render(ErmsReadResult queryResult, Func<System.Data.DataTable, string> serialize)
+    private async Task<IActionResult> Render(ErmsReadResult queryResult, Func<System.Data.DataTable, string> serialize, [CallerMemberName] string endpoint = "")
     {
         var result = string.Empty;
         var error = string.Empty;
+        var context = new Dictionary<string, object?>();
 
         if (queryResult.Succeeded)
         {
-            try
-            {
-                result = serialize(queryResult.Table!);
-            }
-            catch (Exception ex)
-            {
-                error = ex.Message;
-            }
+            var (mapped, mapError) = await _observer.ObserveSwallowedAsync(_logger, "erms", endpoint, context, () => Task.FromResult(serialize(queryResult.Table!)));
+            result = mapped ?? string.Empty;
+            error = mapError ?? string.Empty;
         }
         else
         {
             error = queryResult.ErrorMessage ?? string.Empty;
+            _observer.RecordExpectedFailure(_logger, "erms", endpoint, error, context);
         }
 
         return SetToXml(result, error);

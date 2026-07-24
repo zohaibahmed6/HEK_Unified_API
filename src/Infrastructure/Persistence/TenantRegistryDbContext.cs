@@ -18,6 +18,8 @@ public sealed class TenantRegistryDbContext : DbContext
 
     public DbSet<HisoSessionRegistryEntry> HisoSessions => Set<HisoSessionRegistryEntry>();
 
+    public DbSet<LegacyGlobalConnectionEntry> LegacyGlobalConnections => Set<LegacyGlobalConnectionEntry>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(TenantRegistryDbContext).Assembly);

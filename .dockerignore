@@ -9,3 +9,4 @@ hek_analysis/
 docs/adr/
 *.md
 .env
+**/appsettings.*.local.json

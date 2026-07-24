@@ -9,8 +9,21 @@ info:
     of the contract document) — version is tracked here via info.version and
     an append-only changelog only; no request/response shape changes without
     a coordinated migration.
-  version: "1.1.4"
+  version: "1.1.5"
   x-changelog:
+    - version: "1.1.5"
+      date: "2026-07-23"
+      description: >
+        Synced demographics to real running code: added GET /v1/patients/{patientId}/demographics
+        (one merged endpoint, DemographicsCanonical schema, ?fields= sparse-fieldset support,
+        per-originScope server-side field scoping) matching CanonicalDemographicsController.
+        The four separate /patients/{patientId}/demographics/{hiso,karo,erms,col} paths from v1.1
+        are marked deprecated: true and kept only for historical traceability - no real controller
+        implements them. See Unified-Healthcare-API_API-Contract-Design.md Section 4.2/6.2/Decision 6
+        for the full reconciliation. Note: the new path's "/v1" prefix was confirmed 2026-07-23 to be
+        a deliberate, uniform choice across all 15 canonical hub controllers, not a one-off - the
+        contract doc's Section 9 versioning policy has been revised accordingly (two-tier model:
+        legacy-compat stays unversioned, the hub uses /v1 URL-path versioning).
     - version: "1.1.4"
       date: "2026-07-20"
       description: >
@@ -156,10 +169,46 @@ paths:
                     type: string
                     example: "ok"
 
-  /patients/{patientId}/demographics/hiso:
+  /v1/patients/{patientId}/demographics:
     get:
       tags: [Demographics]
-      summary: Retrieve HISO-shaped patient demographics (kept separate per stakeholder decision, not merged)
+      summary: >
+        Canonical demographics — one endpoint for every consumer (synced 2026-07-23 to match
+        CanonicalDemographicsController; supersedes the four-separate-endpoint design below,
+        deprecated but not yet removed).
+      description: >
+        The caller's originScope claim determines which legacy repository is queried server-side
+        and which canonical fields the response may contain (FR-5). Non-allowed fields are omitted
+        entirely, never returned null. Optional `fields` query param further narrows the response
+        to a subset of the caller's allowed fields (FR-4); requesting a field outside the caller's
+        scope silently drops it rather than erroring. Every call emits a CanonicalDemographicsAccess
+        structured log line (consumer, practiceId, patientId, fields returned — FR-6).
+      parameters:
+        - $ref: '#/components/parameters/patientId'
+        - name: fields
+          in: query
+          required: false
+          schema: { type: string }
+          description: Comma-separated list of canonical field names to return, intersected with the caller's allowed fields.
+      responses:
+        '200':
+          description: Demographic data, shaped per the caller's originScope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DemographicsCanonical'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /patients/{patientId}/demographics/hiso:
+    get:
+      deprecated: true
+      tags: [Demographics]
+      summary: >
+        DEPRECATED 2026-07-23 — superseded by GET /v1/patients/{patientId}/demographics. Kept in
+        this spec only for historical traceability of the v1.1 (2026-07-19) four-endpoint design;
+        not implemented by any real controller.
       parameters:
         - $ref: '#/components/parameters/patientId'
       responses:
@@ -175,8 +224,9 @@ paths:
 
   /patients/{patientId}/demographics/karo:
     get:
+      deprecated: true
       tags: [Demographics]
-      summary: Retrieve KARO-shaped patient demographics (kept separate per stakeholder decision, not merged)
+      summary: "DEPRECATED 2026-07-23 — superseded by GET /v1/patients/{patientId}/demographics."
       parameters:
         - $ref: '#/components/parameters/patientId'
       responses:
@@ -192,8 +242,9 @@ paths:
 
   /patients/{patientId}/demographics/erms:
     get:
+      deprecated: true
       tags: [Demographics]
-      summary: Retrieve ERMS-shaped patient demographics (kept separate per stakeholder decision, not merged)
+      summary: "DEPRECATED 2026-07-23 — superseded by GET /v1/patients/{patientId}/demographics."
       parameters:
         - $ref: '#/components/parameters/patientId'
       responses:
@@ -209,8 +260,9 @@ paths:
 
   /patients/{patientId}/demographics/col:
     get:
+      deprecated: true
       tags: [Demographics]
-      summary: Retrieve COL/Pegasus-shaped patient demographics (kept separate per stakeholder decision, not merged)
+      summary: "DEPRECATED 2026-07-23 — superseded by GET /v1/patients/{patientId}/demographics."
       parameters:
         - $ref: '#/components/parameters/patientId'
       responses:
@@ -1143,9 +1195,27 @@ components:
         practiceId: { type: string }
         originScope: { type: string, enum: [HISO, KARO, ERMS, COL] }
 
+    DemographicsCanonical:
+      type: object
+      description: >
+        Real shape returned by GET /v1/patients/{patientId}/demographics
+        (src/Contracts/Demographics/DemographicsCanonical.cs). One record spans all four origins;
+        fields not populated by the caller's own origin are simply absent from the response
+        (server-side field scoping, not client-visible nulling).
+      properties:
+        patientId: { type: integer }
+        practiceId: { type: string, nullable: true }
+        firstName: { type: string }
+        lastName: { type: string }
+        dateOfBirth: { type: string, format: date, nullable: true }
+        dateOfEnrolment: { type: string, format: date, nullable: true }
+        endEnrolmentDate: { type: string, format: date, nullable: true }
+        encounterId: { type: integer, nullable: true }
+        nhi: { type: string, nullable: true }
+
     DemographicsHiso:
       type: object
-      description: HISO's concept-driven demographics shape. Kept separate, not merged (Section 8 Decision 6 of the contract doc).
+      description: DEPRECATED 2026-07-23 — only used by the deprecated /patients/{patientId}/demographics/hiso path kept for historical traceability. Real traffic uses DemographicsCanonical.
       properties:
         patientId: { type: integer }
         practiceId: { type: string }
@@ -1155,7 +1225,7 @@ components:
 
     DemographicsKaro:
       type: object
-      description: KARO's DemographicInfo shape, per KARO_HSS_doc.md sample. Kept separate, not merged.
+      description: DEPRECATED 2026-07-23 — only used by the deprecated /patients/{patientId}/demographics/karo path kept for historical traceability. Real traffic uses DemographicsCanonical.
       properties:
         patientId: { type: integer }
         practiceId: { type: string }
@@ -1167,7 +1237,7 @@ components:
 
     DemographicsErms:
       type: object
-      description: ERMS APIController's PatientData shape (JSON-translated from legacy XML). Kept separate, not merged.
+      description: DEPRECATED 2026-07-23 — only used by the deprecated /patients/{patientId}/demographics/erms path kept for historical traceability. Real traffic uses DemographicsCanonical.
       properties:
         patientId: { type: integer }
         encounterId: { type: integer }
@@ -1178,7 +1248,7 @@ components:
 
     DemographicsCol:
       type: object
-      description: COL/Pegasus PegasusAPIModel.PatientData shape. Kept separate, not merged.
+      description: DEPRECATED 2026-07-23 — only used by the deprecated /patients/{patientId}/demographics/col path kept for historical traceability. Real traffic uses DemographicsCanonical.
       properties:
         patientId: { type: integer }
         practiceId: { type: string }

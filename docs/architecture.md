@@ -77,12 +77,25 @@ The canonical path (`v1/patients/{id}/demographics`) reuses the *same* `IDemogra
 (zero new DB code) and instead maps the result onto `DemographicsCanonical`, applying per-origin
 field scoping (`FieldSelector.Project`) before serializing.
 
-## Known drift (yaml vs. real controllers)
+## Known drift (yaml vs. real controllers) — RESOLVED 2026-07-23
 
-The OpenAPI yaml (v1.1.4) documents four separate canonical demographics paths
-(`/patients/{patientId}/demographics/hiso|karo|erms|col`). The real
-`CanonicalDemographicsController` instead exposes one merged, versioned endpoint
-(`v1/patients/{patientId}/demographics`) that infers the source system from the caller's JWT
-`OriginScope` claim and accepts a `?fields=` query parameter for sparse fieldsets. This is not a
-trivial missing-route fix — it's a structural difference — so the yaml was left untouched per
-instructions; logged in `docs/CHANGELOG.md` instead.
+Previously: the OpenAPI yaml (v1.1.4) documented four separate canonical demographics paths while
+real code had one merged endpoint. **Fixed 2026-07-23** — the yaml (now v1.1.5) and its companion
+contract-design doc were synced to the real `CanonicalDemographicsController` shape (one merged
+`GET /v1/patients/{patientId}/demographics`, `?fields=` support); the old 4-path design is kept
+`deprecated: true` for historical traceability only. Full detail in `docs/CHANGELOG.md`.
+
+## Telemetry (NFR-5, added 2026-07-23)
+
+`src/Api/Program.cs` wires OpenTelemetry alongside the existing Serilog logging (additive, not a
+replacement): automatic tracing for incoming HTTP requests, outgoing HTTP calls, and SQL Server
+dependency calls, plus .NET runtime metrics. A custom `Meter` (`src/Api/Telemetry/HekTelemetry.cs`,
+registered as a DI singleton) adds two counters tied directly to the spec's field-scoping story —
+`hek.canonical.fields_returned` and `hek.canonical.fields_blocked`, tagged by origin scope and
+endpoint — wired into `CanonicalDemographicsController` first; the same one-line call
+(`_telemetry.RecordFieldScoping(...)`) can be added to the other 14 canonical controllers the same
+way. Data exports over OTLP to a new `aspire-dashboard` container (`docker-compose.yml`) — Microsoft's
+official single-container OTLP viewer, chosen over standing up Jaeger/Prometheus/Grafana separately
+for a same-day demo. Falls back to console output when no OTLP endpoint is configured (the default
+for local `dotnet run`), so nothing extra is required just to see it working. See `docs/deployment.md`
+for how to view it either way.

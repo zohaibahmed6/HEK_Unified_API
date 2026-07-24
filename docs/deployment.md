@@ -18,6 +18,10 @@ older assumptions that no compose file was present):
   `Auth__JwtSigningKey` from environment.
 - `docker-compose.override.yml`: dev-only overrides (`ASPNETCORE_ENVIRONMENT=Development`, port
   5080, read-only source mount).
+- `aspire-dashboard` service (added 2026-07-23): `mcr.microsoft.com/dotnet/aspire-dashboard:8.0`,
+  receives OpenTelemetry traces/metrics from `api` over OTLP, UI at `http://localhost:18888`
+  (unauthenticated in this compose file — demo/dev only). `api` points at it via
+  `Otel__OtlpEndpoint=http://aspire-dashboard:18889`.
 
 ### Known blocker (PROJECT_STATUS.md open item 33) — NOT resolved
 `docker compose up -d --build` builds and starts cleanly, and `sqlserver` reports healthy, but the
@@ -46,6 +50,22 @@ legacy Rijndael key, ported verbatim for byte-compatibility — an accepted, doc
 | `ConnectionStrings__TenantRegistry` | EF Core tenant registry DB connection |
 | `Auth__Enabled` | JWT bearer auth toggle (default false — flag-disabled per assessment §3) |
 | `Auth__JwtSigningKey` | Symmetric key name/value resolved via ISecretProvider (required, no default) |
+
+## Telemetry (NFR-5, resolved 2026-07-23)
+OpenTelemetry is wired into `src/Api/Program.cs` — traces (ASP.NET Core requests, HTTP client calls,
+SQL Server dependency calls) and metrics (the same instrumentation plus .NET runtime GC/thread-pool
+metrics, plus a custom `HekTelemetry` meter for FR-5 field-scoping counters, currently wired into
+`CanonicalDemographicsController`). Additive to Serilog — logs are unchanged.
+
+- **Via `docker compose up`**: traces/metrics flow to the `aspire-dashboard` container automatically
+  (`Otel__OtlpEndpoint` is set in `docker-compose.yml`). Open `http://localhost:18888`.
+- **Via `dotnet run`** (the currently-verified path, see blocker above): `Otel:OtlpEndpoint` is unset
+  by default in `appsettings.Development.json`, so traces/metrics print to console instead. To see
+  them in the same dashboard UI without full compose, run the dashboard container standalone —
+  `docker run --rm -it -p 18888:18888 -p 18889:18889 -e DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=true mcr.microsoft.com/dotnet/aspire-dashboard:8.0`
+  — then set `Otel:OtlpEndpoint` to `http://localhost:18889` in `appsettings.Development.local.json`.
+- Confirmed: full solution build + all 23 tests pass with telemetry wired in; app boots cleanly under
+  `dotnet run` with the console exporter active (smoke-tested 2026-07-23).
 
 ## Health check endpoints
 Wired in `src/Api/Program.cs`:

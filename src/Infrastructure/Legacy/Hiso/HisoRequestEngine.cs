@@ -284,7 +284,19 @@ public sealed class HisoRequestEngine : IHisoRequestEngine
         // base64binary: real byte conversion. Legacy indexes column [2] positionally for the file-type
         // hint (brittle, but reproduced exactly rather than "improved" to a by-name lookup).
         var fileType = table.Rows[index][2]?.ToString()?.ToLowerInvariant() ?? string.Empty;
-        var bytes = (byte[])rawValue;
+
+        // Real AWS-enriched content is written into this row as a byte[] (see
+        // HisoConceptExecutor.EnrichWithAwsAsync), but the column's own DataType came from the SQL
+        // result (a placeholder varchar/nvarchar column in the `_AWS` procedure's shape) - ADO.NET
+        // coerces the assignment through that declared type rather than storing the byte[] as-is,
+        // so it can come back out as either shape depending on the source. Handle both rather than
+        // assume one (confirmed live, 2026-07-24, once real AWS bytes started reaching this path).
+        var bytes = rawValue switch
+        {
+            byte[] b => b,
+            string s => Convert.FromBase64String(s),
+            _ => (byte[])rawValue
+        };
 
         if (fileType.EndsWith("png") || fileType.EndsWith("bmp"))
         {

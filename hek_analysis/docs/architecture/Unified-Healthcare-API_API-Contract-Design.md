@@ -18,25 +18,21 @@
 | 1.0 | 2026-07-19 | Initial contract design, Phase 7 of the project lifecycle, following the completed (Phase 6 skipped by stakeholder decision) Enterprise Architecture phase |
 | 1.1 | 2026-07-19 | Stakeholder Q&A round: demographics kept separate per legacy system instead of merged (Section 4.2, 6.2); HISO's dead-code actions (`addInvoice`, `launchForm`, static mode) implemented rather than excluded (Section 4.9); KARO's `GetEncounterSummary`/`SaveScreeningCode` implemented for real rather than excluded (Section 4.10, 4.13); rate limiting confirmed as a built, config-toggled capability (Section 14); COL/Pegasus confirmed live, Azure mirror confirmed not live but retained (Section 16, 18). See Section 8, Decisions 4–6, and `PROJECT_STATUS.md` for full traceability of each stakeholder answer. |
 | 1.2 | 2026-07-22 | Added spec-alignment cross-reference; see PROJECT_STATUS.md / DOCUMENT_INDEX.md |
+| 1.3 | 2026-07-23 | **Synced Section 4.2 and Section 6.2 to match real running code**: the four-separate-demographics-endpoints design (v1.1) is superseded by the actual `CanonicalDemographicsController` (`src/Api/Features/Canonical/Controllers/CanonicalDemographicsController.cs`) — one merged endpoint, `?fields=` sparse-fieldset support, and server-side per-origin field scoping via `FieldSelector`. v1.1's four-endpoint tables/examples are kept below, labeled superseded, for historical traceability rather than deleted. |
+| 1.4 | 2026-07-23 | **Resolved the `/v1` URL-prefix inconsistency** flagged when v1.3 synced demographics: confirmed all 15 canonical hub controllers use a `v1/` route prefix (deliberate, uniform — not a one-off). Section 9 revised to a two-tier versioning model: legacy-compat endpoints stay unversioned (unchanged, ADR-002/004/007), the canonical hub uses URL-path versioning (`/v1`, `/v2` for future breaking changes) per spec NFR-9's Azure/AWS-gateway-pattern guidance. §11 Versioning Safety risk row updated to match. |
 
 ### Alignment with HEK_UNIFIED_API_SPEC.md (2026-07-22)
 
-Note: this contract kept the four demographics endpoints **separate per legacy system** (v1.1,
-Section 4.2) rather than merged into one canonical shape — the opposite direction from the spec's
-FR-2/FR-3 "one unified/canonical model, single API" framing. The real implementation has since
-diverged again from this document: `CanonicalDemographicsController` (`src/Api/Features/Canonical/`)
-implements one merged, versioned endpoint with server-side field scoping, not the four-separate-
-endpoint shape this document specifies. This is a live drift between this document, the openapi.yaml
-it's meant to back, and actual code — flagged, not fixed, per task scope.
+**Resolved 2026-07-23:** the drift flagged below (four separate demographics endpoints vs. the spec's unified-model requirement) has been synced — Section 4.2 and Section 6.2 now document the real merged `GET /v1/patients/{patientId}/demographics` endpoint, matching `CanonicalDemographicsController`. This document's v1.1 "kept separate" stakeholder decision (Section 8, Decision 6) is now superseded by that later implementation choice — see Section 4.2's superseded note for the full history rather than erasing the original decision record.
 
 | Spec Requirement | Where addressed in this doc | Status |
 |---|---|---|
-| FR-2 (unified/canonical model) | §4.2 explicitly reverses this for demographics — kept per-legacy-system, not merged | Gap — conflicts with spec's canonical-model requirement for this resource; contradicted by actual running code (see note above) |
-| FR-3 (single REST API) | §2 "single platform," §4 endpoint inventory | Aligned overall, Partial for demographics specifically |
-| FR-4 (return only requested fields) | Not addressed as a general contract rule — no sparse-fieldset/`?fields=` convention documented in this version | Gap — spec requires this; the real `CanonicalDemographicsController` implements `?fields=` but this contract doc doesn't document that convention |
-| FR-5 (per-consumer field scoping) | §3.3/§3.4 "resource-scoped authorization," "structurally-determined origin scope" (ADR-003) | Partial — scopes patient/encounter/practice access, not field-level filtering within a response |
-| FR-6 (audit: exact fields) | Not addressed in the reviewed sections | Gap |
-| FR-9 (simulation) | Not addressed — predates demo directive | Gap |
+| FR-2 (unified/canonical model) | §4.2 now documents one merged endpoint, matching real code | **Aligned (as of v1.3, 2026-07-23)** |
+| FR-3 (single REST API) | §2 "single platform," §4 endpoint inventory | Aligned overall |
+| FR-4 (return only requested fields) | §4.2/§6.2 now document the real `?fields=` sparse-fieldset convention (`FieldSelector.Project`) | **Aligned (as of v1.3, 2026-07-23)** |
+| FR-5 (per-consumer field scoping) | §4.2 now documents the real per-`originScope` allowed-field lists enforced server-side (`AllowedFieldsByOrigin` in `CanonicalDemographicsController`), in addition to §3.3/§3.4's resource-scoped authorization (ADR-003) | **Aligned (as of v1.3, 2026-07-23)** for demographics; other Section 4 resources still use the pre-spec per-legacy-system pattern and haven't been individually re-synced |
+| FR-6 (audit: exact fields) | §4.2 now notes the real `CanonicalDemographicsAccess` structured log line (consumer, practiceId, patientId, fields returned) | Partial — real log-line audit exists for this endpoint; still not a durable/queryable audit store (see `docs/assessment-2026-07-22.md` §4) |
+| FR-9 (simulation) | Not addressed in this document — predates demo directive; see `docs/demo/CanonicalDemoScript.md` instead | Gap (in this doc only; met elsewhere) |
 | NFR-7 (systematic error handling) | §3 point 7, "meaningful HTTP status semantics," FR-HTTP-01 | Aligned |
 | NFR-9 (Azure/AWS gateway research) | Not addressed | Gap |
 
@@ -79,7 +75,23 @@ All canonical endpoints below are REST/JSON, served under a single unversioned b
 
 ### 4.2 Patient Demographics
 
-**Revised 2026-07-19 (Section 8, Decision 6):** kept as four separate, legacy-shaped endpoints, not merged into one canonical shape — stakeholder decision, since no sample live responses or time were available to do the field-by-field reconciliation Section 6.2 originally assumed. Each endpoint is only reachable by a token whose `originScope` claim matches it (ADR-003), so this maps directly onto the existing origin-scoping model rather than introducing a new access-control concept.
+**Superseded 2026-07-23 — synced to real code.** v1.1 (2026-07-19, Section 8 Decision 6) specified four separate, legacy-shaped endpoints instead of one merged shape, since no sample live responses or time were available to do a field-by-field reconciliation. The actual implementation (`CanonicalDemographicsController`, `src/Api/Features/Canonical/Controllers/`) took a different, later approach that resolves the same underlying concern without needing that reconciliation up front: **one merged endpoint**, where each caller's `originScope` (ADR-003) determines both which legacy repository call is made server-side *and* which canonical fields that caller is allowed to see — so HISO/KARO/ERMS/COL responses never need a shared field union, each caller still only ever sees its own system's fields, just via one URL instead of four.
+
+| Endpoint | Method | Purpose | Legacy Source(s) | Requirement |
+|---|---|---|---|---|
+| `/v1/patients/{patientId}/demographics` | GET | One canonical demographics endpoint for every consumer. Server resolves the caller's `originScope` from its token, fetches from the matching legacy repository (`IDemographicsRepository.Get{Hiso,Karo,Erms,Col}Async`), maps onto a shared `DemographicsCanonical` shape (unproduced fields null), then narrows the response to that origin's allowed-field list intersected with an optional `?fields=` query param (FR-4/FR-5). Every call logs a `CanonicalDemographicsAccess` line (consumer, practiceId, patientId, exact fields returned — FR-6). | HISO `getData`; KARO `GetDemographics`; ERMS `GetPatientData`; COL `GetCurrentPatientData` | FR-PAT-01, FR-2, FR-3, FR-4, FR-5, FR-6 |
+
+Per-origin allowed fields (server-enforced, not caller-configurable):
+
+| Origin | Allowed canonical fields |
+|---|---|
+| Hiso | `patientId`, `practiceId`, `firstName`, `lastName`, `dateOfBirth` |
+| Karo | `patientId`, `practiceId`, `firstName`, `lastName`, `dateOfBirth`, `dateOfEnrolment`, `endEnrolmentDate` |
+| Erms | `patientId`, `encounterId`, `firstName`, `lastName`, `dateOfBirth`, `nhi` |
+| Col | `patientId`, `practiceId`, `firstName`, `lastName` |
+
+<details>
+<summary>Historical record — v1.1's four-separate-endpoint design (2026-07-19, superseded 2026-07-23, kept for traceability, not current)</summary>
 
 | Endpoint | Method | Purpose | Legacy Source(s) | Requirement |
 |---|---|---|---|---|
@@ -87,6 +99,8 @@ All canonical endpoints below are REST/JSON, served under a single unversioned b
 | `/patients/{patientId}/demographics/karo` | GET | KARO-shaped demographic data (`DemographicInfo` fields) | KARO `GetDemographics` | FR-PAT-01 |
 | `/patients/{patientId}/demographics/erms` | GET | ERMS-shaped demographic data (`PatientData` fields) | ERMS `GetPatientData` | FR-PAT-01 |
 | `/patients/{patientId}/demographics/col` | GET | COL/Pegasus-shaped demographic data (`PegasusAPIModel.PatientData` fields) | COL `GetCurrentPatientData` | FR-PAT-01 |
+
+</details>
 
 ### 4.3 Clinical Notes
 
@@ -232,11 +246,11 @@ Evidence: the SRS is explicitly derived from reverse-engineering three existing 
 
 ### 6.2 Representative Contracts
 
-**`GET /patients/{patientId}/demographics/{hiso|karo|erms|col}`** (revised 2026-07-19 — no longer merged, see Section 4.2, Section 8 Decision 6)
+**`GET /v1/patients/{patientId}/demographics`** (synced 2026-07-23 to match `CanonicalDemographicsController` — see Section 4.2)
 
-Each of the four demographics endpoints returns its own legacy system's field shape as-is (JSON-translated where the legacy shape was XML), rather than one merged/union shape. No field-level reconciliation is attempted for v1.1 — deferred by explicit stakeholder decision, not an oversight.
+One endpoint for every consumer. The response shape is the same `DemographicsCanonical` field set for all callers; which fields are actually populated (non-allowed fields are omitted, not just nulled) depends on the caller's `originScope`. Supports `?fields=` to request a subset of the caller's allowed fields (FR-4) — requested fields outside the caller's allowed set are silently dropped, never a 400/403 (FR-5, verified live 2026-07-22, see `PROJECT_STATUS.md`).
 
-Example — `GET /patients/{patientId}/demographics/karo`, response `200` (KARO `DemographicInfo` shape, per `KARO_HSS_doc.md` sample):
+Example — KARO-scoped token, `GET /v1/patients/123456/demographics`, response `200`:
 ```json
 {
   "patientId": 123456,
@@ -249,17 +263,43 @@ Example — `GET /patients/{patientId}/demographics/karo`, response `200` (KARO 
 }
 ```
 
-Example — `GET /patients/{patientId}/demographics/erms`, response `200` (ERMS `PatientData` shape, field names as ERMS defines them — not force-aligned to KARO's):
+Example — ERMS-scoped token, same endpoint, response `200` (ERMS's allowed fields only — `practiceId`/enrolment fields never appear, even though they exist on the shared canonical shape):
 ```json
 {
   "patientId": 123456,
   "encounterId": 789,
   "firstName": "string",
   "lastName": "string",
-  "dob": "1980-01-01",
+  "dateOfBirth": "1980-01-01",
   "nhi": "string"
 }
 ```
+
+Example — same ERMS-scoped token, `GET /v1/patients/123456/demographics?fields=firstName,practiceId,dateOfEnrolment` (requesting HISO's/KARO's fields on purpose), response `200` — cross-origin fields silently dropped, no error:
+```json
+{
+  "firstName": "string"
+}
+```
+
+<details>
+<summary>Historical record — v1.1's four-separate-endpoint examples (2026-07-19, superseded 2026-07-23)</summary>
+
+Each of the four demographics endpoints returned its own legacy system's field shape as-is (JSON-translated where the legacy shape was XML), rather than one merged/union shape.
+
+```json
+{
+  "patientId": 123456,
+  "practiceId": "302_F3H045",
+  "firstName": "string",
+  "lastName": "string",
+  "dateOfBirth": "1980-01-01",
+  "dateOfEnrolment": "2015-03-01",
+  "endEnrolmentDate": null
+}
+```
+
+</details>
 
 **`POST /patients/{patientId}/encounters/{encounterId}/conditions`**
 
@@ -371,13 +411,22 @@ Reused across multiple endpoints, defined once here and referenced by name in th
 
 **Evidence:** direct stakeholder decision (2026-07-19) — no sample live responses or time available to do the field-by-field reconciliation Section 6.2 originally assumed; deferred, with "as previously implemented" specified as the interim shape (fully separate endpoints, not a shared path with origin-based switching). This changes Section 18's original Open Question 3 from "resolve this reconciliation" to "revisit merging later if it ever becomes worthwhile," a lower-priority, non-blocking item rather than a contract gap.
 
+**Superseded 2026-07-23:** the "revisit merging later" trigger from this decision was reached — `CanonicalDemographicsController` implements one merged endpoint (Section 4.2) without requiring the field-by-field reconciliation this decision deferred, because per-origin field scoping is enforced independently of whether the underlying shape is merged. This document is now synced to that real implementation; Decision 6's reasoning is left in place above as the historical record of why the four-endpoint design existed for a period, not as the current contract.
+
 ---
 
 ## 9. Versioning Strategy
 
 **Stakeholder decision (2026-07-19):** versioning must be visible/trackable in documentation, but must introduce **no change that interrupts existing functionality** for any consumer.
 
-**Resolution:** No version identifier appears in the URL path, in a custom header, or in the media type for v1. The canonical contract launches unversioned in the sense that matters to callers — nothing in a request has to change for the API to evolve within backward-compatible bounds. Versioning is tracked **only** in documentation artifacts: this document's own Document Control table (Section 1), the OpenAPI spec's `info.version` field (Section 15), and an append-only changelog maintained alongside both.
+**Resolution (original, 2026-07-19):** No version identifier appears in the URL path, in a custom header, or in the media type for v1. The canonical contract launches unversioned in the sense that matters to callers — nothing in a request has to change for the API to evolve within backward-compatible bounds. Versioning is tracked **only** in documentation artifacts: this document's own Document Control table (Section 1), the OpenAPI spec's `info.version` field (Section 15), and an append-only changelog maintained alongside both.
+
+**Superseded 2026-07-23 — two-tier model, matching real code:** the 2026-07-19 decision above was written before the canonical hub controllers existed, for a contract that at the time only covered legacy-compat endpoints. Real code now has two distinct surfaces with two distinct, both-deliberate versioning approaches, confirmed by checking every controller rather than assumed:
+
+- **Legacy-compat endpoints** (`AuthController`'s legacy translators, `HisoCompatController`, `KaroCompatController`, `ErmsCompatController`, `ColCompatController`) — **stay unversioned**, exactly per the original 2026-07-19 resolution above. These must remain byte-identical to what each external consumer already calls (ADR-002/004/007's "zero consumer-side change" mandate), so no URL/header/media-type version identifier is appropriate here. Nothing changes for this surface.
+- **Canonical hub surface** (all 15 `Canonical*Controller` classes under `src/Api/Features/Canonical/Controllers/` — `CanonicalDemographicsController`, `CanonicalConditionsController`, `CanonicalDocumentsController`, etc., confirmed via direct grep: 15/15 consistent) — **uses a `/v1/...` URL path prefix**, deliberately and uniformly, not a stray inconsistency in one controller. This has no legacy consumer to preserve compatibility for (it's the new hub surface spec `HEK_UNIFIED_API_SPEC.md` calls for), so URL-path versioning was chosen instead — the standard approach used by both Azure API Management and AWS API Gateway, which is exactly what spec NFR-9 ("research-grounded design... following Azure/AWS API gateway patterns") asks for. A future breaking change to the hub ships as `/v2/...` alongside `/v1/...`, giving a real structural migration path rather than relying purely on documentation discipline.
+
+This document's "Breaking vs. non-breaking" definitions below still apply to both surfaces; the difference is only in *where* a breaking change is expressed (a coordinated migration doc for legacy-compat, a new `/v2` path for the hub).
 
 **Breaking vs. non-breaking, for this contract:**
 - Non-breaking (does not require a new documented version, ships anytime): adding an optional request field, adding a new response field, adding a new endpoint, adding a new enum value that callers are expected to ignore if unrecognized.
@@ -502,7 +551,7 @@ See companion file `Unified-Healthcare-API_openapi.yaml`, alongside this documen
 | Category | Rating | Rationale | Recommendation (if not PASS) |
 |---|---|---|---|
 | Consistency | PASS | Every canonical endpoint follows the same `/patients/{patientId}/...` resource shape, the same envelope (Section 6.1), the same error shape (Section 10), and the same idempotency mechanism (Section 12) across all domains. | — |
-| Versioning Safety | WARNING | The stakeholder-mandated "no version identifier, document-only tracking" approach (Section 9) is workable but relies entirely on process discipline (no breaking change ships without a coordinated migration) rather than a mechanism the contract itself enforces — there is no structural safety net if that discipline lapses. | Add a lightweight breaking-change review gate to Implementation Planning (e.g. a required sign-off checklist referencing Section 9's breaking/non-breaking definitions) before this is fully de-risked. |
+| Versioning Safety | WARNING (legacy-compat surface only) | Updated 2026-07-23: Section 9 is now a two-tier model. The canonical `/v1` hub surface has a real structural safety net — a future breaking change ships as `/v2`, not a silent in-place edit. The original WARNING still applies to the legacy-compat surface only, which stays unversioned by design (must remain byte-identical to existing consumers) and so still relies on process discipline (no breaking change without a coordinated migration) rather than a URL-level mechanism. | Add a lightweight breaking-change review gate to Implementation Planning for the legacy-compat surface specifically (e.g. a required sign-off checklist referencing Section 9's breaking/non-breaking definitions). Not needed for the hub surface, which already has `/v2` as its safety net. |
 | Backward Compatibility (migration mode) | PASS | Every existing consumer's exact wire shape is preserved via edge adapters (Section 8, Decision 1; Section 16); the only approved consumer-visible change in the entire contract is HISO's HTTP→HTTPS transport switch (ADR-009), already stakeholder-approved. | — |
 | Discoverability | WARNING | A new consumer (e.g. a future practice-management integration) can find every canonical endpoint from this document and the OpenAPI spec, but several endpoints (ACC45 session flow, COL/Pegasus context) still carry legacy-shaped concepts (`sessionKey`, `formInstanceId`) that aren't self-explanatory without reading the source legacy system's business rules. | Add a short domain-concept glossary to the OpenAPI spec's description fields, not just this document's Appendix, so the machine-readable contract is self-contained too. |
 | Extensibility | PASS | The `items` list envelope reserves room for pagination metadata; the idempotency contract and error shape are additive-safe; new capabilities can be added as new resources without touching existing ones, consistent with ADR-008's incremental-rollout philosophy. | — |

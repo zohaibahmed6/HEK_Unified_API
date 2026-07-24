@@ -48,15 +48,14 @@ public sealed class ResolveHisoSessionQueryHandler : IRequestHandler<ResolveHiso
             return new HisoSessionLookupResult(HisoSessionLookupStatus.NotFound, null);
         }
 
-        var expiresAt = route.CreatedAt.AddHours(_options.ExpiryHours);
-        if (DateTimeOffset.Now > expiresAt)
-        {
-            _logger.LogWarning(
-                "HISO session lookup failed: session for practice {PracticeId} expired at {ExpiresAt}.",
-                route.PracticeId,
-                expiresAt);
-            return new HisoSessionLookupResult(HisoSessionLookupStatus.Expired, null);
-        }
+        // v1.1 spec follow-through Step 6 (2026-07-24): the enforced 12-hour expiry below this comment
+        // used to run here - removed per Zohaib's direction, since real HISO's SessionGUID mechanism
+        // has no expiry at all (confirmed from HISO_doc.md's static analysis of the real source - a
+        // session GUID is looked up, never time-checked). The earlier expiry was ADR-004-invented
+        // behavior legacy doesn't have, not a real requirement. A session now stays valid until its
+        // registry row is explicitly deactivated (IsActive=false), matching legacy exactly.
+        // HisoSessionLookupStatus.Expired is kept defined (never removed, per project convention) but
+        // no longer returned by this handler.
 
         // Connection built directly from the row's own DbServerHost/DbName - never from a
         // Hiso:ConnectionStrings:* (or any other connection-string-keyed) secret. The credential
