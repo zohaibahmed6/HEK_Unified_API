@@ -32,8 +32,8 @@ public sealed class Acc45DetailRepository : IAcc45DetailRepository
 
         var detailColumns = await GetColumnsAsync("UDT_tblACC45Detail", ct);
         var detailTable = BuildDetailTable(doc, mapping, session, detailColumns);
-        var diagnosisTable = BuildDiagnosisTable(doc, mapping);
-        var referralTable = BuildReferralTable(doc, mapping);
+        var diagnosisTable = BuildDiagnosisTable(doc, mapping, session);
+        var referralTable = BuildReferralTable(doc, mapping, session);
 
         var parameters = new List<SqlParameter>
         {
@@ -139,13 +139,34 @@ public sealed class Acc45DetailRepository : IAcc45DetailRepository
         return table;
     }
 
-    /// <summary>Legacy: Acc45DiagnosisBuilder.GenerateTable - only fields inside `&lt;group name="accident.diagnosis"&gt;`, with the confirmed "side" splitting rule.</summary>
-    private static DataTable BuildDiagnosisTable(XmlDocument doc, DataTable mapping)
+    /// <summary>
+    /// Legacy `Acc45DiagnosisBuilder.GenerateTable` - real, fixed 15-column `UDT_tblACC45Diagnosis`
+    /// shape (hardcoded in legacy source as `ACC45DiadColumns`, not a live-schema guess). A group
+    /// matches on either `name="accident.diagnosis"` or `conceptName="Patient_Accident_Diagnosis"`
+    /// (legacy checks both). Field values resolve through the same concept-mapping table as the
+    /// detail table; "side" is comma-split into SideCode/SideDescription (confirmed rule). Defaults
+    /// (Acc45ID/Acc45DiagnosisID=0, IsActive=true, IsDeleted=false, Inserted/UpdatedBy=session
+    /// ProviderId, Inserted/UpdatedAt=now) match legacy's per-row seeding exactly.
+    /// </summary>
+    private static readonly string[] DiagnosisColumns =
+    [
+        "Acc45DiagnosisID", "ACC45ID", "DiagnosisDescription", "CodeSystem", "Code", "SideCode",
+        "SideDescription", "QualifierCode", "QualifierDescription", "IsActive", "IsDeleted",
+        "InsertedBy", "UpdatedBy", "InsertedAt", "UpdatedAt"
+    ];
+
+    /// <summary>Legacy `Acc45ReferralBuilder.GenerateTable` - real, fixed 3-column `UDT_tblACC45Referral` shape.</summary>
+    private static readonly string[] ReferralColumns = ["ACCRefID", "Notes", "UpdatedBy"];
+
+    private static DataTable BuildDiagnosisTable(XmlDocument doc, DataTable mapping, HealthLinkSession session)
     {
         var table = new DataTable();
-        table.Columns.Add("SideDescription");
+        foreach (var column in DiagnosisColumns)
+        {
+            table.Columns.Add(column);
+        }
 
-        var groups = doc.DocumentElement?.SelectNodes("//group[@name='accident.diagnosis']");
+        var groups = doc.DocumentElement?.SelectNodes("//group[@name='accident.diagnosis' or @conceptName='Patient_Accident_Diagnosis']");
         if (groups is null || groups.Count == 0)
         {
             return table;
@@ -153,23 +174,42 @@ public sealed class Acc45DetailRepository : IAcc45DetailRepository
 
         foreach (XmlNode group in groups)
         {
+            if (group.ChildNodes.Count == 0)
+            {
+                continue;
+            }
+
             var row = table.NewRow();
+            row["ACC45ID"] = 0;
+            row["Acc45DiagnosisID"] = 0;
+            row["IsActive"] = true;
+            row["IsDeleted"] = false;
+            row["InsertedBy"] = session.ProviderId;
+            row["UpdatedBy"] = session.ProviderId;
+            row["InsertedAt"] = DateTime.Now.ToString("s");
+            row["UpdatedAt"] = DateTime.Now.ToString("s");
+
             foreach (XmlNode field in group.ChildNodes)
             {
                 var attrName = field.Attributes?["conceptName"]?.Value;
                 if (string.IsNullOrEmpty(attrName))
                 {
+                    attrName = field.Attributes?["name"]?.Value;
+                }
+
+                if (string.IsNullOrEmpty(attrName))
+                {
                     continue;
                 }
 
-                var columnName = ResolveColumnName(mapping, attrName) ?? attrName;
-                if (!table.Columns.Contains(columnName))
+                var columnName = ResolveColumnName(mapping, attrName);
+                if (columnName is null || !table.Columns.Contains(columnName))
                 {
-                    table.Columns.Add(columnName);
+                    continue;
                 }
 
                 var value = field.InnerText;
-                if (attrName == "side" && !IsNumeric(value) && value.Contains(','))
+                if (attrName == "side" && !IsNumeric(value))
                 {
                     var parts = value.Split(',');
                     row[columnName] = parts[0];
@@ -187,11 +227,13 @@ public sealed class Acc45DetailRepository : IAcc45DetailRepository
         return table;
     }
 
-    /// <summary>Legacy: Acc45ReferralBuilder.GenerateTable - only fields inside `&lt;group name="accident.referral"&gt;`, with the confirmed "treatmentProvider" first-portion-only rule.</summary>
-    private static DataTable BuildReferralTable(XmlDocument doc, DataTable mapping)
+    private static DataTable BuildReferralTable(XmlDocument doc, DataTable mapping, HealthLinkSession session)
     {
         var table = new DataTable();
-        table.Columns.Add("TreatmentProvider");
+        foreach (var column in ReferralColumns)
+        {
+            table.Columns.Add(column);
+        }
 
         var groups = doc.DocumentElement?.SelectNodes("//group[@name='accident.referral']");
         if (groups is null || groups.Count == 0)
@@ -201,19 +243,31 @@ public sealed class Acc45DetailRepository : IAcc45DetailRepository
 
         foreach (XmlNode group in groups)
         {
+            if (group.ChildNodes.Count == 0)
+            {
+                continue;
+            }
+
             var row = table.NewRow();
+            row["UpdatedBy"] = session.ProviderId;
+
             foreach (XmlNode field in group.ChildNodes)
             {
                 var attrName = field.Attributes?["conceptName"]?.Value;
                 if (string.IsNullOrEmpty(attrName))
                 {
+                    attrName = field.Attributes?["name"]?.Value;
+                }
+
+                if (string.IsNullOrEmpty(attrName))
+                {
                     continue;
                 }
 
-                var columnName = ResolveColumnName(mapping, attrName) ?? attrName;
-                if (!table.Columns.Contains(columnName))
+                var columnName = ResolveColumnName(mapping, attrName);
+                if (columnName is null || !table.Columns.Contains(columnName))
                 {
-                    table.Columns.Add(columnName);
+                    continue;
                 }
 
                 var value = field.InnerText;

@@ -1,51 +1,5 @@
 export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
 
-export interface HisoGetDataResult {
-  ok: boolean;
-  raw: unknown;
-  filledXml?: string;
-  error?: string;
-}
-
-/**
- * Uses the JSON-compat /hiso/getData endpoint rather than raw SOAP - same real session-GUID auth
- * mechanism, same real GetDataQueryHandler underneath (proven live this session), just a saner
- * transport for a browser fetch() than hand-rolling SOAP envelopes/XML parsing client-side. The
- * backend's real SOAP endpoint (/FormSessionService.svc) exists separately for actual legacy clients.
- */
-export async function hisoGetData(sessionKey: string, submittedDataXml: string): Promise<HisoGetDataResult> {
-  const res = await fetch(`${API_BASE}/hiso/getData`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      sessionKey,
-      dataContainer: {
-        formMetaData: { formInstanceOperationMode: "N" },
-        submittedDataXml,
-      },
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    return { ok: false, raw: null, error: `HTTP ${res.status}: ${body}` };
-  }
-
-  const json = await res.json();
-  return {
-    ok: true,
-    raw: json,
-    filledXml: json?.getDataResponseReturn?.dataContainer?.submittedDataXml,
-  };
-}
-
-export const HISO_DEMOGRAPHICS_XML =
-  '<dataContainer><section name="demographics">' +
-  '<field name="firstName" conceptName="Patient_FirstName" />' +
-  '<field name="lastName" conceptName="Patient_Surname" />' +
-  '<field name="dateOfBirth" conceptName="Patient_DateOfBirth" />' +
-  "</section></dataContainer>";
-
 export interface AuthResult {
   ok: boolean;
   token?: string;

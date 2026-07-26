@@ -1,4 +1,5 @@
 using System.Data;
+using System.Text.Json;
 using HekCoreApi.Application.Common.Interfaces;
 using Microsoft.Data.SqlClient;
 
@@ -11,11 +12,33 @@ namespace HekCoreApi.Infrastructure.Legacy.Erms;
 /// </summary>
 public sealed class ErmsDataRepository : IErmsDataRepository
 {
-    private readonly IErmsPracticeConnectionResolver _connectionResolver;
+    private static readonly Dictionary<string, string> MimeTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["DOC"] = "application/msword",
+        ["JPEG"] = "image/jpeg",
+        ["HTML"] = "text/html",
+        ["JPG"] = "image/jpeg",
+        ["BMP"] = "image/bmp",
+        ["PDF"] = "application/pdf",
+        ["PNG"] = "image/png",
+        ["GIF"] = "image/gif",
+        ["TIF"] = "image/tiff",
+        ["TIFF"] = "image/tiff",
+        ["RTF"] = "application/rtf",
+        ["TXT"] = "text/plain",
+        ["DOCX"] = "application/msword",
+        ["XML"] = "application/xml"
+    };
 
-    public ErmsDataRepository(IErmsPracticeConnectionResolver connectionResolver)
+    private readonly IErmsPracticeConnectionResolver _connectionResolver;
+    private readonly IErmsDmsConnectionResolver _dmsConnectionResolver;
+    private readonly IAwsDocumentService _awsDocumentService;
+
+    public ErmsDataRepository(IErmsPracticeConnectionResolver connectionResolver, IErmsDmsConnectionResolver dmsConnectionResolver, IAwsDocumentService awsDocumentService)
     {
         _connectionResolver = connectionResolver;
+        _dmsConnectionResolver = dmsConnectionResolver;
+        _awsDocumentService = awsDocumentService;
     }
 
     public Task<DataTable> GetMeasurementAsync(string practiceSuffix, string? patientId, CancellationToken ct = default) =>
@@ -91,7 +114,7 @@ public sealed class ErmsDataRepository : IErmsDataRepository
     public Task<DataTable> GetRadResultsAsync(string practiceSuffix, string? patientId, string? referenceId, CancellationToken ct = default) =>
         ExecuteAsync(practiceSuffix, "[HSS].[uspGetRadResults]", Detail(patientId, referenceId), ct);
 
-    public Task<DataTable> GetOtherDocsAsync(string practiceSuffix, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, bool isReferral, CancellationToken ct = default)
+    public async Task<DataTable> GetOtherDocsAsync(string practiceSuffix, string practiceSuffixNumeric, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, bool isReferral, CancellationToken ct = default)
     {
         var parameters = Dated(patientId, sortOrder, minDate, maxDate);
         if (isReferral)
@@ -99,10 +122,43 @@ public sealed class ErmsDataRepository : IErmsDataRepository
             parameters.Add(new SqlParameter("@pType", "Discharge Summary"));
         }
 
-        return ExecuteAsync(practiceSuffix, "[HSS].[uspGetOtherDocs]", parameters, ct);
+        var connectionString = await _connectionResolver.ResolveAsync(practiceSuffix, ct);
+        if (!int.TryParse(practiceSuffixNumeric, out var practiceIdInt))
+        {
+            return await LegacyDbExecutor.ExecuteDataTableAsync(connectionString, CommandType.StoredProcedure, "[HSS].[uspGetOtherDocs]", parameters, ct);
+        }
+
+        var awsEnabled = await _awsDocumentService.CheckAwsIsEnabledAsync(practiceIdInt, connectionString, ct);
+        if (!awsEnabled)
+        {
+            return await LegacyDbExecutor.ExecuteDataTableAsync(connectionString, CommandType.StoredProcedure, "[HSS].[uspGetOtherDocs]", parameters, ct);
+        }
+
+        var table = await LegacyDbExecutor.ExecuteDataTableAsync(connectionString, CommandType.StoredProcedure, "[HSS].[uspGetOtherDocs_AWS]", parameters, ct);
+        foreach (DataRow row in table.Rows)
+        {
+            if (!table.Columns.Contains("DMSID") || row["DMSID"] is DBNull)
+            {
+                continue;
+            }
+
+            var docKey = row["DMSID"].ToString()?.ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(docKey))
+            {
+                continue;
+            }
+
+            var status = await _awsDocumentService.GetDocumentStatusFromIndiciAsync(docKey, practiceIdInt, connectionString, ct);
+            if (status?.DocumentType is { } docType && MimeTypes.TryGetValue(docType, out var contentType) && table.Columns.Contains("DataType"))
+            {
+                row["DataType"] = row["DataType"] is DBNull ? contentType : row["DataType"] + contentType;
+            }
+        }
+
+        return table;
     }
 
-    public Task<DataTable> GetDocResultsAsync(string practiceSuffix, string? referenceId, bool isDischarge, CancellationToken ct = default)
+    public async Task<DataTable> GetDocResultsAsync(string practiceSuffix, string practiceSuffixNumeric, string? referenceId, bool isDischarge, CancellationToken ct = default)
     {
         var parameters = new List<SqlParameter> { new("@pIsDischarge", isDischarge) };
         if (!string.IsNullOrWhiteSpace(referenceId))
@@ -110,8 +166,60 @@ public sealed class ErmsDataRepository : IErmsDataRepository
             parameters.Add(new SqlParameter("@pReferenceId", referenceId));
         }
 
-        return ExecuteAsync(practiceSuffix, "[HSS].[uspGetDocResults]", parameters, ct);
+        var connectionString = await _connectionResolver.ResolveAsync(practiceSuffix, ct);
+        if (!int.TryParse(practiceSuffixNumeric, out var practiceIdInt))
+        {
+            return await LegacyDbExecutor.ExecuteDataTableAsync(connectionString, CommandType.StoredProcedure, "[HSS].[uspGetDocResults]", parameters, ct);
+        }
+
+        var awsEnabled = await _awsDocumentService.CheckAwsIsEnabledAsync(practiceIdInt, connectionString, ct);
+        if (!awsEnabled)
+        {
+            return await LegacyDbExecutor.ExecuteDataTableAsync(connectionString, CommandType.StoredProcedure, "[HSS].[uspGetDocResults]", parameters, ct);
+        }
+
+        var table = await LegacyDbExecutor.ExecuteDataTableAsync(connectionString, CommandType.StoredProcedure, "[HSS].[uspGetDocResults_AWS]", parameters, ct);
+        if (string.IsNullOrWhiteSpace(referenceId) || table.Rows.Count == 0)
+        {
+            return table;
+        }
+
+        var dmsConnectionString = await _dmsConnectionResolver.ResolveAsync(practiceSuffix, ct);
+        var singleDocJson = await _awsDocumentService.DocumentGetByDocumentKeyJsonResultAsync(referenceId.ToUpperInvariant(), practiceIdInt, dmsConnectionString, connectionString, ct);
+        if (string.IsNullOrEmpty(singleDocJson))
+        {
+            return table;
+        }
+
+        var singleDoc = JsonSerializer.Deserialize<ErmsAwsSingleDocument>(singleDocJson, JsonOptions);
+        if (singleDoc is null)
+        {
+            return table;
+        }
+
+        var firstRow = table.Rows[0];
+        var base64 = singleDoc.DocumentData is null ? string.Empty : Convert.ToBase64String(singleDoc.DocumentData);
+        if (table.Columns.Contains("Content"))
+        {
+            firstRow["Content"] = (firstRow["Content"] is DBNull ? string.Empty : firstRow["Content"]) + base64;
+        }
+
+        if (table.Columns.Contains("DocumentId"))
+        {
+            firstRow["DocumentId"] = singleDoc.DocumentId;
+        }
+
+        if (table.Columns.Contains("DataType") && singleDoc.DocumentType is { } docType && MimeTypes.TryGetValue(docType, out var contentType))
+        {
+            firstRow["DataType"] = (firstRow["DataType"] is DBNull ? string.Empty : firstRow["DataType"]) + contentType;
+        }
+
+        return table;
     }
+
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    private sealed record ErmsAwsSingleDocument(int DocumentId, byte[]? DocumentData, string? DocumentType);
 
     /// <summary>Legacy `GetLabResults`/`GetRadResults`: both params only added when non-blank.</summary>
     private static List<SqlParameter> Detail(string? patientId, string? referenceId)

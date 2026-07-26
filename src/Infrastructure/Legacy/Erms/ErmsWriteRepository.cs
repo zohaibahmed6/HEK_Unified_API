@@ -4,20 +4,23 @@ using Microsoft.Data.SqlClient;
 
 namespace HekCoreApi.Infrastructure.Legacy.Erms;
 
-/// <summary>Ported from ERMS `SaveDocument`'s DAL calls - real procs, non-AWS paths (the AWS branch needs the non-portable `AWSDoc.IndiciDMS` DLL, same deferral as KARO/HISO).</summary>
+/// <summary>Ported from ERMS `SaveDocument`'s DAL calls (`DAL/South/HSSDA.cs`) - real procs including the real AWS-vs-non-AWS branch (`AwsDocumentService`, confirmed against the real `AWSDocCore.dll`, same one HISO already uses).</summary>
 public sealed class ErmsWriteRepository : IErmsWriteRepository
 {
     private readonly IErmsPracticeConnectionResolver _connectionResolver;
     private readonly IErmsDmsConnectionResolver _dmsConnectionResolver;
     private readonly ISecretProvider _secretProvider;
+    private readonly IAwsDocumentService _awsDocumentService;
 
-    public ErmsWriteRepository(IErmsPracticeConnectionResolver connectionResolver, IErmsDmsConnectionResolver dmsConnectionResolver, ISecretProvider secretProvider)
+    public ErmsWriteRepository(IErmsPracticeConnectionResolver connectionResolver, IErmsDmsConnectionResolver dmsConnectionResolver, ISecretProvider secretProvider, IAwsDocumentService awsDocumentService)
     {
         _connectionResolver = connectionResolver;
         _dmsConnectionResolver = dmsConnectionResolver;
         _secretProvider = secretProvider;
+        _awsDocumentService = awsDocumentService;
     }
 
+    /// <summary>Legacy (`HSSDA.cs:38-64`): `CheckAWSIsEnabled(practiceSuffixNumeric, connectionString)` picks `[HSS].[uspUpdateExistingDoc_AWS]` vs `[HSS].[uspUpdateExistingDoc]` - both take the same two params.</summary>
     public async Task UpdateExistingDocumentAsync(string practiceSuffix, string? referralId, string? practiceSuffixNumeric, CancellationToken ct = default)
     {
         // Legacy swallows every error here (its own try/catch fills an out param the controller only logs).
@@ -29,7 +32,18 @@ public sealed class ErmsWriteRepository : IErmsWriteRepository
                 new("@pReferralId", (object?)referralId ?? DBNull.Value),
                 new("@pPracticeId", (object?)practiceSuffixNumeric ?? DBNull.Value)
             };
-            await LegacyDbExecutor.ExecuteNonQueryAsync(connectionString, CommandType.StoredProcedure, "[HSS].[uspUpdateExistingDoc]", parameters, ct);
+
+            var procedureName = "[HSS].[uspUpdateExistingDoc]";
+            if (int.TryParse(practiceSuffixNumeric, out var practiceIdInt))
+            {
+                var awsEnabled = await _awsDocumentService.CheckAwsIsEnabledAsync(practiceIdInt, connectionString, ct);
+                if (awsEnabled)
+                {
+                    procedureName = "[HSS].[uspUpdateExistingDoc_AWS]";
+                }
+            }
+
+            await LegacyDbExecutor.ExecuteNonQueryAsync(connectionString, CommandType.StoredProcedure, procedureName, parameters, ct);
         }
         catch
         {

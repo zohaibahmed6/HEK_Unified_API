@@ -55,10 +55,14 @@ public sealed class KaroCompatController : ControllerBase
         var result = await _mediator.Send(
             new KaroAuthenticateQuery(request.Username, request.Password, request.PatientId, request.EncounterId, request.System, request.Pho), ct);
 
+        var authContext = new Dictionary<string, object?> { ["PatientId"] = request.PatientId, ["EncounterId"] = request.EncounterId };
         if (!result.Succeeded)
         {
-            _observer.RecordExpectedFailure(_logger, "karo", nameof(AuthenticateAsync), result.ErrorMessage ?? "AuthenticationFailed",
-                new Dictionary<string, object?> { ["PatientId"] = request.PatientId, ["EncounterId"] = request.EncounterId });
+            _observer.RecordExpectedFailure(_logger, "karo", nameof(AuthenticateAsync), result.ErrorMessage ?? "AuthenticationFailed", authContext);
+        }
+        else
+        {
+            _observer.Tag("karo", nameof(AuthenticateAsync), authContext);
         }
 
         return Ok(result.Succeeded
@@ -80,6 +84,8 @@ public sealed class KaroCompatController : ControllerBase
             return Ok(KaroFailResponse.Of(result.ErrorMessage ?? "Invalid token value!"));
         }
 
+        _observer.Tag("karo", nameof(GetDemographics), new Dictionary<string, object?> { ["PatientId"] = patientId, ["EncounterId"] = encounterId });
+
         var demographic = new KaroDemographic(
             result.Demographic is null ? [] : [result.Demographic],
             [.. result.Cards ?? []]);
@@ -97,7 +103,7 @@ public sealed class KaroCompatController : ControllerBase
     public async Task<IActionResult> GetConditions(string? system, string? pho, string? patientId, string? encounterId, CancellationToken ct) =>
         RootOrFail(await _mediator.Send(new KaroConditionsQuery(system, pho, patientId, encounterId, GetAuthorizationToken()), ct), "Conditions");
 
-    /// <summary>Legacy: `GET GetDocuments(...)` (`APIController.cs:350`) - real `[HSS].[uspGetDocuments]` (non-AWS path; AWS branch deferred, see repository).</summary>
+    /// <summary>Legacy: `GET GetDocuments(...)` (`APIController.cs:350`) - real `[HSS].[uspGetDocuments]`/`[HSS].[uspGetDocuments_AWS]`, branched by `IAwsDocumentService.CheckAwsIsEnabledAsync` (see repository).</summary>
     [HttpGet("documents")]
     public async Task<IActionResult> GetDocuments(string? system, string? pho, string? patientId, string? encounterId, string? identifier, CancellationToken ct) =>
         RootOrFail(await _mediator.Send(new KaroDocumentsQuery(system, pho, patientId, encounterId, identifier, GetAuthorizationToken()), ct), "Documents");
@@ -239,6 +245,7 @@ public sealed class KaroCompatController : ControllerBase
             return Ok(KaroFailResponse.Of(result.ErrorMessage ?? "Invalid token value!"));
         }
 
+        _observer.Tag("karo", endpoint, new Dictionary<string, object?> { ["PatientId"] = Request.Query["patientId"].ToString() });
         return Ok(new { status = "success", message = result.SuccessMessage ?? string.Empty });
     }
 
@@ -250,6 +257,7 @@ public sealed class KaroCompatController : ControllerBase
             return Ok(KaroFailResponse.Of(result.ErrorMessage ?? "Invalid token value!"));
         }
 
+        _observer.Tag("karo", endpoint, new Dictionary<string, object?> { ["PatientId"] = result.PatientId });
         return Ok(new KaroRootResponse<T>(result.PatientId, resourceType, "hss", result.Entries ?? []));
     }
 

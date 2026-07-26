@@ -353,7 +353,7 @@ public sealed class ErmsGetDischargeSummaryReportListQueryHandler : IRequestHand
     {
         var (min, max) = ErmsReadPipeline.ParseDates(request.MinDateTime, request.MaxDateTime);
         return _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, _, _) => _repository.GetOtherDocsAsync(suffix, patientId, request.Order.ToUpper(), min, max, isReferral: true, ct), min, max, ct, rs => Convert.ToInt32(rs));
+            (suffix, patientId, _, suffixNumeric) => _repository.GetOtherDocsAsync(suffix, suffixNumeric ?? string.Empty, patientId, request.Order.ToUpper(), min, max, isReferral: true, ct), min, max, ct, rs => Convert.ToInt32(rs));
     }
 }
 
@@ -372,7 +372,7 @@ public sealed class ErmsGetScannedListQueryHandler : IRequestHandler<ErmsGetScan
     {
         var (min, max) = ErmsReadPipeline.ParseDates(request.MinDateTime, request.MaxDateTime);
         return _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, _, _) => _repository.GetOtherDocsAsync(suffix, patientId, request.Order.ToUpper(), min, max, isReferral: false, ct), min, max, ct, rs => Convert.ToInt32(rs));
+            (suffix, patientId, _, suffixNumeric) => _repository.GetOtherDocsAsync(suffix, suffixNumeric ?? string.Empty, patientId, request.Order.ToUpper(), min, max, isReferral: false, ct), min, max, ct, rs => Convert.ToInt32(rs));
     }
 }
 
@@ -421,7 +421,7 @@ public sealed class ErmsGetDischargeSummaryDetailsQueryHandler : IRequestHandler
 
     public Task<ErmsReadResult> Handle(ErmsGetDischargeSummaryDetailsQuery request, CancellationToken ct) =>
         _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, _, _) => _repository.GetDocResultsAsync(suffix, request.ReferenceId, isDischarge: true, ct), ct: ct, preValidate: rs => Convert.ToInt32(rs));
+            (suffix, patientId, _, suffixNumeric) => _repository.GetDocResultsAsync(suffix, suffixNumeric ?? string.Empty, request.ReferenceId, isDischarge: true, ct), ct: ct, preValidate: rs => Convert.ToInt32(rs));
 }
 
 public sealed class ErmsGetScannedDetailsQueryHandler : IRequestHandler<ErmsGetScannedDetailsQuery, ErmsReadResult>
@@ -437,7 +437,7 @@ public sealed class ErmsGetScannedDetailsQueryHandler : IRequestHandler<ErmsGetS
 
     public Task<ErmsReadResult> Handle(ErmsGetScannedDetailsQuery request, CancellationToken ct) =>
         _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, _, _) => _repository.GetDocResultsAsync(suffix, request.ReferenceId, isDischarge: false, ct), ct: ct, preValidate: rs => Convert.ToInt32(rs));
+            (suffix, patientId, _, suffixNumeric) => _repository.GetDocResultsAsync(suffix, suffixNumeric ?? string.Empty, request.ReferenceId, isDischarge: false, ct), ct: ct, preValidate: rs => Convert.ToInt32(rs));
 }
 
 

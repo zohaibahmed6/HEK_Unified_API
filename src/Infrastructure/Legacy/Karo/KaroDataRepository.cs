@@ -1,4 +1,5 @@
 using System.Data;
+using System.Text.Json;
 using HekCoreApi.Application.Common.Interfaces;
 using Microsoft.Data.SqlClient;
 
@@ -7,11 +8,33 @@ namespace HekCoreApi.Infrastructure.Legacy.Karo;
 /// <summary>Ported from `HSSDA.cs`'s remaining real GET-operation methods - one repository, matching legacy's single shared `HSSDA` static class.</summary>
 public sealed class KaroDataRepository : IKaroDataRepository
 {
-    private readonly IKaroPracticeConnectionResolver _connectionResolver;
+    private static readonly Dictionary<string, string> MimeTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["DOC"] = "application/msword",
+        ["JPEG"] = "image/jpeg",
+        ["HTML"] = "text/html",
+        ["JPG"] = "image/jpeg",
+        ["BMP"] = "image/bmp",
+        ["PDF"] = "application/pdf",
+        ["PNG"] = "image/png",
+        ["GIF"] = "image/gif",
+        ["TIF"] = "image/tiff",
+        ["TIFF"] = "image/tiff",
+        ["RTF"] = "application/rtf",
+        ["TXT"] = "text/plain",
+        ["DOCX"] = "application/msword",
+        ["XML"] = "application/xml"
+    };
 
-    public KaroDataRepository(IKaroPracticeConnectionResolver connectionResolver)
+    private readonly IKaroPracticeConnectionResolver _connectionResolver;
+    private readonly IKaroDmsConnectionResolver _dmsConnectionResolver;
+    private readonly IAwsDocumentService _awsDocumentService;
+
+    public KaroDataRepository(IKaroPracticeConnectionResolver connectionResolver, IKaroDmsConnectionResolver dmsConnectionResolver, IAwsDocumentService awsDocumentService)
     {
         _connectionResolver = connectionResolver;
+        _dmsConnectionResolver = dmsConnectionResolver;
+        _awsDocumentService = awsDocumentService;
     }
 
     public async Task<List<KaroConsultNote>> GetConsultNotesAsync(string practiceSuffix, string? patientId, CancellationToken ct = default) =>
@@ -20,17 +43,81 @@ public sealed class KaroDataRepository : IKaroDataRepository
     public async Task<List<KaroDiagnosis>> GetConditionsAsync(string practiceSuffix, string? patientId, CancellationToken ct = default) =>
         await RunAsync<KaroDiagnosis>(practiceSuffix, "[HSS].[uspGetConditions]", Param("@pPatientId", patientId), ct);
 
-    /// <summary>Legacy: real branch is `AWSDoc.IndiciDMS.CheckAWSIsEnabled(...)` -> `[HSS].[uspGetDocuments_AWS]` vs `[HSS].[uspGetDocuments]`. AWSDoc's real source isn't portable (compiled DLL only, same gap as HISO's AWS deferral) - always takes the non-AWS real path, flagged not guessed.</summary>
-    public async Task<List<KaroDocumentInfo>> GetDocumentsAsync(string practiceSuffix, string? patientId, string? identifier, CancellationToken ct = default)
+    /// <summary>
+    /// Legacy (`hsswebapi/DAL/South/HSSDA.cs:262-373`): `CheckAWSIsEnabled(practiceSuffixNumeric,
+    /// connectionString)` picks the plain `[HSS].[uspGetDocuments]` path when disabled. When enabled,
+    /// always runs `[HSS].[uspGetDocuments_AWS]` first, then either (a) no identifier: enriches every
+    /// row's ContentType via `GetDocumentStatusFromIndici(identifier, practiceId, connectionString)`, or
+    /// (b) an identifier given: fetches the single document's JSON via
+    /// `DocumentGetByDocumentKeyJsonResult(identifier, practiceId, connectionString, dmsConnectionString)`
+    /// and overwrites the first row's MessageData/MessageTitle/ContentType from it.
+    /// </summary>
+    public async Task<List<KaroDocumentInfo>> GetDocumentsAsync(string practiceSuffix, string practiceSuffixNumeric, string? patientId, string? identifier, CancellationToken ct = default)
     {
+        var connectionString = await _connectionResolver.ResolveAsync(practiceSuffix, ct);
         var parameters = new List<SqlParameter> { new("@pPatientId", (object?)patientId ?? DBNull.Value) };
         if (!string.IsNullOrWhiteSpace(identifier))
         {
             parameters.Add(new SqlParameter("@pIdentifier", identifier));
         }
 
-        return await RunAsync<KaroDocumentInfo>(practiceSuffix, "[HSS].[uspGetDocuments]", parameters, ct);
+        if (!int.TryParse(practiceSuffixNumeric, out var practiceIdInt))
+        {
+            var table0 = await LegacyDbExecutor.ExecuteDataTableAsync(connectionString, CommandType.StoredProcedure, "[HSS].[uspGetDocuments]", parameters, ct);
+            return HekCoreApi.Infrastructure.Legacy.Hiso.DataTableMapper.ToList<KaroDocumentInfo>(table0);
+        }
+
+        var awsEnabled = await _awsDocumentService.CheckAwsIsEnabledAsync(practiceIdInt, connectionString, ct);
+        if (!awsEnabled)
+        {
+            var table = await LegacyDbExecutor.ExecuteDataTableAsync(connectionString, CommandType.StoredProcedure, "[HSS].[uspGetDocuments]", parameters, ct);
+            return HekCoreApi.Infrastructure.Legacy.Hiso.DataTableMapper.ToList<KaroDocumentInfo>(table);
+        }
+
+        var awsTable = await LegacyDbExecutor.ExecuteDataTableAsync(connectionString, CommandType.StoredProcedure, "[HSS].[uspGetDocuments_AWS]", parameters, ct);
+        var results = HekCoreApi.Infrastructure.Legacy.Hiso.DataTableMapper.ToList<KaroDocumentInfo>(awsTable);
+
+        if (string.IsNullOrEmpty(identifier))
+        {
+            foreach (var doc in results)
+            {
+                if (string.IsNullOrWhiteSpace(doc.Identifier))
+                {
+                    continue;
+                }
+
+                var status = await _awsDocumentService.GetDocumentStatusFromIndiciAsync(doc.Identifier.ToUpperInvariant(), practiceIdInt, connectionString, ct);
+                if (status?.DocumentType is { } docType)
+                {
+                    doc.ContentType = MimeTypes.GetValueOrDefault(docType);
+                }
+            }
+
+            return results;
+        }
+
+        var dmsConnectionString = await _dmsConnectionResolver.ResolveAsync(practiceSuffix, ct);
+        var singleDocJson = await _awsDocumentService.DocumentGetByDocumentKeyJsonResultAsync(identifier.ToUpperInvariant(), practiceIdInt, dmsConnectionString, connectionString, ct);
+        if (string.IsNullOrEmpty(singleDocJson) || results.Count == 0)
+        {
+            return results;
+        }
+
+        var singleDoc = JsonSerializer.Deserialize<KaroAwsSingleDocument>(singleDocJson, JsonOptions);
+        if (singleDoc is null)
+        {
+            return results;
+        }
+
+        results[0].MessageData = singleDoc.DocumentData;
+        results[0].MessageTitle = singleDoc.DocumentName;
+        results[0].ContentType = singleDoc.DocumentType is { } t ? MimeTypes.GetValueOrDefault(t) : null;
+        return results;
     }
+
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    private sealed record KaroAwsSingleDocument(byte[]? DocumentData, string? DocumentName, string? DocumentType);
 
     public async Task<List<KaroLabResult>> GetLabResultsAsync(string practiceSuffix, string? patientId, CancellationToken ct = default) =>
         await RunAsync<KaroLabResult>(practiceSuffix, "[HSS].[uspGetLabResults]", Param("@pPatientId", patientId), ct);

@@ -18,9 +18,10 @@ public sealed record SaveContainerCommandResult(bool SessionResolved, bool Respo
 /// <summary>
 /// Ported from `FormSessionService.svc.cs`'s `saveContainer`/`saveDataContainer`. DMS save (only when
 /// `completed==true`) and the ACC45 *definition* save are real. The ACC45 Detail/Diagnosis/Referral
-/// TVP pipeline (`Acc45Builder`/`Acc45DiagnosisBuilder`/`Acc45ReferralBuilder` -> `SaveAccidentInformation`)
-/// is not yet ported (`PROJECT_STATUS.md` HISO wire-compat rebuild) - throws rather than silently
-/// skipping it, since legacy always runs this step regardless of `completed`.
+/// TVP pipeline (`Acc45DetailRepository.SaveAccidentInformationAsync`) also runs for real, unconditionally,
+/// matching legacy running it regardless of `completed` - but see that repository's remarks: its
+/// diagnosis/referral TVP column lists are still incomplete (blocked on the real `UDT_tblACC45Diagnosis`/
+/// `UDT_tblACC45Referral` schema, not yet supplied), so only the detail table's save is fully real today.
 /// </summary>
 public sealed class SaveContainerCommandHandler : IRequestHandler<SaveContainerCommand, SaveContainerCommandResult>
 {

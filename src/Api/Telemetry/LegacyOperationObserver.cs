@@ -34,6 +34,7 @@ public sealed class LegacyOperationObserver
         Func<TResult, bool>? isExpectedFailure = null,
         string? expectedFailureReason = null)
     {
+        TagActivity(system, endpoint, context);
         try
         {
             var result = await action();
@@ -69,6 +70,7 @@ public sealed class LegacyOperationObserver
         IReadOnlyDictionary<string, object?> context,
         Func<Task<string>> action)
     {
+        TagActivity(system, endpoint, context);
         try
         {
             var result = await action();
@@ -90,6 +92,7 @@ public sealed class LegacyOperationObserver
     /// </summary>
     public void RecordExpectedFailure(ILogger logger, string system, string endpoint, string reason, IReadOnlyDictionary<string, object?> context)
     {
+        TagActivity(system, endpoint, context);
         logger.LogWarning(
             "{System} {Endpoint}: expected failure ({Reason}). Context: {@Context}",
             system, endpoint, reason, context);
@@ -102,6 +105,7 @@ public sealed class LegacyOperationObserver
     /// <summary>Logs Error, marks the current span as failed, and records the error-rate metric for an exception that a caller is handling inline (e.g. inside its own try/catch/finally) rather than through <see cref="ObserveAsync{TResult}"/>/<see cref="ObserveSwallowedAsync"/>.</summary>
     public void RecordUnexpectedFailure(ILogger logger, string system, string endpoint, Exception ex, IReadOnlyDictionary<string, object?> context)
     {
+        TagActivity(system, endpoint, context);
         logger.LogError(
             ex,
             "{System} {Endpoint}: unexpected exception. Context: {@Context}",
@@ -117,4 +121,37 @@ public sealed class LegacyOperationObserver
         logger.LogInformation(
             "{System} {Endpoint} succeeded. Context: {@Context}",
             system, endpoint, context);
+
+    /// <summary>
+    /// For controllers that don't route their success path through <see cref="ObserveAsync{TResult}"/>/
+    /// <see cref="ObserveSwallowedAsync"/> at all (e.g. `KaroCompatController`, which only calls this
+    /// class on the failure branch) - lets a success path still tag the trace span with real business
+    /// context, without implying a warning/error the way `RecordExpectedFailure` would.
+    /// </summary>
+    public void Tag(string system, string endpoint, IReadOnlyDictionary<string, object?> context) => TagActivity(system, endpoint, context);
+
+    /// <summary>
+    /// Attaches business context (patientId, sessionKey, encounterId, etc.) directly onto the current
+    /// trace span. Structured logs already carry this via `{@Context}`, but only traces/metrics are
+    /// wired to the OTLP exporter (no `.WithLogging()` in Program.cs) - so without this, the Aspire
+    /// dashboard's Traces view shows only the default ASP.NET Core attributes plus a correlation ID,
+    /// none of the real request context. Tags are prefixed `legacy.` to avoid colliding with
+    /// auto-instrumentation's own `http.*`/`otel.*` attributes. Safe to call more than once per span
+    /// (e.g. both `ObserveAsync` and a later `RecordExpectedFailure` on the same request).
+    /// </summary>
+    private static void TagActivity(string system, string endpoint, IReadOnlyDictionary<string, object?> context)
+    {
+        var activity = Activity.Current;
+        if (activity is null)
+        {
+            return;
+        }
+
+        activity.SetTag("legacy.system", system);
+        activity.SetTag("legacy.endpoint", endpoint);
+        foreach (var (key, value) in context)
+        {
+            activity.SetTag($"legacy.{key}", value?.ToString());
+        }
+    }
 }

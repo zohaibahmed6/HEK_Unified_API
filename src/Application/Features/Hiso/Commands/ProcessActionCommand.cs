@@ -14,11 +14,10 @@ public sealed record ProcessActionCommandResult(bool SessionResolved, bool Proce
 /// <summary>
 /// Ported from `FormSessionService.svc.cs`'s `processAction`/`saveProcessAction`/`Task.processTask`.
 /// `"save"` short-circuits to `processed=true` with no persistence when `IsDynamic` is off, exactly
-/// like legacy - the real 5-builder patient/consult/employer/problem/practitioner save pipeline
-/// (`PROJECT_STATUS.md` HISO wire-compat rebuild) is not yet ported when `IsDynamic` is on, so that
-/// specific combination throws rather than silently claiming a save that didn't happen.
-/// `"addTask"` is fully real. `"addInvoice"`/`"launchForm"` are legacy's own genuine empty no-ops,
-/// reproduced exactly per Zohaib's "legacy fidelity wins" decision - `processed` stays `false`.
+/// like legacy; when `IsDynamic` is on, the real 5-builder patient/consult/employer/problem/practitioner
+/// save pipeline (`HisoProcessActionSaveRepository`) runs for real. `"addTask"` is fully real.
+/// `"addInvoice"`/`"launchForm"` are legacy's own genuine empty no-ops, reproduced exactly per
+/// Zohaib's "legacy fidelity wins" decision - `processed` stays `false`.
 /// </summary>
 public sealed class ProcessActionCommandHandler : IRequestHandler<ProcessActionCommand, ProcessActionCommandResult>
 {

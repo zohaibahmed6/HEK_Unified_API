@@ -64,6 +64,15 @@ public sealed class ErmsCompatController : ControllerBase
         }
 
         var result = await _mediator.Send(new ErmsAuthenticateQuery(credential.Username, credential.Password, credential.PatientId, credential.EncounterId), ct);
+        var authContext = new Dictionary<string, object?> { ["PatientId"] = credential.PatientId, ["EncounterId"] = credential.EncounterId };
+        if (result.Succeeded)
+        {
+            _observer.Tag("erms", nameof(Authenticate), authContext);
+        }
+        else
+        {
+            _observer.RecordExpectedFailure(_logger, "erms", nameof(Authenticate), result.ErrorMessage ?? "AuthenticationFailed", authContext);
+        }
 
         return result.Succeeded
             ? XmlResult(new ErmsAuthenticationResponse
@@ -337,7 +346,7 @@ public sealed class ErmsCompatController : ControllerBase
         });
     }
 
-    /// <summary>Legacy: `GET GetDischargeSummaryReportList(...)` (`APIController.cs:428`) - `[HSS].[uspGetOtherDocs]` with `@pType="Discharge Summary"` (non-AWS path).</summary>
+    /// <summary>Legacy: `GET GetDischargeSummaryReportList(...)` (`APIController.cs:428`) - `[HSS].[uspGetOtherDocs]`/`[HSS].[uspGetOtherDocs_AWS]` with `@pType="Discharge Summary"`, branched by `IAwsDocumentService.CheckAwsIsEnabledAsync` (see repository).</summary>
     [HttpGet("GetDischargeSummaryReportList")]
     public async Task<IActionResult> GetDischargeSummaryReportList(string? pmsPatientId, string? pmsEncounterId, string pmsOrder = "desc",
         string pmsMinDateTime = "", string pmsMaxDateTime = "", CancellationToken ct = default)
@@ -358,7 +367,7 @@ public sealed class ErmsCompatController : ControllerBase
         });
     }
 
-    /// <summary>Legacy: `GET GetScannedList(...)` (`APIController.cs:1329`) - `[HSS].[uspGetOtherDocs]` without the type filter (non-AWS path).</summary>
+    /// <summary>Legacy: `GET GetScannedList(...)` (`APIController.cs:1329`) - `[HSS].[uspGetOtherDocs]`/`[HSS].[uspGetOtherDocs_AWS]` without the type filter, branched by `IAwsDocumentService.CheckAwsIsEnabledAsync` (see repository).</summary>
     [HttpGet("GetScannedList")]
     public async Task<IActionResult> GetScannedList(string? pmsPatientId, string? pmsEncounterId, string pmsOrder = "desc",
         string pmsMinDateTime = "", string pmsMaxDateTime = "", CancellationToken ct = default)
@@ -425,7 +434,7 @@ public sealed class ErmsCompatController : ControllerBase
         });
     }
 
-    /// <summary>Legacy: `GET GetDischargeSummaryDetails(...)` (`APIController.cs:505`) - `[HSS].[uspGetDocResults]` with `@pIsDischarge=true` (non-AWS path); no RTF conversion.</summary>
+    /// <summary>Legacy: `GET GetDischargeSummaryDetails(...)` (`APIController.cs:505`) - `[HSS].[uspGetDocResults]`/`[HSS].[uspGetDocResults_AWS]` with `@pIsDischarge=true`, branched by `IAwsDocumentService.CheckAwsIsEnabledAsync` (see repository); no RTF conversion.</summary>
     [HttpGet("GetDischargeSummaryDetails")]
     public async Task<IActionResult> GetDischargeSummaryDetails(string? pmsPatientId, string? pmsEncounterId, string? pmsReferenceId, CancellationToken ct)
     {
@@ -447,7 +456,7 @@ public sealed class ErmsCompatController : ControllerBase
         });
     }
 
-    /// <summary>Legacy: `GET GetScannedDetails(...)` (`APIController.cs:1408`) - `[HSS].[uspGetDocResults]` with `@pIsDischarge=false` (non-AWS path); mapped into `ScannedGroup`, no RTF conversion.</summary>
+    /// <summary>Legacy: `GET GetScannedDetails(...)` (`APIController.cs:1408`) - `[HSS].[uspGetDocResults]`/`[HSS].[uspGetDocResults_AWS]` with `@pIsDischarge=false`, branched by `IAwsDocumentService.CheckAwsIsEnabledAsync` (see repository); mapped into `ScannedGroup`, no RTF conversion.</summary>
     [HttpGet("GetScannedDetails")]
     public async Task<IActionResult> GetScannedDetails(string? pmsPatientId, string? pmsEncounterId, string? pmsReferenceId, CancellationToken ct)
     {
@@ -526,6 +535,8 @@ public sealed class ErmsCompatController : ControllerBase
             return new ContentResult { Content = "BadRequest", ContentType = "application/xml; charset=utf-8", StatusCode = StatusCodes.Status400BadRequest };
         }
 
+        _observer.Tag("erms", nameof(SaveDocument), context);
+
         var responseSerializer = new XmlSerializer(typeof(ReferralDocument));
         using var writer = new StringWriter();
         responseSerializer.Serialize(writer, objDocument);
@@ -545,7 +556,10 @@ public sealed class ErmsCompatController : ControllerBase
     {
         var result = string.Empty;
         var error = string.Empty;
-        var context = new Dictionary<string, object?>();
+        // Read straight from the query string rather than threading patientId/encounterId through
+        // every one of this method's ~19 call sites - every real ERMS Get* op takes these same two
+        // query params, so they're always present here regardless of which endpoint called in.
+        var context = new Dictionary<string, object?> { ["PatientId"] = Request.Query["pmsPatientId"].ToString(), ["EncounterId"] = Request.Query["pmsEncounterId"].ToString() };
 
         if (queryResult.Succeeded)
         {

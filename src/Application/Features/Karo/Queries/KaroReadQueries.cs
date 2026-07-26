@@ -81,13 +81,33 @@ public sealed class KaroConditionsQueryHandler : IRequestHandler<KaroConditionsQ
 
 public sealed class KaroDocumentsQueryHandler : IRequestHandler<KaroDocumentsQuery, KaroListResult<KaroDocumentInfo>>
 {
-    private readonly KaroPipeline _pipeline;
+    private readonly IKaroRequestParser _parser;
+    private readonly IKaroTokenValidator _tokenValidator;
     private readonly IKaroDataRepository _repository;
-    public KaroDocumentsQueryHandler(IKaroRequestParser parser, IKaroTokenValidator validator, IKaroDataRepository repository)
-    { _pipeline = new KaroPipeline(parser, validator); _repository = repository; }
-    public Task<KaroListResult<KaroDocumentInfo>> Handle(KaroDocumentsQuery request, CancellationToken ct) =>
-        _pipeline.RunAsync(request.Pho, request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, c) => _repository.GetDocumentsAsync(suffix, patientId, request.Identifier, c), ct);
+    public KaroDocumentsQueryHandler(IKaroRequestParser parser, IKaroTokenValidator tokenValidator, IKaroDataRepository repository)
+    { _parser = parser; _tokenValidator = tokenValidator; _repository = repository; }
+
+    public async Task<KaroListResult<KaroDocumentInfo>> Handle(KaroDocumentsQuery request, CancellationToken ct)
+    {
+        try
+        {
+            var (encounterId, practiceSuffix, practiceSuffixNumeric) = _parser.ParseEncounterId(request.EncounterId);
+            var patientId = _parser.Decrypt(request.PatientId);
+
+            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, patientId, encounterId, request.BearerToken, request.Pho, ct);
+            if (!validation.Valid)
+            {
+                return new KaroListResult<KaroDocumentInfo>(false, null, null, "Invalid token value!");
+            }
+
+            var entries = await _repository.GetDocumentsAsync(practiceSuffix, practiceSuffixNumeric, patientId, request.Identifier, ct);
+            return new KaroListResult<KaroDocumentInfo>(true, patientId, entries, null);
+        }
+        catch (Exception ex)
+        {
+            return new KaroListResult<KaroDocumentInfo>(false, null, null, ex.Message);
+        }
+    }
 }
 
 public sealed class KaroLabResultsQueryHandler : IRequestHandler<KaroLabResultsQuery, KaroListResult<KaroLabResult>>

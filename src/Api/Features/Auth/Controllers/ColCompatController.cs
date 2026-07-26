@@ -37,9 +37,14 @@ public sealed class ColCompatController : ControllerBase
     public async Task<IActionResult> Authenticate([FromBody] ColCredential credential, CancellationToken ct)
     {
         var result = await _mediator.Send(new ColAuthenticateQuery(credential.Username, credential.Password, credential.PatientId, credential.EncounterId), ct);
+        var authContext = new Dictionary<string, object?> { ["PatientId"] = credential.PatientId, ["EncounterId"] = credential.EncounterId };
         if (!string.IsNullOrEmpty(result.Error))
         {
-            _observer.RecordExpectedFailure(_logger, "col", nameof(Authenticate), result.Error, new Dictionary<string, object?> { ["PatientId"] = credential.PatientId, ["EncounterId"] = credential.EncounterId });
+            _observer.RecordExpectedFailure(_logger, "col", nameof(Authenticate), result.Error, authContext);
+        }
+        else
+        {
+            _observer.Tag("col", nameof(Authenticate), authContext);
         }
 
         var reply = new ColUserAuthenticate { Token = result.Token, Expiry = result.Expiry, PracticeId = result.PracticeId, error = result.Error };
@@ -51,7 +56,7 @@ public sealed class ColCompatController : ControllerBase
     public async Task<IActionResult> GetCurrentPatientData(string? pmsPatientId, string? pmsEncounterId, CancellationToken ct)
     {
         var result = await _mediator.Send(new ColGetCurrentPatientDataQuery(pmsPatientId, pmsEncounterId, GetAuthorizationToken()), ct);
-        return await RenderList<ColPatientData>(result);
+        return await RenderList<ColPatientData>(result, pmsPatientId, pmsEncounterId);
     }
 
     /// <summary>Legacy: `GET GetSessionData` (`COLController.cs:147`) - real legacy BUG preserved: `PHCO.GetSessionData` executes an EMPTY stored-procedure name, so this always returns the SQL error text.</summary>
@@ -59,7 +64,7 @@ public sealed class ColCompatController : ControllerBase
     public async Task<IActionResult> GetSessionData(string? pmsPatientId, string? pmsEncounterId, CancellationToken ct)
     {
         var result = await _mediator.Send(new ColGetSessionDataQuery(pmsPatientId, pmsEncounterId, GetAuthorizationToken()), ct);
-        return await RenderList<ColSessionData>(result);
+        return await RenderList<ColSessionData>(result, pmsPatientId, pmsEncounterId);
     }
 
     /// <summary>Legacy: `GET GetProviderData` (`COLController.cs:200`) - `[OnlineClaim].[uspGetProvider]`.</summary>
@@ -67,7 +72,7 @@ public sealed class ColCompatController : ControllerBase
     public async Task<IActionResult> GetProviderData(string? pmsPatientId, string? pmsEncounterId, CancellationToken ct)
     {
         var result = await _mediator.Send(new ColGetProviderDataQuery(pmsPatientId, pmsEncounterId, GetAuthorizationToken()), ct);
-        return await RenderList<ColProviderData>(result);
+        return await RenderList<ColProviderData>(result, pmsPatientId, pmsEncounterId);
     }
 
     /// <summary>Legacy: `GET GetSurgeryData` (`COLController.cs:251`) - `[OnlineClaim].[uspGetSurgeryData]`, optional raw `LocationId`.</summary>
@@ -75,7 +80,7 @@ public sealed class ColCompatController : ControllerBase
     public async Task<IActionResult> GetSurgeryData(string? pmsPatientId, string? pmsEncounterId, string LocationId = "", CancellationToken ct = default)
     {
         var result = await _mediator.Send(new ColGetSurgeryDataQuery(pmsPatientId, pmsEncounterId, LocationId, GetAuthorizationToken()), ct);
-        return await RenderList<ColSurgeryData>(result);
+        return await RenderList<ColSurgeryData>(result, pmsPatientId, pmsEncounterId);
     }
 
     /// <summary>Legacy: `GET GetDiagnosisData` (`COLController.cs:303`) - `[OnlineClaim].[uspGetConditions]`; `pmsOrder` passed raw (no ToUpper - real COL quirk).</summary>
@@ -84,7 +89,7 @@ public sealed class ColCompatController : ControllerBase
         string pmsMinDateTime = "", string pmsMaxDateTime = "", CancellationToken ct = default)
     {
         var result = await _mediator.Send(new ColGetDiagnosisDataQuery(pmsPatientId, pmsEncounterId, pmsOrder, pmsMinDateTime, pmsMaxDateTime, GetAuthorizationToken()), ct);
-        return await RenderList<ColDiagnosisData>(result);
+        return await RenderList<ColDiagnosisData>(result, pmsPatientId, pmsEncounterId);
     }
 
     /// <summary>
@@ -100,11 +105,14 @@ public sealed class ColCompatController : ControllerBase
             invoice.ServiceProvider, invoice.ServiceProviderType, invoice.ServiceDate, invoice.PegasusReference,
             invoice.ClaimShortCode, GetAuthorizationToken()), ct);
 
+        var invoiceContext = new Dictionary<string, object?> { ["PatientId"] = invoice.PatientID, ["EncounterId"] = invoice.EncounterID };
         if (!string.IsNullOrEmpty(result.Error))
         {
-            _observer.RecordExpectedFailure(_logger, "col", nameof(SaveInvoice), result.Error, new Dictionary<string, object?> { ["PatientId"] = invoice.PatientID, ["EncounterId"] = invoice.EncounterID });
+            _observer.RecordExpectedFailure(_logger, "col", nameof(SaveInvoice), result.Error, invoiceContext);
             return Json(result.Error);
         }
+
+        _observer.Tag("col", nameof(SaveInvoice), invoiceContext);
 
         return Json(result.ServiceMappingId == -3
             ? "{\"status\":\"success\",\"message\":\" Invoice Already exist.}"
@@ -112,14 +120,15 @@ public sealed class ColCompatController : ControllerBase
     }
 
     /// <summary>Legacy list shape: serialize the whole list when it has rows, else ONE empty object; the mapper's null return NREs on `.Count` exactly like legacy (message becomes the body).</summary>
-    private async Task<IActionResult> RenderList<T>(ColReadResult result, [CallerMemberName] string endpoint = "") where T : class, new()
+    private async Task<IActionResult> RenderList<T>(ColReadResult result, string? patientId = null, string? encounterId = null, [CallerMemberName] string endpoint = "") where T : class, new()
     {
         var body = string.Empty;
         var error = result.Error;
+        var context = new Dictionary<string, object?> { ["PatientId"] = patientId, ["EncounterId"] = encounterId };
 
         if (result.Succeeded)
         {
-            var (mapped, mapError) = await _observer.ObserveSwallowedAsync(_logger, "col", endpoint, new Dictionary<string, object?>(), () =>
+            var (mapped, mapError) = await _observer.ObserveSwallowedAsync(_logger, "col", endpoint, context, () =>
             {
                 var list = ColDataTableMapper.ToList<T>(result.Table!);
                 var serialized = list!.Count > 0
@@ -132,7 +141,7 @@ public sealed class ColCompatController : ControllerBase
         }
         else if (!string.IsNullOrEmpty(error))
         {
-            _observer.RecordExpectedFailure(_logger, "col", endpoint, error, new Dictionary<string, object?>());
+            _observer.RecordExpectedFailure(_logger, "col", endpoint, error, context);
         }
 
         return Json(string.IsNullOrEmpty(error) ? body : error);

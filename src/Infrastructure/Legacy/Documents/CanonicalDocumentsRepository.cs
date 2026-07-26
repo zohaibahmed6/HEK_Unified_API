@@ -43,7 +43,7 @@ public sealed class CanonicalDocumentsRepository : ICanonicalDocumentsRepository
 
     public async Task<IReadOnlyList<DocumentCanonical>> GetKaroAsync(RoutingContext routing, string? patientId, CancellationToken ct = default)
     {
-        var documents = await _karoRepository.GetDocumentsAsync(routing.PracticeId, patientId, identifier: null, ct);
+        var documents = await _karoRepository.GetDocumentsAsync(routing.PracticeId, routing.PracticeId, patientId, identifier: null, ct);
         return documents.Select(d => new DocumentCanonical(
             d.Identifier,
             d.MessageTitle ?? d.MessageSubject ?? string.Empty,
@@ -55,7 +55,7 @@ public sealed class CanonicalDocumentsRepository : ICanonicalDocumentsRepository
 
     public async Task<IReadOnlyList<DocumentCanonical>> GetErmsAsync(RoutingContext routing, string? patientId, CancellationToken ct = default)
     {
-        var table = await _ermsRepository.GetOtherDocsAsync(routing.PracticeId, patientId, sortOrder: null, DateTime.MinValue, DateTime.MinValue, isReferral: false, ct);
+        var table = await _ermsRepository.GetOtherDocsAsync(routing.PracticeId, routing.PracticeId, patientId, sortOrder: null, DateTime.MinValue, DateTime.MinValue, isReferral: false, ct);
         var results = new List<DocumentCanonical>();
 
         foreach (DataRow row in table.Rows)

@@ -1,8 +1,30 @@
+@import "tailwindcss";
+
+@theme {
+  /* Medical Blue theme (legacy-reference/UI_referance/Medical Blue Theme - Color Palette Reference.md) */
+  --color-medical-primary: #0f52ba; /* Sapphire Blue */
+  --color-medical-secondary: #007bff; /* Medical Blue */
+  --color-medical-success: #28a745;
+  --color-medical-warning: #ffc107;
+  --color-medical-danger: #dc3545;
+  --color-medical-bg: #f8f9fa;
+  --color-medical-text: #212529;
+  --color-medical-muted: #6c757d;
+  --font-sans: "Inter", "Roboto", "Segoe UI", "Open Sans", sans-serif;
+}
+
 * {
   margin: 0;
   padding: 0;
+  box-sizing: border-box;
 }
 
 html, body, #root {
   height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-medical-bg);
+  color: var(--color-medical-text);
 }

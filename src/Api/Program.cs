@@ -23,6 +23,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using HekCoreApi.Api.Telemetry;
 using Microsoft.OpenApi.Models;
+using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -166,6 +167,24 @@ try
     builder.Services.AddMetrics();
     builder.Services.AddSingleton<HekTelemetry>();
     builder.Services.AddSingleton<LegacyOperationObserver>();
+
+    // Structured logs (ILogger output, including the {@Context} data attached by
+    // LegacyOperationObserver) are additive to Serilog's console sink - without this, the
+    // Aspire dashboard's Structured Logs view has nothing to show even though traces/metrics work.
+    builder.Logging.AddOpenTelemetry(logging =>
+    {
+        logging.IncludeFormattedMessage = true;
+        logging.IncludeScopes = true;
+        if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+        {
+            logging.AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint));
+        }
+        else
+        {
+            logging.AddConsoleExporter();
+        }
+    });
+
     builder.Services.AddOpenTelemetry()
         .ConfigureResource(resource => resource.AddService(
             serviceName: "HekCoreApi",

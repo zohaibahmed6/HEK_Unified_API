@@ -4,7 +4,6 @@ using HekCoreApi.Application.Common.Interfaces;
 using HekCoreApi.Application.Common.Models;
 using HekCoreApi.Contracts.Acc45;
 using HekCoreApi.Domain.Exceptions;
-using HekCoreApi.Infrastructure.Legacy.Dormant.Dmsda;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 
@@ -12,30 +11,23 @@ namespace HekCoreApi.Infrastructure.Legacy.Acc45;
 
 /// <summary>
 /// FLAGGED INFERENCES throughout (procedure/column names, version numbers) - no live schema access.
-///
-/// FLAGGED GAP: <see cref="SaveFormAsync"/>'s "render view to DMS" step (HISO-BR-12) would use
-/// HISO's Aspose-based HTML/image rendering in the legacy system. Aspose is commercially licensed
-/// and unavailable here (see DmsDocumentService remarks for the same gap on the DMSDA side) - this
-/// stores the form's raw data container as JSON via the already-ported DmsDocumentService instead
-/// of a rendered document. The DMS-GUID-linked-to-definition-record sequencing itself (HISO-BR-12)
-/// IS implemented; only the rendering step is a placeholder pending Aspose licensing.
 /// </summary>
 public sealed class Acc45Repository : IAcc45Repository
 {
     private readonly IHisoConceptExecutor _hisoExecutor;
     private readonly ILegacyPracticeConnectionResolver _connectionResolver;
-    private readonly DmsDocumentService _dmsDocumentService;
+    private readonly IHisoDocumentHandler _documentHandler;
     private readonly ILogger<Acc45Repository> _logger;
 
     public Acc45Repository(
         IHisoConceptExecutor hisoExecutor,
         ILegacyPracticeConnectionResolver connectionResolver,
-        DmsDocumentService dmsDocumentService,
+        IHisoDocumentHandler documentHandler,
         ILogger<Acc45Repository> logger)
     {
         _hisoExecutor = hisoExecutor;
         _connectionResolver = connectionResolver;
-        _dmsDocumentService = dmsDocumentService;
+        _documentHandler = documentHandler;
         _logger = logger;
     }
 
@@ -99,19 +91,15 @@ public sealed class Acc45Repository : IAcc45Repository
     public async Task<FormData> SaveFormAsync(Guid sessionKey, string formInstanceId, HealthLinkSession session, FormSaveInput input, CancellationToken ct = default)
     {
         // HISO-BR-12: render view to DMS, THEN persist the ACC45 definition, DMS GUID linked.
-        // TODO(Aspose): replace this block with the real Aspose HTML/image rendering once a valid
-        // company license is available (PROJECT_STATUS.md open item 30). Do not substitute a
-        // different rendering library - keep this aligned with what the legacy system did. Only the
-        // bytes/extension/description below need to change; the surrounding save/DMS sequencing
-        // (render first, then persist the definition with the returned DMS GUID) must stay as-is.
+        // Legacy (`FormSessionService.svc.cs:314-321`, `DocumentHandler.AddDocument`) saves the
+        // caller-supplied `view`/`viewType` bytes as-is (HTML as UTF8 text, PDF as base64-decoded
+        // bytes) - it does NOT run Aspose rendering here at all (that only happens in `getData`'s
+        // attachment conversion, see `AsposeMimeConverter`/`IHisoMimeConverter`). Reuses the same real
+        // `IHisoDocumentHandler` the SOAP `saveContainer` wire-compat path (`SaveContainerCommand`)
+        // already verified against `[dbo].[uspDocumentSave]`, instead of JSON-serializing
+        // `DataContainer` (a different field, not what legacy saves as the document).
         var renderedJson = JsonSerializer.Serialize(input.DataContainer);
-        var dmsGuid = await _dmsDocumentService.AddDocumentAsync(
-            base64Content: Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(renderedJson)),
-            extension: ".json",
-            fileName: $"acc45-{formInstanceId}.json",
-            description: "ACC45 form view (Aspose rendering not available - JSON placeholder, see Acc45Repository remarks)",
-            ct: ct);
-        // END TODO(Aspose)
+        var dmsGuid = await _documentHandler.AddDocumentAsync(input.View, input.ViewType ?? "text/html", formInstanceId, session.PracticeId, ct);
 
         var connectionString = await _connectionResolver.ResolveAsync(session.PracticeId, ct);
         var parameters = new List<SqlParameter>

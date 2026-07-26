@@ -30,44 +30,23 @@ Pick the `originScope` for whichever system you want to "be" for the next call.
 { "username": "demo", "password": "demo", "originScope": "Erms", "patientId": 2459731, "rawEncounterId": "280210498__901____local" }
 ```
 
-**COL** ✅
-```json
-{ "username": "demo", "password": "demo", "originScope": "Col", "patientId": 2459731, "practiceId": "901" }
-```
-
 Copy the `token` field from the response, then click the padlock icon in Swagger ("Authorize") and
 paste just the token (no `Bearer ` prefix).
 
-### 1b. Canonical resources (same routes work for all tokens above - just swap which token you authorize with)
+### 1b. Canonical resources (same 3 routes work for all 3 tokens above)
 
 | Route | Notes |
 |---|---|
-| `GET /v1/patients/2459731/demographics` | ✅ Hiso/Karo/Erms/Col |
+| `GET /v1/patients/2459731/demographics` | ✅ all 3 origins |
 | `GET /v1/patients/2459731/demographics?fields=firstName,lastName` | ✅ narrows the response |
-| `GET /v1/patients/2459731/conditions` | ✅ Hiso/Karo/Erms/Col (Col wired in 2026-07-23, real `[OnlineClaim].[uspGetConditions]`) |
-| `GET /v1/patients/2459731/documents` | ✅ Hiso/Karo/Erms |
-| `GET /v1/patients/2459731/clinicalnotes` | ✅ Hiso/Karo/Erms - Hiso returns real dates but empty note text for this patient (real HISO-side data gap, not a bug) |
-| `GET /v1/patients/2459731/labresults` | ✅ Karo/Erms (10 real rows each); Hiso returns `{"items":[]}` (real gap - HISO's lab-report tables have no documents for this patient) |
-| `GET /v1/patients/2459731/medications` | ✅ Hiso/Karo/Erms - Karo/Erms agree (3 real long-term meds); Hiso returns more (11) since it queries its own concept tables independently - a real data variance, not a bug |
-| `GET /v1/patients/2459731/allergies` | ✅ Hiso (1 real entry)/Erms (2 real entries); Karo → 501 (no real Karo allergies operation exists) |
-| `GET /v1/patients/2459731/currentprovider` | Hiso/Karo/Erms all return 404 for this patient - confirmed via raw SQL that `uspGetProvider` genuinely returns zero rows here, not a bug |
-| `GET /v1/patients/2459731/practitioners` | ✅ Erms (real rows); Hiso returns `{"items":[]}` (real gap); Karo → 501 (no real operation) |
-| `GET /v1/patients/2459731/radiologyreports` | Hiso/Erms both return `{"items":[]}` (confirmed real absence via sqlcmd); Karo → 501 (no real operation) |
-| `GET /v1/patients/2459731/smokingstatus` | ✅ Erms (1 real entry); Hiso returns `{"items":[]}` (real gap); Karo → 501 (no real operation) |
-| `GET /v1/patients/2459731/nextofkin` | ✅ Erms (1 real entry); Hiso returns `{"items":[]}` (real gap); Karo → 501 (no real operation) |
+| `GET /v1/patients/2459731/conditions` | ✅ all 3 origins |
+| `GET /v1/patients/2459731/documents` | ✅ all 3 origins |
 
-### 1c. KARO-only canonical resources (no Hiso/Erms equivalent exists - confirmed gaps, other origins get a clean 501)
+HISO: patientId, practiceId, firstName, lastName, dateOfBirth
 
-Use the **KARO** token from section 1a for all three.
+KARO: patientId, practiceId, firstName, lastName, dateOfBirth, dateOfEnrolment, endEnrolmentDate
 
-| Route | Notes |
-|---|---|
-| `GET /v1/patients/2459731/recalls` | ✅ returns 4 real recall entries for this patient |
-| `GET /v1/recallcategories?group=1` | Not patient-scoped (no `{patientId}` in the route) - returned `{"items":[]}` for this group value; try other `group` values if you need to see populated data |
-| `GET /v1/screeningcodes` | Not patient-scoped - legacy always passes practiceId literal `"6"` internally; returned `{"items":[]}` in this environment |
-
-**Deliberately not built** (see `PROJECT_STATUS.md` 2026-07-23 entry for why): **Measurements** (real columns use a doubly-nested delimiter shape not yet decoded with confidence), **Encounter Summary** (confirmed to be a hardcoded legacy stub, not real DB data - wrapping it as "canonical" would misrepresent it), **Observations** (no confident HISO concept match found yet).
-
+ERMS: patientId, firstName, lastName, dateOfBirth, encounterId, nhi
 ---
 
 ## 2. Legacy HISO (`/hiso/*`) — session-based, no token/login needed

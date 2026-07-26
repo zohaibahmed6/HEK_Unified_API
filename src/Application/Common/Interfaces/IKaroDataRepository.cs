@@ -10,7 +10,8 @@ public interface IKaroDataRepository
 {
     Task<List<KaroConsultNote>> GetConsultNotesAsync(string practiceSuffix, string? patientId, CancellationToken ct = default);
     Task<List<KaroDiagnosis>> GetConditionsAsync(string practiceSuffix, string? patientId, CancellationToken ct = default);
-    Task<List<KaroDocumentInfo>> GetDocumentsAsync(string practiceSuffix, string? patientId, string? identifier, CancellationToken ct = default);
+    /// <summary>Legacy (`hsswebapi/DAL/South/HSSDA.cs:262-373`): real branch is `CheckAWSIsEnabled(practiceSuffixNumeric, connectionString)` -> `[HSS].[uspGetDocuments_AWS]` (+ per-row `GetDocumentStatusFromIndici` ContentType enrichment when no identifier, or `DocumentGetByDocumentKeyJsonResult` single-doc content when an identifier is given) vs plain `[HSS].[uspGetDocuments]`.</summary>
+    Task<List<KaroDocumentInfo>> GetDocumentsAsync(string practiceSuffix, string practiceSuffixNumeric, string? patientId, string? identifier, CancellationToken ct = default);
     Task<List<KaroLabResult>> GetLabResultsAsync(string practiceSuffix, string? patientId, CancellationToken ct = default);
     Task<List<KaroMedication>> GetMedicationsAsync(string practiceSuffix, string? patientId, CancellationToken ct = default);
     Task<List<KaroObservation>> GetObservationsAsync(string practiceSuffix, string? patientId, string? conceptId, CancellationToken ct = default);

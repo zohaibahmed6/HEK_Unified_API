@@ -3,10 +3,8 @@ namespace HekCoreApi.Application.Common.Interfaces;
 /// <summary>
 /// Real byte-level attachment conversion confirmed from
 /// legacy-reference/Hiso/ConceptMapper/TypeConverter.cs (`CreatePDFromImage`/`ConvertHTMLToByte`),
-/// both backed by Aspose.Words - the same Aspose-licensing gap already flagged for ACC45 form
-/// rendering (PROJECT_STATUS.md item 30). Placeholder implementation returns the original bytes
-/// unconverted until a license is available - matches legacy's own graceful-degradation behavior on
-/// conversion failure (`ConvertHTMLToByte` swallows exceptions and returns the original bytes too).
+/// both backed by the real, licensed `Aspose.Words.dll` (`AsposeMimeConverter`, PROJECT_STATUS.md
+/// item 30 resolved 2026-07-26).
 /// </summary>
 public interface IHisoMimeConverter
 {

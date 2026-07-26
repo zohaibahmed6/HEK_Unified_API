@@ -1,32 +1,97 @@
 import { useState } from "react";
+import { Activity, FileText, ClipboardList, Receipt, Menu, X, Stethoscope } from "lucide-react";
 import { systems, type SystemId } from "./systems";
-import { HisoPanel } from "./HisoPanel";
-import { AuthPanel } from "./AuthPanel";
-import { karoAuthenticate, ermsAuthenticate, colAuthenticate } from "./api";
+import { SystemDashboard } from "./SystemDashboard";
+import { useDashboardStore } from "./store";
 import "./App.css";
+
+const SYSTEM_ICONS: Record<SystemId, React.ComponentType<{ size?: number; className?: string }>> = {
+  hiso: Activity,
+  karo: Stethoscope,
+  erms: FileText,
+  col: Receipt,
+};
 
 function App() {
   const [active, setActive] = useState<SystemId>("hiso");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const current = systems.find((s) => s.id === active)!;
+  const { state, setValue, setAuth } = useDashboardStore();
+
+  const selectSystem = (id: SystemId) => {
+    setActive(id);
+    setMobileNavOpen(false);
+  };
 
   return (
     <div className="shell" data-theme={active}>
-      <aside className="sidebar">
+      {/* Mobile top bar: hamburger + brand, hidden on desktop */}
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--line)] bg-white px-4 py-3 md:hidden">
+        <button
+          type="button"
+          aria-label={mobileNavOpen ? "Close navigation" : "Open navigation"}
+          onClick={() => setMobileNavOpen((v) => !v)}
+          className="rounded-md p-2 text-[var(--ink)] hover:bg-[var(--bg)]"
+        >
+          {mobileNavOpen ? <X size={22} /> : <Menu size={22} />}
+        </button>
+        <div className="flex items-center gap-2">
+          <ClipboardList size={18} className="text-[var(--accent)]" />
+          <span className="font-semibold text-[var(--accent)]">HEK</span>
+        </div>
+        <span className="w-9" />
+      </div>
+
+      {/* Mobile nav overlay */}
+      {mobileNavOpen && (
+        <div className="fixed inset-0 z-40 flex md:hidden">
+          <div className="w-72 max-w-[80vw] overflow-y-auto bg-white shadow-xl">
+            <aside className="sidebar !border-r-0">
+              <div className="brand">
+                <span className="brand-mark">HEK</span>
+                <span className="brand-sub">Legacy System Client</span>
+              </div>
+              <nav>
+                {systems.map((s) => {
+                  const Icon = SYSTEM_ICONS[s.id];
+                  return (
+                    <button
+                      key={s.id}
+                      className={`nav-item nav-item--${s.id} ${s.id === active ? "is-active" : ""}`}
+                      onClick={() => selectSystem(s.id)}
+                    >
+                      <Icon size={16} />
+                      {s.label}
+                    </button>
+                  );
+                })}
+              </nav>
+            </aside>
+          </div>
+          <div className="flex-1 bg-black/30" onClick={() => setMobileNavOpen(false)} />
+        </div>
+      )}
+
+      {/* Desktop persistent sidebar */}
+      <aside className="sidebar hidden md:flex">
         <div className="brand">
           <span className="brand-mark">HEK</span>
           <span className="brand-sub">Legacy System Client</span>
         </div>
         <nav>
-          {systems.map((s) => (
-            <button
-              key={s.id}
-              className={`nav-item nav-item--${s.id} ${s.id === active ? "is-active" : ""}`}
-              onClick={() => setActive(s.id)}
-            >
-              <span className="nav-dot" />
-              {s.label}
-            </button>
-          ))}
+          {systems.map((s) => {
+            const Icon = SYSTEM_ICONS[s.id];
+            return (
+              <button
+                key={s.id}
+                className={`nav-item nav-item--${s.id} ${s.id === active ? "is-active" : ""}`}
+                onClick={() => selectSystem(s.id)}
+              >
+                <Icon size={16} />
+                {s.label}
+              </button>
+            );
+          })}
         </nav>
       </aside>
 
@@ -44,47 +109,12 @@ function App() {
           <p className="panel-description">{current.description}</p>
         </section>
 
-        {current.id === "hiso" && <HisoPanel />}
-
-        {current.id === "karo" && (
-          <AuthPanel
-            actionLabel="Authenticate (KARO)"
-            fields={[
-              { key: "username", label: "Username", default: "hsslive" },
-              { key: "password", label: "Password", default: "H$$L1v3005", type: "password" },
-              { key: "patientId", label: "Patient ID", default: "2459731" },
-              { key: "encounterId", label: "Encounter ID", default: "2147488418__901__FZZ999-B" },
-              { key: "pho", label: "PHO", default: "NBPH0" },
-            ]}
-            onAuthenticate={(v) => karoAuthenticate(v.username, v.password, v.patientId, v.encounterId, v.pho)}
-          />
-        )}
-
-        {current.id === "erms" && (
-          <AuthPanel
-            actionLabel="Authenticate (ERMS)"
-            fields={[
-              { key: "username", label: "Username", default: "ermsdev" },
-              { key: "password", label: "Password", default: "eRMsd3V", type: "password" },
-              { key: "patientId", label: "Patient ID", default: "2459731" },
-              { key: "encounterId", label: "Encounter ID", default: "2147488418__901__FZZ999-B" },
-            ]}
-            onAuthenticate={(v) => ermsAuthenticate(v.username, v.password, v.patientId, v.encounterId)}
-          />
-        )}
-
-        {current.id === "col" && (
-          <AuthPanel
-            actionLabel="Authenticate (COL)"
-            fields={[
-              { key: "username", label: "Username", default: "indiCOLProd" },
-              { key: "password", label: "Password", default: "C@L321$Prod!", type: "password" },
-              { key: "patientId", label: "Patient ID", default: "2459731" },
-              { key: "encounterId", label: "Encounter ID", default: "2147488418__901__FZZ999-B" },
-            ]}
-            onAuthenticate={(v) => colAuthenticate(v.username, v.password, v.patientId, v.encounterId)}
-          />
-        )}
+        <SystemDashboard
+          system={current.id}
+          auth={state[current.id]}
+          onSetValue={(key, value) => setValue(current.id, key, value)}
+          onSetAuth={(patch) => setAuth(current.id, patch)}
+        />
 
         <section className="panel panel--callflow">
           <div className="panel-row">

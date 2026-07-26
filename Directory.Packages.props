@@ -75,6 +75,10 @@
          break, just reduced capability on Linux containers (ADR-005). See ADR-012 for detail. -->
     <PackageVersion Include="System.Drawing.Common" Version="8.0.10" />
     <PackageVersion Include="PdfSharp" Version="6.1.1" />
+    <!-- Required at runtime by the vendored Aspose.Words.dll (a .NET Framework 4.0 assembly, real
+         license supplied by Zohaib, confirmed working under net8.0 via a scratch probe 2026-07-26) -
+         it calls the legacy Windows-1252 codepage APIs .NET Core no longer registers by default. -->
+    <PackageVersion Include="System.Text.Encoding.CodePages" Version="8.0.0" />
     <!-- Testing -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageVersion Include="xunit" Version="2.9.2" />

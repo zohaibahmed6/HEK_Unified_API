@@ -54,12 +54,18 @@ public interface IErmsDataRepository
     Task<DataTable> GetRadResultsAsync(string practiceSuffix, string? patientId, string? referenceId, CancellationToken ct = default);
 
     /// <summary>
-    /// `HSSDA.GetOtherDocs` (`HSSDA.cs:653`) - non-AWS path only (`[HSS].[uspGetOtherDocs]`); the AWS branch
-    /// needs the non-portable `AWSDoc.IndiciDMS` DLL - same documented deferral as KARO/HISO's AWS gaps.
-    /// `isReferral` true adds `@pType = "Discharge Summary"`.
+    /// `HSSDA.GetOtherDocs` (`HSSDA.cs:653-726`) - real branch is `CheckAWSIsEnabled(practiceSuffixNumeric,
+    /// connectionString)` -&gt; `[HSS].[uspGetOtherDocs_AWS]` (+ per-row `DataType` enrichment via
+    /// `GetDocumentStatusFromIndici`) vs plain `[HSS].[uspGetOtherDocs]`. `isReferral` true adds
+    /// `@pType = "Discharge Summary"`.
     /// </summary>
-    Task<DataTable> GetOtherDocsAsync(string practiceSuffix, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, bool isReferral, CancellationToken ct = default);
+    Task<DataTable> GetOtherDocsAsync(string practiceSuffix, string practiceSuffixNumeric, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, bool isReferral, CancellationToken ct = default);
 
-    /// <summary>`HSSDA.GetDocResults` (`HSSDA.cs:260`) - non-AWS path only (`[HSS].[uspGetDocResults]`); `@pIsDischarge` always sent, `@pReferenceId` only when non-blank (legacy's referralId arg is always blank from the API).</summary>
-    Task<DataTable> GetDocResultsAsync(string practiceSuffix, string? referenceId, bool isDischarge, CancellationToken ct = default);
+    /// <summary>
+    /// `HSSDA.GetDocResults` (`HSSDA.cs:260-345`) - real branch is `CheckAWSIsEnabled(practiceSuffixNumeric,
+    /// connectionString)` -&gt; `[HSS].[uspGetDocResults_AWS]` (+ single-document `Content`/`DocumentId`/
+    /// `DataType` enrichment via `DocumentGetByDocumentKeyJsonResult` when `referenceId` is present) vs
+    /// plain `[HSS].[uspGetDocResults]`. `@pIsDischarge` always sent, `@pReferenceId` only when non-blank.
+    /// </summary>
+    Task<DataTable> GetDocResultsAsync(string practiceSuffix, string practiceSuffixNumeric, string? referenceId, bool isDischarge, CancellationToken ct = default);
 }

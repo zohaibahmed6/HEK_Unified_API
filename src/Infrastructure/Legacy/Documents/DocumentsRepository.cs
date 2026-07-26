@@ -10,14 +10,12 @@ namespace HekCoreApi.Infrastructure.Legacy.Documents;
 /// FLAGGED INFERENCES: procedure/column names follow the same conventions documented on other
 /// Block 2 repositories - none confirmed against a live schema.
 ///
-/// FLAGGED GAP, NOT IMPLEMENTED: HISO's document save capability (`saveContainer`) includes
-/// Aspose-based HTML/image-to-PDF/DOCX rendering, which the stakeholder decided to "keep,
-/// implemented as the old system did it" (PROJECT_STATUS.md). Aspose is commercially licensed
-/// software - no license or package is available in this environment to actually port that
-/// rendering step. This repository stores document content as supplied (no format conversion);
-/// the Aspose rendering step itself is not implemented and must be added once licensing is
-/// available - tracked as an open item, not silently dropped or faked with a different library
-/// (which would violate the "no replacement" stakeholder decision).
+/// Stores document content as supplied, no format conversion - this matches legacy exactly, not a
+/// gap: none of KARO/ERMS/HISO's real document-save operations run Aspose rendering (confirmed from
+/// `DocumentHandler.AddDocument`/ERMS's `HSSDA.SaveToDMS`/KARO's `HSSDA.DocumentSave` - all three save
+/// caller-supplied bytes as-is). Aspose is only real for HISO `getData`'s image/HTML attachment
+/// conversion (`AsposeMimeConverter`/`IHisoMimeConverter`, PROJECT_STATUS.md item 30, resolved 2026-07-26),
+/// which is unrelated to any document-save path.
 /// </summary>
 public sealed class DocumentsRepository : IDocumentsRepository
 {

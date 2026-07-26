@@ -19,6 +19,7 @@
     <PackageReference Include="Microsoft.IdentityModel.Tokens" />
     <PackageReference Include="System.Drawing.Common" />
     <PackageReference Include="PdfSharp" />
+    <PackageReference Include="System.Text.Encoding.CodePages" />
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
   </ItemGroup>
 
@@ -28,6 +29,16 @@
     <Reference Include="AWSDocCore">
       <HintPath>Legacy\Hiso\vendor\AWSDocCore.dll</HintPath>
     </Reference>
+    <!-- PROJECT_STATUS.md item 30 resolved (2026-07-26): the real Aspose.Words.dll + Aspose.Words.lic
+         Zohaib supplied were sitting in legacy-reference/Hiso/bin the whole time - the earlier
+         "no license available" framing was stale/wrong, same mistake as the AWSDocCore gap. Confirmed
+         working under net8.0 via a scratch probe (real license load + Document->PDF render succeeded)
+         with System.Text.Encoding.CodePages + System.Drawing.Common as the only two extra shims a
+         .NET Framework 4.0 assembly needs under .NET 8. -->
+    <Reference Include="Aspose.Words">
+      <HintPath>Legacy\Hiso\vendor\Aspose.Words.dll</HintPath>
+    </Reference>
+    <None Include="Legacy\Hiso\vendor\Aspose.Words.lic" Link="Aspose.Words.lic" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

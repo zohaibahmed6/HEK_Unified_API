@@ -2,12 +2,13 @@ namespace HekCoreApi.Application.Common.Interfaces;
 
 /// <summary>
 /// Ported from ERMS's `SaveDocument` DAL calls (`DAL/South/HSSDA.cs`): `UpdateExistingDocument`
-/// (`[HSS].[uspUpdateExistingDoc]`, non-AWS path only), `DocumentSave` (`[dbo].[uspDocumentSave]` on the
+/// (`[HSS].[uspUpdateExistingDoc]` vs `[HSS].[uspUpdateExistingDoc_AWS]`, branched on the real
+/// `AWSDoc.IndiciDMS.CheckAWSIsEnabled`), `DocumentSave` (`[dbo].[uspDocumentSave]` on the
 /// real DMS connection) and `InsertDocument` (`[HSS].[uspInsertDocument]`).
 /// </summary>
 public interface IErmsWriteRepository
 {
-    /// <summary>`HSSDA.UpdateExistingDocument` (`HSSDA.cs:38`) - legacy swallows its own errors (out param only logged by the controller), so this never throws.</summary>
+    /// <summary>`HSSDA.UpdateExistingDocument` (`HSSDA.cs:38-64`) - legacy swallows its own errors (out param only logged by the controller), so this never throws. Real branch: `CheckAWSIsEnabled(practiceSuffixNumeric, connectionString)` picks `[HSS].[uspUpdateExistingDoc_AWS]` vs `[HSS].[uspUpdateExistingDoc]`.</summary>
     Task UpdateExistingDocumentAsync(string practiceSuffix, string? referralId, string? practiceSuffixNumeric, CancellationToken ct = default);
 
     /// <summary>
