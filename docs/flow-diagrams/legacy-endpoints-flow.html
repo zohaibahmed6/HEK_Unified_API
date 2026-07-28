@@ -1,0 +1,283 @@
+<meta charset="utf-8" />
+<title>HEK Core API — Legacy Endpoints Flow</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f2f0ea; --surface: #ffffff; --ink: #1e211d; --ink-dim: #63685f;
+    --border: #dcd8cd; --shadow: 0 1px 2px rgba(30,33,29,0.07);
+    --hiso: #2f6f62; --hiso-soft: #e2efe9;
+    --karo: #a4661a; --karo-soft: #f5e8d6;
+    --erms: #5b4b9e; --erms-soft: #e9e5f7;
+    --col: #a3335a; --col-soft: #f6e2ea;
+    --wire: #b9b3a3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15170f; --surface: #1d2016; --ink: #e9e6db; --ink-dim: #a3a291;
+      --border: #34372a; --shadow: 0 1px 2px rgba(0,0,0,0.35);
+      --hiso: #7fc9b6; --hiso-soft: #1c2f28;
+      --karo: #e3a75d; --karo-soft: #332417;
+      --erms: #b3a4ec; --erms-soft: #26213c;
+      --col: #ea92ae; --col-soft: #35202a;
+      --wire: #454738;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #15170f; --surface: #1d2016; --ink: #e9e6db; --ink-dim: #a3a291;
+    --border: #34372a; --shadow: 0 1px 2px rgba(0,0,0,0.35);
+    --hiso: #7fc9b6; --hiso-soft: #1c2f28;
+    --karo: #e3a75d; --karo-soft: #332417;
+    --erms: #b3a4ec; --erms-soft: #26213c;
+    --col: #ea92ae; --col-soft: #35202a;
+    --wire: #454738;
+  }
+  :root[data-theme="light"] {
+    --bg: #f2f0ea; --surface: #ffffff; --ink: #1e211d; --ink-dim: #63685f;
+    --border: #dcd8cd; --shadow: 0 1px 2px rgba(30,33,29,0.07);
+    --hiso: #2f6f62; --hiso-soft: #e2efe9;
+    --karo: #a4661a; --karo-soft: #f5e8d6;
+    --erms: #5b4b9e; --erms-soft: #e9e5f7;
+    --col: #a3335a; --col-soft: #f6e2ea;
+    --wire: #b9b3a3;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, serif;
+    background: var(--bg); color: var(--ink); margin: 0; padding: 2rem 1.25rem 3rem;
+  }
+  .page { max-width: 1180px; margin: 0 auto; }
+  header.top { margin-bottom: 1.75rem; }
+  h1 {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 1.55rem; font-weight: 700; margin: 0 0 0.3rem; letter-spacing: -0.01em; text-wrap: balance;
+  }
+  .lede { font-size: 0.94rem; color: var(--ink-dim); max-width: 62ch; }
+  .lede code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; }
+  .hint {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 0.78rem; color: var(--ink-dim); margin-top: 0.6rem;
+  }
+
+  .lanes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; align-items: start; }
+  @media (max-width: 900px) { .lanes { grid-template-columns: 1fr; } }
+
+  .lane { transition: opacity 0.2s ease; }
+  @media (prefers-reduced-motion: reduce) { .lane { transition: none; } }
+  .lanes.has-active .lane:not(.active) { opacity: 0.32; }
+
+  .lane-head {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    width: 100%; text-align: left; cursor: pointer; border: 1px solid var(--border);
+    background: var(--surface); border-radius: 10px; padding: 0.7rem 0.85rem; margin-bottom: 0.85rem;
+    box-shadow: var(--shadow); display: flex; align-items: center; gap: 0.55rem;
+  }
+  .lane-head:focus-visible { outline: 2px solid var(--dot); outline-offset: 1px; }
+  .dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--dot); flex-shrink: 0; }
+  .lane-title { font-weight: 700; font-size: 0.95rem; }
+  .lane-sub { font-size: 0.68rem; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .lane[data-sys="hiso"] { --dot: var(--hiso); --soft: var(--hiso-soft); }
+  .lane[data-sys="karo"] { --dot: var(--karo); --soft: var(--karo-soft); }
+  .lane[data-sys="erms"] { --dot: var(--erms); --soft: var(--erms-soft); }
+  .lane[data-sys="col"]  { --dot: var(--col);  --soft: var(--col-soft); }
+
+  .steps { position: relative; padding-left: 0.9rem; }
+  .steps::before {
+    content: ""; position: absolute; left: 0.28rem; top: 0.3rem; bottom: 0.3rem; width: 2px; background: var(--wire);
+  }
+  .step {
+    position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: var(--shadow); padding: 0.55rem 0.7rem; margin-bottom: 0.55rem; cursor: pointer; text-align: left; width: 100%;
+    font: inherit; color: inherit;
+  }
+  .step:focus-visible { outline: 2px solid var(--dot); outline-offset: 1px; }
+  .step::before {
+    content: ""; position: absolute; left: -0.9rem; top: 0.9rem; width: 0.5rem; height: 0.5rem;
+    border-radius: 50%; background: var(--dot); border: 2px solid var(--bg);
+  }
+  .step.selected { border-color: var(--dot); background: var(--soft); }
+  .step-n {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.65rem; color: var(--dot); font-weight: 700;
+  }
+  .step-title {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 0.82rem; font-weight: 600; margin-top: 0.05rem;
+  }
+  .step-tag {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.68rem; color: var(--ink-dim); margin-top: 0.15rem; word-break: break-word;
+  }
+
+  .detail {
+    margin-top: 1.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: var(--shadow); padding: 1rem 1.25rem; min-height: 6rem;
+  }
+  .detail-empty {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--ink-dim); font-size: 0.85rem;
+  }
+  .detail-head { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem; }
+  .detail-title { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; font-weight: 700; font-size: 1rem; }
+  .detail-body { font-size: 0.92rem; line-height: 1.55; }
+  .detail-body code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em;
+    background: var(--bg); padding: 0.1rem 0.35rem; border-radius: 4px;
+  }
+  .detail-body ul { margin: 0.4rem 0 0; padding-left: 1.1rem; }
+  .detail-body li { margin-bottom: 0.2rem; }
+</style>
+
+<div class="page">
+  <header class="top">
+    <h1>Legacy Endpoints Flow — HISO / KARO / ERMS / COL</h1>
+    <p class="lede">
+      Four legacy-compat surfaces (<code>src/Api/Features/Auth/Controllers/*CompatController.cs</code>), each
+      reproducing its real source system byte-for-byte. Deliberately module-isolated — separate parsers, token
+      validators, and connection resolvers per system, so no lane's quirks can leak into another's.
+    </p>
+    <p class="hint">Click a system name to isolate its lane · click any step for the real detail.</p>
+  </header>
+
+  <div class="lanes" id="lanes">
+    <!-- HISO -->
+    <div class="lane" data-sys="hiso">
+      <button class="lane-head" data-lane="hiso">
+        <span class="dot"></span>
+        <span><span class="lane-title">HISO</span><br /><span class="lane-sub">Route /hiso</span></span>
+      </button>
+      <div class="steps">
+        <button class="step" data-d="hiso-1"><div class="step-n">1</div><div class="step-title">Client</div><div class="step-tag">Session GUID, no bearer token</div></button>
+        <button class="step" data-d="hiso-2"><div class="step-n">2</div><div class="step-title">Auth</div><div class="step-tag">Legacy SOAP session, /FormSessionService.svc</div></button>
+        <button class="step" data-d="hiso-3"><div class="step-n">3</div><div class="step-title">HisoCompatController</div><div class="step-tag">6 ops</div></button>
+        <button class="step" data-d="hiso-4"><div class="step-n">4</div><div class="step-title">MediatR → Handler</div><div class="step-tag">Application/Features/Hiso</div></button>
+        <button class="step" data-d="hiso-5"><div class="step-n">5</div><div class="step-title">Connection resolver</div><div class="step-tag">HisoPracticeConnectionResolver</div></button>
+        <button class="step" data-d="hiso-6"><div class="step-n">6</div><div class="step-title">Real database</div><div class="step-tag">Hiso.uspGetPatient etc.</div></button>
+        <button class="step" data-d="hiso-7"><div class="step-n">7</div><div class="step-title">Response</div><div class="step-tag">Same SOAP-shaped envelope</div></button>
+      </div>
+    </div>
+
+    <!-- KARO -->
+    <div class="lane" data-sys="karo">
+      <button class="lane-head" data-lane="karo">
+        <span class="dot"></span>
+        <span><span class="lane-title">KARO / HSS</span><br /><span class="lane-sub">Route /karo</span></span>
+      </button>
+      <div class="steps">
+        <button class="step" data-d="karo-1"><div class="step-n">1</div><div class="step-title">Client</div><div class="step-tag">Dashboard or real HSS caller</div></button>
+        <button class="step" data-d="karo-2"><div class="step-n">2</div><div class="step-title">Auth</div><div class="step-tag">POST /karo/authenticate (JSON) → bearer token</div></button>
+        <button class="step" data-d="karo-3"><div class="step-n">3</div><div class="step-title">KaroCompatController</div><div class="step-tag">~19 reads + 8 writes</div></button>
+        <button class="step" data-d="karo-4"><div class="step-n">4</div><div class="step-title">MediatR → Handler</div><div class="step-tag">Application/Features/Karo</div></button>
+        <button class="step" data-d="karo-5"><div class="step-n">5</div><div class="step-title">Connection resolver</div><div class="step-tag">IKaroPracticeConnectionResolver + KaroDmsConnectionResolver</div></button>
+        <button class="step" data-d="karo-6"><div class="step-n">6</div><div class="step-title">Real database</div><div class="step-tag">dbserver-local → PMS_NZ_V2 / DMS_PMS</div></button>
+        <button class="step" data-d="karo-7"><div class="step-n">7</div><div class="step-title">Response</div><div class="step-tag">Same JSON envelope as real HSS API</div></button>
+      </div>
+    </div>
+
+    <!-- ERMS -->
+    <div class="lane" data-sys="erms">
+      <button class="lane-head" data-lane="erms">
+        <span class="dot"></span>
+        <span><span class="lane-title">ERMS</span><br /><span class="lane-sub">Route /erms</span></span>
+      </button>
+      <div class="steps">
+        <button class="step" data-d="erms-1"><div class="step-n">1</div><div class="step-title">Client</div><div class="step-tag">Dashboard or real ERMS caller</div></button>
+        <button class="step" data-d="erms-2"><div class="step-n">2</div><div class="step-title">Auth</div><div class="step-tag">POST /erms/authenticate (XML, UTF-16 resp) → bearer token</div></button>
+        <button class="step" data-d="erms-3"><div class="step-n">3</div><div class="step-title">ErmsCompatController</div><div class="step-tag">~20 reads + SaveDocument</div></button>
+        <button class="step" data-d="erms-4"><div class="step-n">4</div><div class="step-title">MediatR → Handler</div><div class="step-tag">Application/Features/Erms</div></button>
+        <button class="step" data-d="erms-5"><div class="step-n">5</div><div class="step-title">Connection resolver</div><div class="step-tag">IErmsPracticeConnectionResolver + ErmsDmsConnectionResolver</div></button>
+        <button class="step" data-d="erms-6"><div class="step-n">6</div><div class="step-title">Real database</div><div class="step-tag">dbserver-local → PMS_NZ_V2 / DMS_PMS</div></button>
+        <button class="step" data-d="erms-7"><div class="step-n">7</div><div class="step-title">Response</div><div class="step-tag">Same XML envelope as real ERMS API</div></button>
+      </div>
+    </div>
+
+    <!-- COL -->
+    <div class="lane" data-sys="col">
+      <button class="lane-head" data-lane="col">
+        <span class="dot"></span>
+        <span><span class="lane-title">COL</span><br /><span class="lane-sub">Route /erms/col</span></span>
+      </button>
+      <div class="steps">
+        <button class="step" data-d="col-1"><div class="step-n">1</div><div class="step-title">Client</div><div class="step-tag">Dashboard or real Pegasus caller</div></button>
+        <button class="step" data-d="col-2"><div class="step-n">2</div><div class="step-title">Auth</div><div class="step-tag">POST /erms/col/authenticate (JSON) → bearer token</div></button>
+        <button class="step" data-d="col-3"><div class="step-n">3</div><div class="step-title">ColCompatController</div><div class="step-tag">5 reads + SaveInvoice</div></button>
+        <button class="step" data-d="col-4"><div class="step-n">4</div><div class="step-title">MediatR → Handler</div><div class="step-tag">Application/Features/Col</div></button>
+        <button class="step" data-d="col-5"><div class="step-n">5</div><div class="step-title">Connection resolver</div><div class="step-tag">Shared ERMS routing infra (IErmsRoutingResolver)</div></button>
+        <button class="step" data-d="col-6"><div class="step-n">6</div><div class="step-title">Real database</div><div class="step-tag">dbserver-local → PMS_NZ_V2, [OnlineClaim] schema</div></button>
+        <button class="step" data-d="col-7"><div class="step-n">7</div><div class="step-title">Response</div><div class="step-tag">JSON list or single sentinel object</div></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="detail" id="detail">
+    <p class="detail-empty">Click any step above for the real detail behind it.</p>
+  </div>
+</div>
+
+<script>
+  const DETAILS = {
+    "hiso-1": { t: "Client", h: "hiso", b: "Real legacy caller, or this project's own dashboard (<code>frontend/src/hisoView.tsx</code>). HISO is the only one of the four with no bearer-token step - the caller just needs a valid session GUID." },
+    "hiso-2": { t: "Auth — session GUID", h: "hiso", b: "No <code>/authenticate</code> call. HISO sessions are minted by the real legacy SOAP session-creation flow (<code>/FormSessionService.svc</code>) and passed as <code>sessionKey</code> on every call - <code>HisoSessionResolver</code> validates it server-side per request." },
+    "hiso-3": { t: "HisoCompatController", h: "hiso", b: "<code>src/Api/Features/Auth/Controllers/HisoCompatController.cs</code>, route <code>/hiso</code>. 6 ops: <ul><li><code>getData</code> — full patient record</li><li><code>getVersion</code>, <code>getDeliveryOptions</code>, <code>getFormView</code></li><li><code>processAction</code>, <code>saveContainer</code> (writes)</li></ul>" },
+    "hiso-4": { t: "MediatR → Application handler", h: "hiso", b: "Controller sends an <code>IRequest</code> (e.g. <code>HisoGetDataQuery</code>); handler lives in <code>Application/Features/Hiso</code>, depending only on interfaces under <code>Application/Common/Interfaces</code>. FluentValidation pipeline runs first." },
+    "hiso-5": { t: "HisoPracticeConnectionResolver", h: "hiso", b: "Resolves the practice's real DB target. HISO also has two genuinely global-per-environment connections (not per-practice) via <code>ILegacyPracticeConnectionResolver.ResolveSecondNodeAsync</code> / <code>ResolveIndiciMasterAsync</code>, backed by the <code>LegacyGlobalConnections</code> registry table." },
+    "hiso-6": { t: "Real database", h: "hiso", b: "HISO's own SOAP-backed DB, e.g. <code>Hiso.uspGetPatient</code> confirmed live this session. DMS content (attachments) resolves separately via <code>Hiso:DmsConnectionString</code> to the shared <code>DMS_PMS</code> catalog." },
+    "hiso-7": { t: "Response", h: "hiso", b: "Same SOAP-envelope-shaped JSON as the real legacy system - the compat layer's whole purpose is byte-exact parity, not a modernized shape." },
+
+    "karo-1": { t: "Client", h: "karo", b: "Real HSS/Indici caller, or this project's dashboard (<code>frontend/src/patientRecordForm.tsx</code>)." },
+    "karo-2": { t: "Auth — JSON, bearer token", h: "karo", b: "<code>POST /karo/authenticate</code> with <code>{username, password, patientId, encounterId, system:\"hss\", pho}</code> → <code>{status, token, practiceId}</code>. Token then sent as <code>Authorization: Bearer …</code>." },
+    "karo-3": { t: "KaroCompatController", h: "karo", b: "<code>src/Api/Features/Auth/Controllers/KaroCompatController.cs</code>, route <code>/karo</code>. Reads: demographics, clinicalnotes, conditions, documents, labresults, medications, observations, provider, recallcategories, encountersummary, recalls, screeningcodes, patientattachment. Writes: clinicalnotes, conditions, invoice, observations, recalls, document, summary." },
+    "karo-4": { t: "MediatR → Application handler", h: "karo", b: "e.g. <code>KaroSaveRecallCommand</code> → <code>KaroSaveRecallCommandHandler</code> in <code>Application/Features/Karo/Commands</code>. Every write handler resolves its own <code>RoutingContext</code> from the encounter ID before touching the DB." },
+    "karo-5": { t: "Connection resolvers", h: "karo", b: "<code>IKaroPracticeConnectionResolver</code> resolves the practice DB (server+credential keyed by <code>DbServerHost</code>, from Tenant Registry). <code>KaroDmsConnectionResolver</code> (fixed this session) now reuses that same route and just swaps the database name to <code>DMS_PMS</code>, instead of needing its own separate secret." },
+    "karo-6": { t: "Real database", h: "karo", b: "<code>dbserver-local</code> → <code>PMS_NZ_V2</code> for demographics/clinical/writes (e.g. <code>[HSS].[uspGetDemographics]</code>, <code>[HSS].[uspInsertUpdateRecall]</code>); <code>DMS_PMS</code> for document content (<code>[dbo].[uspDocumentSave]</code>)." },
+    "karo-7": { t: "Response", h: "karo", b: "Same JSON envelope shape as the real HSS Web API - reads return <code>{patientId, resourceType, system, entry:[...]}</code>; writes return <code>{status, message}</code>." },
+
+    "erms-1": { t: "Client", h: "erms", b: "Real ERMS caller, or this project's dashboard (<code>frontend/src/ermsView.tsx</code>)." },
+    "erms-2": { t: "Auth — XML, bearer token", h: "erms", b: "<code>POST /erms/authenticate</code>, body is XML with root <code>&lt;Credential&gt;</code> (Username/Password/PatientId/EncounterId). Real response is UTF-16-encoded XML with a <code>&lt;Token&gt;</code> element - decoding with the wrong charset silently breaks token extraction (a real bug found and fixed this session)." },
+    "erms-3": { t: "ErmsCompatController", h: "erms", b: "<code>src/Api/Features/Auth/Controllers/ErmsCompatController.cs</code>, route <code>/erms</code>. ~20 Get* reads (patient data, measurements, accidents, consult notes, lab/radiology/discharge/scanned report list+detail pairs) plus <code>SaveDocument</code>." },
+    "erms-4": { t: "MediatR → Application handler", h: "erms", b: "e.g. <code>ErmsSaveDocumentCommand</code> → handler in <code>Application/Features/Erms/Commands</code>, parsing the real <code>ReferralDocument_*</code> XML element names (<code>src/Adapters.Erms/Hiso/ErmsReferralDocument.cs</code>) - plain tag names are silently ignored by <code>XmlSerializer</code>, a real bug found and fixed this session." },
+    "erms-5": { t: "Connection resolvers", h: "erms", b: "<code>IErmsPracticeConnectionResolver</code> (same Tenant-Registry-route pattern as KARO). <code>ErmsDmsConnectionResolver</code> (fixed this session, same change as KARO's) now reuses the primary route and swaps the DB name to <code>DMS_PMS</code>." },
+    "erms-6": { t: "Real database", h: "erms", b: "<code>dbserver-local</code> → <code>PMS_NZ_V2</code> for reads/writes; <code>DMS_PMS</code> for document content via the shared <code>[dbo].[uspDocumentSave]</code> procedure (same one KARO's document write calls)." },
+    "erms-7": { t: "Response", h: "erms", b: "Real ERMS XML shape - a single flat record, or a <code>conceptType=\"List\"</code> root wrapping repeated records with <code>referenceID</code> attributes used for drill-down detail calls." },
+
+    "col-1": { t: "Client", h: "col", b: "Real Pegasus/COL caller, or this project's dashboard." },
+    "col-2": { t: "Auth — JSON, bearer token", h: "col", b: "<code>POST /erms/col/authenticate</code> with <code>{username, password, patientId, encounterId}</code> → <code>{Token, PracticeId}</code>. No base64 step (unlike some legacy variants); \"3rd segment overwrites\" encounterId quirk confirmed live." },
+    "col-3": { t: "ColCompatController", h: "col", b: "<code>src/Api/Features/Auth/Controllers/ColCompatController.cs</code>, route <code>/erms/col</code>. Reads: GetCurrentPatientData, GetSessionData, GetProviderData, GetSurgeryData, GetDiagnosisData. Write: SaveInvoice." },
+    "col-4": { t: "MediatR → Application handler", h: "col", b: "e.g. <code>ColSaveInvoiceCommand</code> → handler in <code>Application/Features/Col</code>. COL always answers HTTP 200 even on failure - errors live in the JSON body's <code>error</code> field, not the status code." },
+    "col-5": { t: "Connection resolver", h: "col", b: "COL shares ERMS's routing/auth infrastructure (<code>IErmsRoutingResolver</code>) rather than having its own - confirmed in code comments (\"COL shares ERMS's auth/connection infrastructure\")." },
+    "col-6": { t: "Real database", h: "col", b: "<code>dbserver-local</code> → <code>PMS_NZ_V2</code>, <code>[OnlineClaim]</code> schema procedures (ported from <code>DAL/Pegasus/PHCO.cs</code> + <code>HSSDA.InsertUpdateService</code>)." },
+    "col-7": { t: "Response", h: "col", b: "Legacy list shape: the whole list when it has rows, else one empty sentinel object - a null mapper result NREs exactly like the real legacy code did, by design." },
+  };
+
+  const lanesEl = document.getElementById("lanes");
+  const detailEl = document.getElementById("detail");
+  let activeLane = null;
+
+  document.querySelectorAll(".lane-head").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const sys = btn.dataset.lane;
+      if (activeLane === sys) {
+        activeLane = null;
+        lanesEl.classList.remove("has-active");
+        document.querySelectorAll(".lane").forEach((l) => l.classList.remove("active"));
+      } else {
+        activeLane = sys;
+        lanesEl.classList.add("has-active");
+        document.querySelectorAll(".lane").forEach((l) => l.classList.toggle("active", l.dataset.sys === sys));
+      }
+    });
+  });
+
+  document.querySelectorAll(".step").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".step").forEach((s) => s.classList.remove("selected"));
+      btn.classList.add("selected");
+      const d = DETAILS[btn.dataset.d];
+      if (!d) return;
+      detailEl.innerHTML =
+        '<div class="detail-head"><span class="dot" style="background:var(--' + d.h + ')"></span>' +
+        '<span class="detail-title">' + d.t + '</span></div>' +
+        '<div class="detail-body">' + d.b + '</div>';
+    });
+  });
+</script>

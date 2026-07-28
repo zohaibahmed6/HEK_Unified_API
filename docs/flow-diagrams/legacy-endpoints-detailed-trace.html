@@ -1,0 +1,286 @@
+<meta charset="utf-8" />
+<title>HEK Core API — Detailed Endpoint Trace</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f2f0ea; --surface: #ffffff; --ink: #1e211d; --ink-dim: #63685f;
+    --border: #dcd8cd; --shadow: 0 1px 2px rgba(30,33,29,0.07);
+    --hiso: #2f6f62; --hiso-soft: #e2efe9;
+    --karo: #a4661a; --karo-soft: #f5e8d6;
+    --erms: #5b4b9e; --erms-soft: #e9e5f7;
+    --col: #a3335a; --col-soft: #f6e2ea;
+    --wire: #b9b3a3; --db: #1b5e8a; --db-soft: #dfeaf3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15170f; --surface: #1d2016; --ink: #e9e6db; --ink-dim: #a3a291;
+      --border: #34372a; --shadow: 0 1px 2px rgba(0,0,0,0.35);
+      --hiso: #7fc9b6; --hiso-soft: #1c2f28;
+      --karo: #e3a75d; --karo-soft: #332417;
+      --erms: #b3a4ec; --erms-soft: #26213c;
+      --col: #ea92ae; --col-soft: #35202a;
+      --wire: #454738; --db: #7fb8e0; --db-soft: #1a2c38;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #15170f; --surface: #1d2016; --ink: #e9e6db; --ink-dim: #a3a291;
+    --border: #34372a; --shadow: 0 1px 2px rgba(0,0,0,0.35);
+    --hiso: #7fc9b6; --hiso-soft: #1c2f28;
+    --karo: #e3a75d; --karo-soft: #332417;
+    --erms: #b3a4ec; --erms-soft: #26213c;
+    --col: #ea92ae; --col-soft: #35202a;
+    --wire: #454738; --db: #7fb8e0; --db-soft: #1a2c38;
+  }
+  :root[data-theme="light"] {
+    --bg: #f2f0ea; --surface: #ffffff; --ink: #1e211d; --ink-dim: #63685f;
+    --border: #dcd8cd; --shadow: 0 1px 2px rgba(30,33,29,0.07);
+    --hiso: #2f6f62; --hiso-soft: #e2efe9;
+    --karo: #a4661a; --karo-soft: #f5e8d6;
+    --erms: #5b4b9e; --erms-soft: #e9e5f7;
+    --col: #a3335a; --col-soft: #f6e2ea;
+    --wire: #b9b3a3; --db: #1b5e8a; --db-soft: #dfeaf3;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, serif;
+    background: var(--bg); color: var(--ink); margin: 0; padding: 2rem 1.25rem 3rem;
+  }
+  .page { max-width: 880px; margin: 0 auto; }
+  h1 {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 1.5rem; font-weight: 700; margin: 0 0 0.3rem; letter-spacing: -0.01em; text-wrap: balance;
+  }
+  .lede { font-size: 0.94rem; color: var(--ink-dim); max-width: 68ch; margin: 0 0 0.5rem; }
+  .caveat {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 0.78rem; color: var(--ink-dim); background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 0.6rem 0.85rem; margin: 0.9rem 0 1.6rem; box-shadow: var(--shadow);
+  }
+  .caveat b { color: var(--ink); }
+
+  .picker { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.75rem; }
+  .pick {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 0.8rem; font-weight: 600; padding: 0.45rem 0.8rem; border-radius: 999px;
+    border: 1.5px solid var(--border); background: var(--surface); color: var(--ink-dim); cursor: pointer;
+    display: flex; align-items: center; gap: 0.4rem;
+  }
+  .pick .dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; }
+  .pick:focus-visible { outline: 2px solid var(--accent-dot); outline-offset: 1px; }
+  .pick.active { border-color: var(--accent-dot); background: var(--accent-soft); color: var(--ink); }
+  .pick[data-sys="hiso"] { --accent-dot: var(--hiso); --accent-soft: var(--hiso-soft); }
+  .pick[data-sys="karo"] { --accent-dot: var(--karo); --accent-soft: var(--karo-soft); }
+  .pick[data-sys="erms"] { --accent-dot: var(--erms); --accent-soft: var(--erms-soft); }
+  .pick[data-sys="col"]  { --accent-dot: var(--col);  --accent-soft: var(--col-soft); }
+  .pick .dot { background: var(--accent-dot); }
+
+  .kind {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.62rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.04em; padding: 0.05rem 0.35rem; border-radius: 3px;
+    background: var(--code-bg, var(--border)); color: var(--ink-dim);
+  }
+
+  .trace-head { margin-bottom: 1rem; }
+  .trace-title {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 1.15rem; font-weight: 700;
+  }
+  .trace-route {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem; color: var(--ink-dim); margin-top: 0.15rem;
+  }
+
+  .chain { position: relative; padding-left: 1.4rem; }
+  .chain::before {
+    content: ""; position: absolute; left: 0.42rem; top: 0.4rem; bottom: 0.4rem; width: 2px; background: var(--wire);
+  }
+  .link {
+    position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 9px;
+    box-shadow: var(--shadow); padding: 0.75rem 0.95rem; margin-bottom: 0.65rem;
+  }
+  .link::before {
+    content: ""; position: absolute; left: -1.4rem; top: 1.05rem; width: 0.55rem; height: 0.55rem;
+    border-radius: 50%; background: var(--accent-dot); border: 2px solid var(--bg);
+  }
+  .link.final { border-color: var(--db); background: var(--db-soft); }
+  .link.final::before { background: var(--db); }
+  .link-step {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.62rem; color: var(--accent-dot); font-weight: 700; letter-spacing: 0.03em;
+  }
+  .link.final .link-step { color: var(--db); }
+  .link-sig {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.88rem; font-weight: 600; margin-top: 0.15rem; word-break: break-word;
+  }
+  .link-note {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 0.85rem; color: var(--ink); margin-top: 0.3rem; line-height: 1.45;
+  }
+  .link-path {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.7rem; color: var(--ink-dim); margin-top: 0.35rem;
+  }
+  .link-params {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.72rem; color: var(--ink-dim); margin-top: 0.4rem; background: var(--bg);
+    border-radius: 5px; padding: 0.4rem 0.55rem; white-space: pre-wrap; word-break: break-word;
+  }
+  .branch-label {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--db); margin: 0.9rem 0 0.4rem 0;
+  }
+</style>
+
+<div class="page">
+  <h1>Detailed Endpoint Trace — Method by Method</h1>
+  <p class="lede">
+    For eight representative legacy-compat calls (one read + one write per system), the exact chain from
+    controller action down to the exact stored procedure and database — traced from the real code, not summarized.
+  </p>
+  <div class="caveat">
+    <b>Table names:</b> the real repository code never names a literal SQL table (no <code>tblPatient</code>,
+    no <code>tblDocument</code>) anywhere in these paths — every call goes through a named <b>stored procedure</b>
+    only. So "method → table" bottoms out here at <b>method → stored procedure → database</b>, the deepest level
+    this codebase actually exposes.
+  </div>
+
+  <div class="picker" id="picker"></div>
+  <div id="trace"></div>
+</div>
+
+<script>
+  const P = (name, note) => ({ name, note });
+
+  const TRACES = [
+    {
+      id: "hiso-getData", sys: "hiso", kind: "READ", title: "HISO — getData", route: "POST /hiso/getData",
+      chain: [
+        { step: "1 · CONTROLLER", sig: "HisoCompatController.GetData(...)", path: "src/Api/Features/Hiso/Controllers/HisoCompatController.cs:43", note: "Receives sessionKey + submittedDataXml, sends the query." },
+        { step: "2 · REQUEST", sig: "GetDataQuery(SessionKey, CalledServerAddress, FormInstanceOperationMode, SubmittedDataXml)", path: "src/Application/Features/Hiso/Queries/GetDataQuery.cs:17", note: "MediatR request object." },
+        { step: "3 · HANDLER", sig: "GetDataQueryHandler.Handle(...)", path: "src/Application/Features/Hiso/Queries/GetDataQuery.cs:54", note: "Resolves the HISO session, then (dynamic path) walks the requested concepts one at a time." },
+        { step: "4 · CONCEPT LOOKUP", sig: "IHisoConceptDictionary.GetConceptsAsync(practiceId)", path: "Application/Common/Interfaces", note: "Backed by [Hiso].[UspGetHisoConcepts] - maps each requested field to a real stored procedure." },
+        { step: "5 · EXECUTE PER CONCEPT", sig: "IHisoConceptExecutor.ExecuteAsync(procedureName, session, preparedRequests, ct)", path: "Application/Common/Interfaces", note: "One real call per resolved concept - e.g. Patient_FirstName/Surname/DateOfBirth all resolve to the same proc below." },
+      ],
+      finals: [ { db: "PMS_NZ_V2", proc: "Hiso.uspGetPatient", params: "(confirmed example mapping for Patient_FirstName / Patient_Surname / Patient_DateOfBirth concepts)" } ],
+    },
+    {
+      id: "karo-demographics", sys: "karo", kind: "READ", title: "KARO — demographics", route: "GET /karo/demographics",
+      chain: [
+        { step: "1 · CONTROLLER", sig: "KaroCompatController.GetDemographics(...)", path: "src/Api/Features/Auth/Controllers/KaroCompatController.cs:75", note: "Reads patientId/encounterId/system/pho from the query string." },
+        { step: "2 · REQUEST", sig: "KaroDemographicsQuery(system, pho, patientId, encounterId, token)", path: "src/Application/Features/Karo/Queries/KaroDemographicsQuery.cs:6", note: "MediatR query object." },
+        { step: "3 · HANDLER", sig: "KaroDemographicsQueryHandler.Handle(...)", path: "src/Application/Features/Karo/Queries/KaroDemographicsQuery.cs:31", note: "IKaroRequestParser.ParseEncounterId/Decrypt → IKaroRoutingResolver.Resolve → IKaroTokenValidator.ValidateAsync, then calls the repository." },
+        { step: "4 · REPOSITORY", sig: "KaroDemographicsRepository.GetAsync(practiceSuffix, routingContext, patientId, ct)", path: "src/Infrastructure/Legacy/Karo/KaroDemographicsRepository.cs:17", note: "Resolves the connection via IKaroPracticeConnectionResolver.ResolveAsync(routingContext)." },
+      ],
+      finals: [ { db: "PMS_NZ_V2", proc: "[HSS].[uspGetDemographics]", params: "@pPatientId — returns a 2-table DataSet: patient row (Nhi, Given, Family, BirthDate, Ethnicity1-3, ...) + up to 2 card rows (cardtype, startdate, expirydate, cardnumber)" } ],
+    },
+    {
+      id: "karo-clinicalnotes", sys: "karo", kind: "WRITE", title: "KARO — clinicalnotes", route: "POST /karo/clinicalnotes",
+      chain: [
+        { step: "1 · CONTROLLER", sig: "KaroCompatController.SaveClinicalNotes(...)", path: "src/Api/Features/Auth/Controllers/KaroCompatController.cs:161", note: "Deserializes the JSON body." },
+        { step: "2 · REQUEST", sig: "KaroSaveClinicalNotesCommand(PatientId, EncounterId, UserId, SubjectiveNotes, ObjectiveNotes, Assessment, Plans, BearerToken)", path: "src/Application/Features/Karo/Commands/KaroWriteCommands.cs:14", note: "MediatR command object." },
+        { step: "3 · HANDLER", sig: "KaroSaveClinicalNotesCommandHandler.Handle(...)", path: "src/Application/Features/Karo/Commands/KaroWriteCommands.cs:25", note: "Parses/decrypts IDs, validates the bearer token, then calls the repository." },
+        { step: "4 · REPOSITORY", sig: "KaroWriteRepository.SaveClinicalNotesAsync(...)", path: "src/Infrastructure/Legacy/Karo/KaroWriteRepository.cs:24", note: "Builds @pPatientId (int), @pAppointmentId (long), optional @pUserId/@pSubjective/@pObjective/@pAssessment/@pPlans, output @pOutputParam." },
+      ],
+      finals: [ { db: "PMS_NZ_V2", proc: "[HSS].[uspInsertUpdateConsultNotes]", params: "@pOutputParam (output) = new/updated note ID, 0 on failure" } ],
+    },
+    {
+      id: "karo-document", sys: "karo", kind: "WRITE · 2 DBs", title: "KARO — document", route: "POST /karo/document",
+      chain: [
+        { step: "1 · CONTROLLER", sig: "KaroCompatController.SaveDocument(...)", path: "src/Api/Features/Auth/Controllers/KaroCompatController.cs:190", note: "Deserializes the JSON body (messageData is base64)." },
+        { step: "2 · REQUEST", sig: "KaroSaveDocumentCommand(PatientId, EncounterId, MessageData, ContentType, MessageSubject, ItemType, BearerToken)", path: "src/Application/Features/Karo/Commands/KaroWriteCommands.cs:240", note: "MediatR command object." },
+        { step: "3 · HANDLER", sig: "KaroSaveDocumentCommandHandler.Handle(...)", path: "src/Application/Features/Karo/Commands/KaroWriteCommands.cs:251", note: "Parses/decrypts, resolves routing, validates token, then calls the repository." },
+        { step: "4 · REPOSITORY", sig: "KaroWriteRepository.SaveDocumentAsync(...)", path: "src/Infrastructure/Legacy/Karo/KaroWriteRepository.cs:148", note: "Two sequential database calls — the DMS write must succeed first; its returned document key feeds the second call." },
+      ],
+      finals: [
+        { db: "DMS_PMS", proc: "[dbo].[uspDocumentSave]", params: "@pClientID=3, @pCategoryID (17 inbound/18 outbound), @pDocumentName, @pDocumentTypeID, @pDescription=\"HSS\", @pDocumentKey (new GUID), @pDocumentSize, @pProfileID=\"1\", @pPracticeID, @pDocumentData (varbinary), output @pDocumentIDOut — connection via IKaroDmsConnectionResolver" },
+        { db: "PMS_NZ_V2", proc: "[HSS].[uspInsertDocument]", params: "@pPatientID, @pMessageSubject, @pDMSID (= DMS document key from step above), @pInboxItemTypeID (1/2), @pDataSourceId=\"25\", optional @pEnounterId, output @pOutputParam — connection via IKaroPracticeConnectionResolver" },
+      ],
+    },
+    {
+      id: "erms-getpatientdata", sys: "erms", kind: "READ", title: "ERMS — GetPatientData", route: "GET /erms/GetPatientData",
+      chain: [
+        { step: "1 · CONTROLLER", sig: "ErmsCompatController.GetPatientData(...)", path: "src/Api/Features/Auth/Controllers/ErmsCompatController.cs:89", note: "Reads pmsPatientId/pmsEncounterId from the query string." },
+        { step: "2 · REQUEST", sig: "ErmsGetPatientDataQuery(pmsPatientId, pmsEncounterId, BearerToken)", path: "src/Application/Features/Erms/Queries/ErmsGetPatientDataQuery.cs", note: "MediatR query object." },
+        { step: "3 · HANDLER", sig: "ErmsGetPatientDataQueryHandler.Handle(...)", path: "src/Application/Features/Erms/Queries/ErmsGetPatientDataQuery.cs", note: "IErmsRequestParser.ParseEncounterId → Decrypt(DecodeBase64(...)) → IErmsRoutingResolver.Resolve → IErmsTokenValidator.ValidateAsync (itself backed by [HSS].[uspInsertAndValidateToken])." },
+        { step: "4 · REPOSITORY", sig: "ErmsDemographicsRepository.GetDemographicsAsync(...)", path: "src/Infrastructure/Legacy/Erms/ErmsDemographicsRepository.cs:18", note: "Connection via IErmsPracticeConnectionResolver (ConnIndiciDB{practiceid} routing)." },
+      ],
+      finals: [ { db: "PMS_NZ_V2", proc: "[HSS].[uspGetDemographics]", params: "@pPatientId — same real procedure KARO's demographics read uses" } ],
+    },
+    {
+      id: "erms-savedocument", sys: "erms", kind: "WRITE · 2 DBs", title: "ERMS — SaveDocument", route: "POST /erms/SaveDocument",
+      chain: [
+        { step: "1 · CONTROLLER", sig: "ErmsCompatController.SaveDocument(...)", path: "src/Api/Features/Auth/Controllers/ErmsCompatController.cs:489", note: "Deserializes the raw ReferralDocument_* XML body." },
+        { step: "2 · REQUEST", sig: "ErmsSaveDocumentCommand(Id, DocumentId, PatientId, EncounterId, ProviderId, Type, ItemType, CreatedDate, ContentType, Content, BearerToken)", path: "src/Application/Features/Erms/Commands/ErmsSaveDocumentCommand.cs", note: "MediatR command object." },
+        { step: "3 · HANDLER", sig: "ErmsSaveDocumentCommandHandler.Handle(...)", path: "src/Application/Features/Erms/Commands/ErmsSaveDocumentCommand.cs", note: "Parses/decrypts, validates token, then three repository calls in sequence." },
+        { step: "4a · REPOSITORY", sig: "ErmsWriteRepository.UpdateExistingDocumentAsync(...)", path: "src/Infrastructure/Legacy/Erms/ErmsWriteRepository.cs:25", note: "Branches via IAwsDocumentService.CheckAwsIsEnabledAsync between [HSS].[uspUpdateExistingDoc] and _AWS. Errors swallowed (legacy quirk) — on PMS_NZ_V2." },
+        { step: "4b · REPOSITORY", sig: "ErmsWriteRepository.SaveToDmsAsync(...)", path: "src/Infrastructure/Legacy/Erms/ErmsWriteRepository.cs:55", note: "Connection via IErmsDmsConnectionResolver — same server as PMS_NZ_V2, Initial Catalog=DMS_PMS is the only difference." },
+        { step: "4c · REPOSITORY", sig: "ErmsWriteRepository.InsertDocumentAsync(...)", path: "src/Infrastructure/Legacy/Erms/ErmsWriteRepository.cs:83", note: "Back on the PMS_NZ_V2 connection (IErmsPracticeConnectionResolver)." },
+      ],
+      finals: [
+        { db: "DMS_PMS", proc: "[dbo].[uspDocumentSave]", params: "@pClientID, @pCategoryID, @pDocumentName, @pDocumentTypeID, @pDescription, @pDocumentKey, @pDocumentSize, @pProfileID, @pPracticeID, @pDocumentData (varbinary), output @pDocumentIDOut — identical procedure to KARO's document write" },
+        { db: "PMS_NZ_V2", proc: "[HSS].[uspInsertDocument]", params: "@pPatientID, @pMessageSubject, @pDMSID, @pInboxItemTypeID, @pResultDate, @pDataSourceId=\"23\", @pReferralId, @pUserId, @pEnounterId (real legacy misspelling), output @pOutputParam" },
+      ],
+    },
+    {
+      id: "col-getcurrentpatientdata", sys: "col", kind: "READ", title: "COL — GetCurrentPatientData", route: "GET /erms/col/GetCurrentPatientData",
+      chain: [
+        { step: "1 · CONTROLLER", sig: "ColCompatController.GetCurrentPatientData(...)", path: "src/Api/Features/Auth/Controllers/ColCompatController.cs:56", note: "Reads pmsPatientId/pmsEncounterId from the query string." },
+        { step: "2 · REQUEST", sig: "ColGetCurrentPatientDataQuery(PatientId, EncounterId, BearerToken)", path: "src/Application/Features/Col/ColQueries.cs:15", note: "MediatR query object." },
+        { step: "3 · HANDLER", sig: "ColGetCurrentPatientDataQueryHandler.Handle(...) → ColReadPipeline.RunAsync(...)", path: "src/Application/Features/Col/ColQueries.cs:125", note: "IColRequestParser.ParseEncounterId/Decrypt → IErmsRoutingResolver.Resolve → IErmsTokenValidator.ValidateAsync — COL reuses ERMS's own routing/token infra, confirmed, not a separate one." },
+        { step: "4 · REPOSITORY", sig: "ColDataRepository.GetCurrentPatientDataAsync(...)", path: "src/Infrastructure/Legacy/Erms/ColDataRepository.cs:18", note: "Connection via IErmsPracticeConnectionResolver." },
+      ],
+      finals: [ { db: "PMS_NZ_V2", proc: "[OnlineClaim].[uspGetPatientData]", params: "@pPatientId — [OnlineClaim] schema, ported from DAL/Pegasus/PHCO.cs" } ],
+    },
+    {
+      id: "col-saveinvoice", sys: "col", kind: "WRITE", title: "COL — SaveInvoice", route: "POST /erms/col/SaveInvoice",
+      chain: [
+        { step: "1 · CONTROLLER", sig: "ColCompatController.SaveInvoice(...)", path: "src/Api/Features/Auth/Controllers/ColCompatController.cs:101", note: "Deserializes the JSON body." },
+        { step: "2 · REQUEST", sig: "ColSaveInvoiceCommand(PatientId, AccountHolderId, EncounterId, ServiceName, ServiceCode, AmountInclGst, Description, Payee, ServiceProvider, ServiceProviderType, ServiceDate, PegasusReference, ClaimShortCode, BearerToken)", path: "src/Application/Features/Col/ColQueries.cs:21", note: "MediatR command object." },
+        { step: "3 · HANDLER", sig: "ColSaveInvoiceCommandHandler.Handle(...)", path: "src/Application/Features/Col/ColQueries.cs:213", note: "Parses/decrypts, IErmsTokenValidator.ValidateAsync, then calls the repository." },
+        { step: "4 · REPOSITORY", sig: "ColDataRepository.SaveInvoiceAsync(...)", path: "src/Infrastructure/Legacy/Erms/ColDataRepository.cs:62", note: "Connection via IErmsPracticeConnectionResolver — same resolver as the read above." },
+      ],
+      finals: [ { db: "PMS_NZ_V2", proc: "[OnlineClaim].[uspInsertUpdateService]", params: "@pPatientID, @pAppointmentId, @pMasterServiceName=\"COL\" (hardcoded), @pSubServiceName, @pAccountHolderID, @pSubServiceCode, @pFee, @pLocationId=NULL (COL always blank), @pDescription, @pPayee, @pServiceProvider, @pServiceProviderType, @pServiceDate, @pPegasusReference, @pClaimShortCode, output @pOutputParam → ServiceMappingId (-3 = duplicate sentinel)" } ],
+    },
+  ];
+
+  const pickerEl = document.getElementById("picker");
+  const traceEl = document.getElementById("trace");
+
+  TRACES.forEach((t, i) => {
+    const btn = document.createElement("button");
+    btn.className = "pick";
+    btn.dataset.sys = t.sys;
+    btn.dataset.id = t.id;
+    btn.innerHTML = '<span class="dot"></span>' + t.title + ' <span class="kind">' + t.kind + '</span>';
+    btn.addEventListener("click", () => render(t.id));
+    pickerEl.appendChild(btn);
+  });
+
+  function render(id) {
+    document.querySelectorAll(".pick").forEach((b) => b.classList.toggle("active", b.dataset.id === id));
+    const t = TRACES.find((x) => x.id === id);
+    const sysVar = "var(--" + t.sys + ")";
+    let html = '<div class="trace-head"><div class="trace-title">' + t.title + '</div>' +
+      '<div class="trace-route">' + t.route + '</div></div>' +
+      '<div class="chain" style="--accent-dot:' + sysVar + '">';
+    for (const l of t.chain) {
+      html += '<div class="link"><div class="link-step">' + l.step + '</div>' +
+        '<div class="link-sig">' + l.sig + '</div>' +
+        '<div class="link-note">' + l.note + '</div>' +
+        '<div class="link-path">' + l.path + '</div></div>';
+    }
+    html += '</div>';
+    if (t.finals.length > 1) html += '<div class="branch-label">Database calls, in order</div>';
+    html += '<div class="chain" style="--accent-dot:' + sysVar + '">';
+    for (const f of t.finals) {
+      html += '<div class="link final"><div class="link-step">DATABASE</div>' +
+        '<div class="link-sig">' + f.db + ' → ' + f.proc + '</div>' +
+        '<div class="link-params">' + f.params + '</div></div>';
+    }
+    html += '</div>';
+    traceEl.innerHTML = html;
+  }
+
+  render(TRACES[0].id);
+</script>

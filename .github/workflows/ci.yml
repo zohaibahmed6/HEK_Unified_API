@@ -20,13 +20,13 @@ jobs:
       - name: Build
         run: dotnet build HekCoreApi.sln --no-restore -c Release
 
-      # Block 1 ships unit-level coverage only (no Testcontainers/mock-idp integration suite yet -
-      # deferred to the post-sprint hardening phase's automated-test-suite stage, see PROJECT_STATUS.md).
-      # All current tests run in-process with no external dependencies, so no filter is needed yet;
-      # once Testcontainers-based tests are added, filter them out of this fast lane by trait.
+      # LiveApi tests (Category=LiveIntegration) hit a real docker-compose stack on
+      # http://localhost:8080 (see LiveApiFixture.cs) - there's no such stack in this runner,
+      # so they must be excluded from the fast CI lane. Everything else runs in-process.
       - name: Test
         run: >
           dotnet test HekCoreApi.sln --no-build -c Release
+          --filter "Category!=LiveIntegration"
           --logger trx
           --collect:"XPlat Code Coverage"
 
