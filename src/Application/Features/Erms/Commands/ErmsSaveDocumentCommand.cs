@@ -1,4 +1,4 @@
-using HekCoreApi.Application.Common.Interfaces;
+﻿using HekCoreApi.Application.Common.Interfaces;
 using MediatR;
 
 namespace HekCoreApi.Application.Features.Erms.Commands;
@@ -30,12 +30,14 @@ public sealed class ErmsSaveDocumentCommandHandler : IRequestHandler<ErmsSaveDoc
 {
     private readonly IErmsRequestParser _parser;
     private readonly IErmsTokenValidator _tokenValidator;
+    private readonly IErmsRoutingResolver _routingResolver;
     private readonly IErmsWriteRepository _writeRepository;
 
-    public ErmsSaveDocumentCommandHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsWriteRepository writeRepository)
+    public ErmsSaveDocumentCommandHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsWriteRepository writeRepository)
     {
         _parser = parser;
         _tokenValidator = tokenValidator;
+        _routingResolver = routingResolver;
         _writeRepository = writeRepository;
     }
 
@@ -49,8 +51,9 @@ public sealed class ErmsSaveDocumentCommandHandler : IRequestHandler<ErmsSaveDoc
             var (encounterId, practiceSuffix, _, practiceSuffixNumeric) = _parser.ParseEncounterId(request.EncounterId);
             var patientId = _parser.Decrypt(_parser.DecodeBase64(request.PatientId));
             var providerId = _parser.Decrypt(_parser.DecodeBase64(request.ProviderId));
+            var routingContext = _routingResolver.Resolve(request.EncounterId ?? string.Empty);
 
-            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, patientId, encounterId, request.BearerToken, ct);
+            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, routingContext, patientId, encounterId, request.BearerToken, ct);
             if (!validation.Valid)
             {
                 return new ErmsSaveDocumentResult(validation.ErrorMessage ?? "Invalid token value!");
@@ -67,8 +70,8 @@ public sealed class ErmsSaveDocumentCommandHandler : IRequestHandler<ErmsSaveDoc
                 referralId = request.Id + "_" + request.DocumentId;
 
                 // Legacy quirk: ItemType.ToLower() NREs on a missing ItemType - the message lands in the error path.
-                await _writeRepository.UpdateExistingDocumentAsync(practiceSuffix, referralId, practiceSuffixNumeric, ct);
-                dmsGuidKey = await _writeRepository.SaveToDmsAsync(practiceSuffix, practiceSuffixNumeric, base64Value, request.ContentType, request.Type,
+                await _writeRepository.UpdateExistingDocumentAsync(practiceSuffix, routingContext, referralId, practiceSuffixNumeric, ct);
+                dmsGuidKey = await _writeRepository.SaveToDmsAsync(routingContext, practiceSuffixNumeric, base64Value, request.ContentType, request.Type,
                     request.ItemType!.ToLower().Equals("in") ? 17 : 18, referralId, ct);
             }
             else
@@ -79,7 +82,7 @@ public sealed class ErmsSaveDocumentCommandHandler : IRequestHandler<ErmsSaveDoc
             if (!string.IsNullOrWhiteSpace(dmsGuidKey))
             {
                 DateTime.TryParse(request.CreatedDate, out var resultDate);
-                await _writeRepository.InsertDocumentAsync(practiceSuffix, patientId, encounterId, request.Type, dmsGuidKey,
+                await _writeRepository.InsertDocumentAsync(practiceSuffix, routingContext, patientId, encounterId, request.Type, dmsGuidKey,
                     request.ItemType!.ToLower().Equals("in") ? 1 : 2, resultDate, referralId, providerId, ct);
             }
         }

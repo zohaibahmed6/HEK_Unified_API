@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using System.Xml;
 using HekCoreApi.Application.Common.Interfaces;
 using HekCoreApi.Application.Common.Models;
@@ -42,7 +42,7 @@ public sealed class CanonicalLabResultsRepository : ICanonicalLabResultsReposito
 
     public async Task<IReadOnlyList<LabResultCanonical>> GetKaroAsync(RoutingContext routing, string? patientId, CancellationToken ct = default)
     {
-        var results = await _karoRepository.GetLabResultsAsync(routing.PracticeId, patientId, ct);
+        var results = await _karoRepository.GetLabResultsAsync(routing.PracticeId, routing, patientId, ct);
         return results.Select(r => new LabResultCanonical(
             null,
             r.Title,
@@ -57,7 +57,7 @@ public sealed class CanonicalLabResultsRepository : ICanonicalLabResultsReposito
 
     public async Task<IReadOnlyList<LabResultCanonical>> GetErmsAsync(RoutingContext routing, string? patientId, CancellationToken ct = default)
     {
-        var table = await _ermsRepository.GetLabResultsAsync(routing.PracticeId, patientId, referenceId: null, ct);
+        var table = await _ermsRepository.GetLabResultsAsync(routing.PracticeId, routing, patientId, referenceId: null, ct);
         var results = new List<LabResultCanonical>();
 
         foreach (DataRow row in table.Rows)

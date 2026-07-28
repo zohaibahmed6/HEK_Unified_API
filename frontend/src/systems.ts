@@ -19,7 +19,7 @@ export const systems: SystemDef[] = [
   },
   {
     id: "karo",
-    label: "KARO",
+    label: "HSS",
     fullName: "Indici HSS Web API",
     authKind: "Authenticate → bearer token + environment identifier",
     description:

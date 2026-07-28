@@ -193,7 +193,7 @@ try
         {
             tracing.AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
-                .AddSqlClientInstrumentation(o => o.SetDbStatementForText = true);
+                .AddSqlClientInstrumentation(o => o.SetDbStatementForText = false);
             if (!string.IsNullOrWhiteSpace(otlpEndpoint))
             {
                 tracing.AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint));
@@ -307,6 +307,7 @@ try
     app.UseRouting();
 
     app.UseHttpsRedirection();
+    app.UseSecurityHeaders();
     app.UseCors(CorsOptions.PolicyName);
 
     if (rateLimitOptions.Enabled)

@@ -2,6 +2,7 @@ using System.Data;
 using System.Text;
 using System.Text.Json;
 using HekCoreApi.Application.Common.Interfaces;
+using HekCoreApi.Application.Common.Models;
 using Microsoft.Data.SqlClient;
 
 namespace HekCoreApi.Infrastructure.Legacy.Karo;
@@ -20,7 +21,7 @@ public sealed class KaroWriteRepository : IKaroWriteRepository
         _secretProvider = secretProvider;
     }
 
-    public async Task<long> SaveClinicalNotesAsync(string practiceSuffix, string? patientId, string? appointmentId, string? userId, string? subjective, string? objective, string? assessment, string? plans, CancellationToken ct = default)
+    public async Task<long> SaveClinicalNotesAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? appointmentId, string? userId, string? subjective, string? objective, string? assessment, string? plans, CancellationToken ct = default)
     {
         var parameters = new List<SqlParameter>
         {
@@ -40,11 +41,11 @@ public sealed class KaroWriteRepository : IKaroWriteRepository
         var outParam = new SqlParameter("@pOutputParam", SqlDbType.BigInt) { Direction = ParameterDirection.Output };
         parameters.Add(outParam);
 
-        await RunAsync(practiceSuffix, "[HSS].[uspInsertUpdateConsultNotes]", parameters, ct);
+        await RunAsync(routingContext, "[HSS].[uspInsertUpdateConsultNotes]", parameters, ct);
         return outParam.Value is DBNull or null ? 0 : Convert.ToInt64(outParam.Value);
     }
 
-    public async Task<int> SaveConditionAsync(string practiceSuffix, string? patientId, string? appointmentId, string? userId, string? diagnosisType, DateTime? onsetDate, string? summary, bool isLongTerm, string? conceptId, string? diseaseName, string? fsn, CancellationToken ct = default)
+    public async Task<int> SaveConditionAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? appointmentId, string? userId, string? diagnosisType, DateTime? onsetDate, string? summary, bool isLongTerm, string? conceptId, string? diseaseName, string? fsn, CancellationToken ct = default)
     {
         var parameters = new List<SqlParameter>
         {
@@ -66,12 +67,12 @@ public sealed class KaroWriteRepository : IKaroWriteRepository
         var outParam = new SqlParameter("@pOutputParam", SqlDbType.Int) { Direction = ParameterDirection.Output };
         parameters.Add(outParam);
 
-        await RunAsync(practiceSuffix, "[HSS].[uspInsertUpdateDiagnosis]", parameters, ct);
+        await RunAsync(routingContext, "[HSS].[uspInsertUpdateDiagnosis]", parameters, ct);
         return outParam.Value is DBNull or null ? 0 : Convert.ToInt32(outParam.Value);
     }
 
     /// <summary>Legacy: `locationId` is always the literal "167" - not derived from any request field.</summary>
-    public async Task<int> SaveInvoiceAsync(string practiceSuffix, string? patientId, string? encounterId, string? name, string? code, string? fee, string? userId, string? payee, CancellationToken ct = default)
+    public async Task<int> SaveInvoiceAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? encounterId, string? name, string? code, string? fee, string? userId, string? payee, CancellationToken ct = default)
     {
         var parameters = new List<SqlParameter>
         {
@@ -89,11 +90,11 @@ public sealed class KaroWriteRepository : IKaroWriteRepository
         var outParam = new SqlParameter("@pOutputParam", SqlDbType.Int) { Direction = ParameterDirection.Output };
         parameters.Add(outParam);
 
-        await RunAsync(practiceSuffix, "[HSS].[uspInsertUpdateService]", parameters, ct);
+        await RunAsync(routingContext, "[HSS].[uspInsertUpdateService]", parameters, ct);
         return outParam.Value is DBNull or null ? 0 : Convert.ToInt32(outParam.Value);
     }
 
-    public async Task<int> SaveObservationsAsync(string practiceSuffix, string? patientId, string? appointmentId, string? userId, string? temperature, string? waist, string? height, string? weight, string? bpSys, string? bpDia, string? heartRate, string? notes, string? risk, string? framingham, CancellationToken ct = default)
+    public async Task<int> SaveObservationsAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? appointmentId, string? userId, string? temperature, string? waist, string? height, string? weight, string? bpSys, string? bpDia, string? heartRate, string? notes, string? risk, string? framingham, CancellationToken ct = default)
     {
         var parameters = new List<SqlParameter>
         {
@@ -114,11 +115,11 @@ public sealed class KaroWriteRepository : IKaroWriteRepository
         var outParam = new SqlParameter("@pOutputParam", SqlDbType.Int) { Direction = ParameterDirection.Output };
         parameters.Add(outParam);
 
-        await RunAsync(practiceSuffix, "[HSS].[uspInsertUpdateObservation]", parameters, ct);
+        await RunAsync(routingContext, "[HSS].[uspInsertUpdateObservation]", parameters, ct);
         return outParam.Value is DBNull or null ? 0 : Convert.ToInt32(outParam.Value);
     }
 
-    public async Task<int> SaveRecallAsync(string practiceSuffix, string? patientId, string? appointmentId, string? userId, string? priority, string? group, DateTime? dueDate, string? notes, string? categoryId, CancellationToken ct = default)
+    public async Task<int> SaveRecallAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? appointmentId, string? userId, string? priority, string? group, DateTime? dueDate, string? notes, string? categoryId, CancellationToken ct = default)
     {
         var parameters = new List<SqlParameter>
         {
@@ -139,18 +140,18 @@ public sealed class KaroWriteRepository : IKaroWriteRepository
         var outParam = new SqlParameter("@pOutputParam", SqlDbType.Int) { Direction = ParameterDirection.Output };
         parameters.Add(outParam);
 
-        await RunAsync(practiceSuffix, "[HSS].[uspInsertUpdateRecall]", parameters, ct);
+        await RunAsync(routingContext, "[HSS].[uspInsertUpdateRecall]", parameters, ct);
         return outParam.Value is DBNull or null ? 0 : Convert.ToInt32(outParam.Value);
     }
 
     /// <summary>Ported from `SaveToDMS` (`[dbo].[uspDocumentSave]` on the real DMS connection) + `InsertDocument` (`[HSS].[uspInsertDocument]` on the real Indici connection).</summary>
-    public async Task<KaroSaveDocumentResult> SaveDocumentAsync(string practiceSuffix, string practiceSuffixNumeric, string? patientId, string? encounterId, byte[]? messageData, string? contentType, string? messageSubject, string? itemType, CancellationToken ct = default)
+    public async Task<KaroSaveDocumentResult> SaveDocumentAsync(string practiceSuffix, string practiceSuffixNumeric, RoutingContext routingContext, string? patientId, string? encounterId, byte[]? messageData, string? contentType, string? messageSubject, string? itemType, CancellationToken ct = default)
     {
         var isInbound = string.Equals(itemType, "in", StringComparison.OrdinalIgnoreCase);
         var categoryId = isInbound ? 17 : 18;
 
         var postedType = await ResolveDocumentTypeAsync(contentType, ct);
-        var dmsConnectionString = await _dmsConnectionResolver.ResolveAsync(practiceSuffix, ct);
+        var dmsConnectionString = await _dmsConnectionResolver.ResolveAsync(routingContext, ct);
 
         var dmsParameters = new List<SqlParameter>
         {
@@ -182,7 +183,7 @@ public sealed class KaroWriteRepository : IKaroWriteRepository
             return new KaroSaveDocumentResult(false, null);
         }
 
-        var indiciConnectionString = await _connectionResolver.ResolveAsync(practiceSuffix, ct);
+        var indiciConnectionString = await _connectionResolver.ResolveAsync(routingContext, ct);
         var insertParameters = new List<SqlParameter>
         {
             new("@pPatientID", int.Parse(patientId!)),
@@ -237,9 +238,9 @@ public sealed class KaroWriteRepository : IKaroWriteRepository
     }
 
     /// <summary>Ported from `GetTemplateSchema`/`CreateDataTable`/`FillSummaryData`/`BuildJsonTimeLineData`/`InsertSummary` (`SaveSummary`, `APIController.cs:978`).</summary>
-    public async Task<int> SaveSummaryAsync(string practiceSuffix, string? patientId, string? encounterId, string? providerId, string? identifier, string? dateTimeRecorded, string entriesJson, CancellationToken ct = default)
+    public async Task<int> SaveSummaryAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? encounterId, string? providerId, string? identifier, string? dateTimeRecorded, string entriesJson, CancellationToken ct = default)
     {
-        var connectionString = await _connectionResolver.ResolveAsync(practiceSuffix, ct);
+        var connectionString = await _connectionResolver.ResolveAsync(routingContext, ct);
         var schema = await LegacyDbExecutor.ExecuteDataTableAsync(connectionString, CommandType.StoredProcedure, "[HSS].[uspGetTemplateSchema]", BuildSchemaParams(patientId, identifier), ct);
         if (schema.Rows.Count == 0)
         {
@@ -516,9 +517,9 @@ public sealed class KaroWriteRepository : IKaroWriteRepository
         return (jsonResult, timeline.ToString().TrimEnd(','));
     }
 
-    private async Task RunAsync(string practiceSuffix, string procedureName, List<SqlParameter> parameters, CancellationToken ct)
+    private async Task RunAsync(RoutingContext routingContext, string procedureName, List<SqlParameter> parameters, CancellationToken ct)
     {
-        var connectionString = await _connectionResolver.ResolveAsync(practiceSuffix, ct);
+        var connectionString = await _connectionResolver.ResolveAsync(routingContext, ct);
         await LegacyDbExecutor.ExecuteNonQueryAsync(connectionString, CommandType.StoredProcedure, procedureName, parameters, ct);
     }
 

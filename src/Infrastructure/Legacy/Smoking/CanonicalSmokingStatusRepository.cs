@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using System.Xml;
 using HekCoreApi.Application.Common.Interfaces;
 using HekCoreApi.Application.Common.Models;
@@ -35,7 +35,7 @@ public sealed class CanonicalSmokingStatusRepository : ICanonicalSmokingStatusRe
 
     public async Task<IReadOnlyList<SmokingStatusCanonical>> GetErmsAsync(RoutingContext routing, string? patientId, CancellationToken ct = default)
     {
-        var table = await _ermsRepository.GetSmokingStatusAsync(routing.PracticeId, patientId, ct);
+        var table = await _ermsRepository.GetSmokingStatusAsync(routing.PracticeId, routing, patientId, ct);
         var results = new List<SmokingStatusCanonical>();
 
         foreach (DataRow row in table.Rows)

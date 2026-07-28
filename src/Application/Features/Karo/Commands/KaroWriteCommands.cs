@@ -1,4 +1,5 @@
-using HekCoreApi.Application.Common.Interfaces;
+﻿using HekCoreApi.Application.Common.Interfaces;
+using HekCoreApi.Application.Common.Models;
 using MediatR;
 
 namespace HekCoreApi.Application.Features.Karo.Commands;
@@ -16,25 +17,27 @@ public sealed class KaroSaveClinicalNotesCommandHandler : IRequestHandler<KaroSa
 {
     private readonly IKaroRequestParser _parser;
     private readonly IKaroTokenValidator _tokenValidator;
+    private readonly IKaroRoutingResolver _routingResolver;
     private readonly IKaroWriteRepository _repository;
-    public KaroSaveClinicalNotesCommandHandler(IKaroRequestParser parser, IKaroTokenValidator tokenValidator, IKaroWriteRepository repository)
-    { _parser = parser; _tokenValidator = tokenValidator; _repository = repository; }
+    public KaroSaveClinicalNotesCommandHandler(IKaroRequestParser parser, IKaroTokenValidator tokenValidator, IKaroRoutingResolver routingResolver, IKaroWriteRepository repository)
+    { _parser = parser; _tokenValidator = tokenValidator; _routingResolver = routingResolver; _repository = repository; }
 
     public async Task<KaroWriteResult> Handle(KaroSaveClinicalNotesCommand request, CancellationToken ct)
     {
         try
         {
             var (encounterId, practiceSuffix, _) = _parser.ParseEncounterId(request.EncounterId);
+            var routingContext = _routingResolver.Resolve(request.EncounterId ?? string.Empty);
             var patientId = _parser.Decrypt(request.PatientId);
             var userId = _parser.Decrypt(request.UserId);
 
-            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, patientId, encounterId, request.BearerToken, null, ct);
+            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, routingContext, patientId, encounterId, request.BearerToken, null, ct);
             if (!validation.Valid)
             {
                 return new KaroWriteResult(false, null, "Invalid token value!");
             }
 
-            var saved = await _repository.SaveClinicalNotesAsync(practiceSuffix, patientId, encounterId, userId, request.SubjectiveNotes, request.ObjectiveNotes, request.Assessment, request.Plans, ct);
+            var saved = await _repository.SaveClinicalNotesAsync(practiceSuffix, routingContext, patientId, encounterId, userId, request.SubjectiveNotes, request.ObjectiveNotes, request.Assessment, request.Plans, ct);
             return saved > 0
                 ? new KaroWriteResult(true, string.Empty, null)
                 : new KaroWriteResult(false, null, "Unable to Save Notes.Please try again or contact INDICI support.");
@@ -52,27 +55,29 @@ public sealed class KaroSaveConditionCommandHandler : IRequestHandler<KaroSaveCo
 {
     private readonly IKaroRequestParser _parser;
     private readonly IKaroTokenValidator _tokenValidator;
+    private readonly IKaroRoutingResolver _routingResolver;
     private readonly IKaroWriteRepository _repository;
-    public KaroSaveConditionCommandHandler(IKaroRequestParser parser, IKaroTokenValidator tokenValidator, IKaroWriteRepository repository)
-    { _parser = parser; _tokenValidator = tokenValidator; _repository = repository; }
+    public KaroSaveConditionCommandHandler(IKaroRequestParser parser, IKaroTokenValidator tokenValidator, IKaroRoutingResolver routingResolver, IKaroWriteRepository repository)
+    { _parser = parser; _tokenValidator = tokenValidator; _routingResolver = routingResolver; _repository = repository; }
 
     public async Task<KaroWriteResult> Handle(KaroSaveConditionCommand request, CancellationToken ct)
     {
         try
         {
             var (encounterId, practiceSuffix, _) = _parser.ParseEncounterId(request.EncounterId);
+            var routingContext = _routingResolver.Resolve(request.EncounterId ?? string.Empty);
             var patientId = _parser.Decrypt(request.PatientId);
             var userId = _parser.Decrypt(request.UserId);
             DateTime.TryParse(request.OnSetDate, out var onsetDate);
 
-            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, patientId, encounterId, request.BearerToken, null, ct);
+            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, routingContext, patientId, encounterId, request.BearerToken, null, ct);
             if (!validation.Valid)
             {
                 return new KaroWriteResult(false, null, "Invalid token value!");
             }
 
             var isLongTerm = string.Equals(request.IsLongTerm, "true", StringComparison.OrdinalIgnoreCase);
-            var saved = await _repository.SaveConditionAsync(practiceSuffix, patientId, encounterId, userId, request.Type, onsetDate == DateTime.MinValue ? null : onsetDate, request.Summary, isLongTerm, request.ConceptId, request.Name, request.FSN, ct);
+            var saved = await _repository.SaveConditionAsync(practiceSuffix, routingContext, patientId, encounterId, userId, request.Type, onsetDate == DateTime.MinValue ? null : onsetDate, request.Summary, isLongTerm, request.ConceptId, request.Name, request.FSN, ct);
 
             if (saved > 0)
             {
@@ -100,26 +105,28 @@ public sealed class KaroSaveInvoiceCommandHandler : IRequestHandler<KaroSaveInvo
 {
     private readonly IKaroRequestParser _parser;
     private readonly IKaroTokenValidator _tokenValidator;
+    private readonly IKaroRoutingResolver _routingResolver;
     private readonly IKaroWriteRepository _repository;
-    public KaroSaveInvoiceCommandHandler(IKaroRequestParser parser, IKaroTokenValidator tokenValidator, IKaroWriteRepository repository)
-    { _parser = parser; _tokenValidator = tokenValidator; _repository = repository; }
+    public KaroSaveInvoiceCommandHandler(IKaroRequestParser parser, IKaroTokenValidator tokenValidator, IKaroRoutingResolver routingResolver, IKaroWriteRepository repository)
+    { _parser = parser; _tokenValidator = tokenValidator; _routingResolver = routingResolver; _repository = repository; }
 
     public async Task<KaroWriteResult> Handle(KaroSaveInvoiceCommand request, CancellationToken ct)
     {
         try
         {
             var (encounterId, practiceSuffix, _) = _parser.ParseEncounterId(request.EncounterId);
+            var routingContext = _routingResolver.Resolve(request.EncounterId ?? string.Empty);
             var patientId = _parser.Decrypt(request.PatientId);
             var userId = _parser.Decrypt(request.UserId);
             var pho = practiceSuffix.Contains("302_F3H045") ? "SCDHB" : null; // Legacy: real, narrow PHO override quirk.
 
-            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, patientId, encounterId, request.BearerToken, pho, ct);
+            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, routingContext, patientId, encounterId, request.BearerToken, pho, ct);
             if (!validation.Valid)
             {
                 return new KaroWriteResult(false, null, "Invalid token value!");
             }
 
-            var serviceMappingId = await _repository.SaveInvoiceAsync(practiceSuffix, patientId, encounterId, request.Name, request.Code, request.Fee, userId, request.Payee, ct);
+            var serviceMappingId = await _repository.SaveInvoiceAsync(practiceSuffix, routingContext, patientId, encounterId, request.Name, request.Code, request.Fee, userId, request.Payee, ct);
 
             if (serviceMappingId > 0)
             {
@@ -147,20 +154,22 @@ public sealed class KaroSaveObservationsCommandHandler : IRequestHandler<KaroSav
 {
     private readonly IKaroRequestParser _parser;
     private readonly IKaroTokenValidator _tokenValidator;
+    private readonly IKaroRoutingResolver _routingResolver;
     private readonly IKaroWriteRepository _repository;
-    public KaroSaveObservationsCommandHandler(IKaroRequestParser parser, IKaroTokenValidator tokenValidator, IKaroWriteRepository repository)
-    { _parser = parser; _tokenValidator = tokenValidator; _repository = repository; }
+    public KaroSaveObservationsCommandHandler(IKaroRequestParser parser, IKaroTokenValidator tokenValidator, IKaroRoutingResolver routingResolver, IKaroWriteRepository repository)
+    { _parser = parser; _tokenValidator = tokenValidator; _routingResolver = routingResolver; _repository = repository; }
 
     public async Task<KaroWriteResult> Handle(KaroSaveObservationsCommand request, CancellationToken ct)
     {
         try
         {
             var (encounterId, practiceSuffix, _) = _parser.ParseEncounterId(request.EncounterId);
+            var routingContext = _routingResolver.Resolve(request.EncounterId ?? string.Empty);
             var patientId = _parser.Decrypt(request.PatientId);
             var userId = _parser.Decrypt(request.UserId);
             var pho = practiceSuffix.Contains("302_F3H045") ? "SCDHB" : null; // Legacy: real, narrow PHO override quirk.
 
-            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, patientId, encounterId, request.BearerToken, pho, ct);
+            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, routingContext, patientId, encounterId, request.BearerToken, pho, ct);
             if (!validation.Valid)
             {
                 return new KaroWriteResult(false, null, "Invalid token value!");
@@ -175,7 +184,7 @@ public sealed class KaroSaveObservationsCommandHandler : IRequestHandler<KaroSav
                 return new KaroWriteResult(false, null, "Unable to Save Observation. Please Send at least one screening value to save Observation in the INDICI.");
             }
 
-            var saved = await _repository.SaveObservationsAsync(practiceSuffix, patientId, encounterId, userId, request.Temperature, request.WaistCircumference, request.Height, request.Weight, request.BPSys, request.BPDia, request.HeartRate, request.Notes, request.Risk, request.Framingham, ct);
+            var saved = await _repository.SaveObservationsAsync(practiceSuffix, routingContext, patientId, encounterId, userId, request.Temperature, request.WaistCircumference, request.Height, request.Weight, request.BPSys, request.BPDia, request.HeartRate, request.Notes, request.Risk, request.Framingham, ct);
             return saved > 0
                 ? new KaroWriteResult(true, string.Empty, null)
                 : new KaroWriteResult(false, null, "Unable to Save Observation.Please try again or contact INDICI support.");
@@ -193,27 +202,29 @@ public sealed class KaroSaveRecallCommandHandler : IRequestHandler<KaroSaveRecal
 {
     private readonly IKaroRequestParser _parser;
     private readonly IKaroTokenValidator _tokenValidator;
+    private readonly IKaroRoutingResolver _routingResolver;
     private readonly IKaroWriteRepository _repository;
-    public KaroSaveRecallCommandHandler(IKaroRequestParser parser, IKaroTokenValidator tokenValidator, IKaroWriteRepository repository)
-    { _parser = parser; _tokenValidator = tokenValidator; _repository = repository; }
+    public KaroSaveRecallCommandHandler(IKaroRequestParser parser, IKaroTokenValidator tokenValidator, IKaroRoutingResolver routingResolver, IKaroWriteRepository repository)
+    { _parser = parser; _tokenValidator = tokenValidator; _routingResolver = routingResolver; _repository = repository; }
 
     public async Task<KaroWriteResult> Handle(KaroSaveRecallCommand request, CancellationToken ct)
     {
         try
         {
             var (encounterId, practiceSuffix, _) = _parser.ParseEncounterId(request.EncounterId);
+            var routingContext = _routingResolver.Resolve(request.EncounterId ?? string.Empty);
             var patientId = _parser.Decrypt(request.PatientId);
             var userId = _parser.Decrypt(request.UserId);
             DateTime.TryParse(request.DueDate, out var dueDate);
             var pho = practiceSuffix.Contains("302_F3H045") ? "SCDHB" : null; // Legacy: real, narrow PHO override quirk.
 
-            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, patientId, encounterId, request.BearerToken, pho, ct);
+            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, routingContext, patientId, encounterId, request.BearerToken, pho, ct);
             if (!validation.Valid)
             {
                 return new KaroWriteResult(false, null, "Invalid token value!");
             }
 
-            var saved = await _repository.SaveRecallAsync(practiceSuffix, patientId, encounterId, userId, request.Priority, request.Group, dueDate == DateTime.MinValue ? null : dueDate, request.Notes, request.CategoryId, ct);
+            var saved = await _repository.SaveRecallAsync(practiceSuffix, routingContext, patientId, encounterId, userId, request.Priority, request.Group, dueDate == DateTime.MinValue ? null : dueDate, request.Notes, request.CategoryId, ct);
             return saved > 0
                 ? new KaroWriteResult(true, string.Empty, null)
                 : new KaroWriteResult(false, null, "Unable to Save Recall.Please try again or contact INDICI support.");
@@ -232,25 +243,27 @@ public sealed class KaroSaveDocumentCommandHandler : IRequestHandler<KaroSaveDoc
 {
     private readonly IKaroRequestParser _parser;
     private readonly IKaroTokenValidator _tokenValidator;
+    private readonly IKaroRoutingResolver _routingResolver;
     private readonly IKaroWriteRepository _repository;
-    public KaroSaveDocumentCommandHandler(IKaroRequestParser parser, IKaroTokenValidator tokenValidator, IKaroWriteRepository repository)
-    { _parser = parser; _tokenValidator = tokenValidator; _repository = repository; }
+    public KaroSaveDocumentCommandHandler(IKaroRequestParser parser, IKaroTokenValidator tokenValidator, IKaroRoutingResolver routingResolver, IKaroWriteRepository repository)
+    { _parser = parser; _tokenValidator = tokenValidator; _routingResolver = routingResolver; _repository = repository; }
 
     public async Task<KaroWriteResult> Handle(KaroSaveDocumentCommand request, CancellationToken ct)
     {
         try
         {
             var (encounterId, practiceSuffix, practiceSuffixNumeric) = _parser.ParseEncounterId(request.EncounterId);
+            var routingContext = _routingResolver.Resolve(request.EncounterId ?? string.Empty);
             var patientId = _parser.Decrypt(request.PatientId);
             var pho = practiceSuffix.Contains("302_F3H045") ? "SCDHB" : null; // Legacy: real, narrow PHO override quirk.
 
-            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, patientId, encounterId, request.BearerToken, pho, ct);
+            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, routingContext, patientId, encounterId, request.BearerToken, pho, ct);
             if (!validation.Valid)
             {
                 return new KaroWriteResult(false, null, "Invalid token value!");
             }
 
-            var result = await _repository.SaveDocumentAsync(practiceSuffix, practiceSuffixNumeric, patientId, encounterId, request.MessageData, request.ContentType, request.MessageSubject, request.ItemType, ct);
+            var result = await _repository.SaveDocumentAsync(practiceSuffix, practiceSuffixNumeric, routingContext, patientId, encounterId, request.MessageData, request.ContentType, request.MessageSubject, request.ItemType, ct);
             return result.Succeeded
                 ? new KaroWriteResult(true, result.DmsGuidKey, null)
                 : new KaroWriteResult(false, null, "Unable to save document. Please try again or contact INDICI support.");
@@ -274,26 +287,28 @@ public sealed class KaroSaveSummaryCommandHandler : IRequestHandler<KaroSaveSumm
 {
     private readonly IKaroRequestParser _parser;
     private readonly IKaroTokenValidator _tokenValidator;
+    private readonly IKaroRoutingResolver _routingResolver;
     private readonly IKaroWriteRepository _repository;
-    public KaroSaveSummaryCommandHandler(IKaroRequestParser parser, IKaroTokenValidator tokenValidator, IKaroWriteRepository repository)
-    { _parser = parser; _tokenValidator = tokenValidator; _repository = repository; }
+    public KaroSaveSummaryCommandHandler(IKaroRequestParser parser, IKaroTokenValidator tokenValidator, IKaroRoutingResolver routingResolver, IKaroWriteRepository repository)
+    { _parser = parser; _tokenValidator = tokenValidator; _routingResolver = routingResolver; _repository = repository; }
 
     public async Task<KaroWriteResult> Handle(KaroSaveSummaryCommand request, CancellationToken ct)
     {
         try
         {
             var (encounterId, practiceSuffix, _) = _parser.ParseEncounterId(request.EncounterId);
+            var routingContext = _routingResolver.Resolve(request.EncounterId ?? string.Empty);
             var pho = practiceSuffix.Contains("302_F3H045") ? "SCDHB" : null; // Legacy: real, narrow PHO override quirk.
             var patientId = _parser.Decrypt(request.PatientId);
 
-            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, patientId, encounterId, request.BearerToken, pho, ct);
+            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, routingContext, patientId, encounterId, request.BearerToken, pho, ct);
             if (!validation.Valid)
             {
                 return new KaroWriteResult(false, null, " Invalid token value.");
             }
 
             var providerId = _parser.Decrypt(request.ProviderId);
-            var result = await _repository.SaveSummaryAsync(practiceSuffix, patientId, encounterId, providerId, request.Identifier, request.DateTimeRecorded, request.EntriesJson, ct);
+            var result = await _repository.SaveSummaryAsync(practiceSuffix, routingContext, patientId, encounterId, providerId, request.Identifier, request.DateTimeRecorded, request.EntriesJson, ct);
 
             if (result > 0)
             {

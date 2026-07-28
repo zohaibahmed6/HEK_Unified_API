@@ -1,4 +1,5 @@
 using HekCoreApi.Application.Common.Interfaces;
+using HekCoreApi.Application.Common.Models;
 
 namespace HekCoreApi.Infrastructure.Legacy.Karo;
 
@@ -18,9 +19,9 @@ public sealed class KaroTokenValidator : IKaroTokenValidator
         _authRepository = authRepository;
     }
 
-    public async Task<KaroTokenValidationResult> ValidateAsync(string practiceSuffix, string? patientId, string? encounterId, string? token, string? pho, CancellationToken ct = default)
+    public async Task<KaroTokenValidationResult> ValidateAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? encounterId, string? token, string? pho, CancellationToken ct = default)
     {
-        var result = await _authRepository.InsertAndValidateTokenAsync(practiceSuffix, username: null, password: null, patientId, encounterId, token, pho, ct);
+        var result = await _authRepository.InsertAndValidateTokenAsync(practiceSuffix, routingContext, username: null, password: null, patientId, encounterId, token, pho, ct);
 
         return result is not null && string.IsNullOrEmpty(result.StatusMessage)
             ? new KaroTokenValidationResult(true, null)

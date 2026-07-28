@@ -35,6 +35,12 @@ services:
       Erms__DbCredentials__ConnIndiciDB_901: ${ERMS_DBCREDENTIALS_CONNINDICIDB_901}
       Erms__DbCredentials__ConnIndiciDB_FZZ999-B: ${ERMS_DBCREDENTIALS_CONNINDICIDB_FZZ999B}
       Erms__DbCredentials__ConnIndiciDB_901_FZZ999-B: ${ERMS_DBCREDENTIALS_CONNINDICIDB_901_FZZ999B}
+      # KaroPracticeConnectionResolver/ErmsPracticeConnectionResolver (+ the DMS resolvers, same
+      # convention) key credentials by the tenant registry's DbServerHost, not by a per-practice
+      # suffix (2026-07-24 routing rework) - the ConnIndiciDB* keys above are the pre-rework
+      # convention, kept for whatever still reads them; this is the one the current resolvers need.
+      Karo__DbCredentials__dbserver-local: ${KARO_DBCREDENTIALS_DBSERVER_LOCAL}
+      Erms__DbCredentials__dbserver-local: ${ERMS_DBCREDENTIALS_DBSERVER_LOCAL}
       # Real AWS document content lives in a separate DMS_PMS database (confirmed from the real
       # concept dictionary: Patient_Attachment_Content -> DMS_PMS.dbo.tblDocumentDetail), not the
       # PMS_NZ_V2 connection used everywhere else - AWS enrichment (2026-07-24) needs this explicitly.

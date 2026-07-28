@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using HekCoreApi.Application.Common.Interfaces;
 using MediatR;
 
@@ -20,12 +20,14 @@ public sealed class ErmsGetPatientDataQueryHandler : IRequestHandler<ErmsGetPati
 {
     private readonly IErmsRequestParser _parser;
     private readonly IErmsTokenValidator _tokenValidator;
+    private readonly IErmsRoutingResolver _routingResolver;
     private readonly IErmsDemographicsRepository _repository;
 
-    public ErmsGetPatientDataQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsDemographicsRepository repository)
+    public ErmsGetPatientDataQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDemographicsRepository repository)
     {
         _parser = parser;
         _tokenValidator = tokenValidator;
+        _routingResolver = routingResolver;
         _repository = repository;
     }
 
@@ -35,14 +37,15 @@ public sealed class ErmsGetPatientDataQueryHandler : IRequestHandler<ErmsGetPati
         {
             var (encounterId, practiceSuffix, _, _) = _parser.ParseEncounterId(request.EncounterId);
             var patientId = _parser.Decrypt(_parser.DecodeBase64(request.PatientId));
+            var routingContext = _routingResolver.Resolve(request.EncounterId ?? string.Empty);
 
-            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, patientId, encounterId, request.BearerToken, cancellationToken);
+            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, routingContext, patientId, encounterId, request.BearerToken, cancellationToken);
             if (!validation.Valid)
             {
                 return new ErmsGetPatientDataResult(false, null, validation.ErrorMessage ?? "Invalid token value!");
             }
 
-            var table = await _repository.GetDemographicsAsync(practiceSuffix, patientId, cancellationToken);
+            var table = await _repository.GetDemographicsAsync(practiceSuffix, routingContext, patientId, cancellationToken);
             return new ErmsGetPatientDataResult(true, table, null);
         }
         catch (Exception ex)

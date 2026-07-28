@@ -1,3 +1,5 @@
+using HekCoreApi.Application.Common.Models;
+
 namespace HekCoreApi.Application.Common.Interfaces;
 
 /// <summary>
@@ -8,19 +10,19 @@ namespace HekCoreApi.Application.Common.Interfaces;
 /// </summary>
 public interface IKaroDataRepository
 {
-    Task<List<KaroConsultNote>> GetConsultNotesAsync(string practiceSuffix, string? patientId, CancellationToken ct = default);
-    Task<List<KaroDiagnosis>> GetConditionsAsync(string practiceSuffix, string? patientId, CancellationToken ct = default);
+    Task<List<KaroConsultNote>> GetConsultNotesAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, CancellationToken ct = default);
+    Task<List<KaroDiagnosis>> GetConditionsAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, CancellationToken ct = default);
     /// <summary>Legacy (`hsswebapi/DAL/South/HSSDA.cs:262-373`): real branch is `CheckAWSIsEnabled(practiceSuffixNumeric, connectionString)` -> `[HSS].[uspGetDocuments_AWS]` (+ per-row `GetDocumentStatusFromIndici` ContentType enrichment when no identifier, or `DocumentGetByDocumentKeyJsonResult` single-doc content when an identifier is given) vs plain `[HSS].[uspGetDocuments]`.</summary>
-    Task<List<KaroDocumentInfo>> GetDocumentsAsync(string practiceSuffix, string practiceSuffixNumeric, string? patientId, string? identifier, CancellationToken ct = default);
-    Task<List<KaroLabResult>> GetLabResultsAsync(string practiceSuffix, string? patientId, CancellationToken ct = default);
-    Task<List<KaroMedication>> GetMedicationsAsync(string practiceSuffix, string? patientId, CancellationToken ct = default);
-    Task<List<KaroObservation>> GetObservationsAsync(string practiceSuffix, string? patientId, string? conceptId, CancellationToken ct = default);
-    Task<List<KaroProvider>> GetProviderAsync(string practiceSuffix, string? patientId, string? userId, CancellationToken ct = default);
-    Task<List<KaroRecallCategory>> GetRecallCategoriesAsync(string practiceSuffix, string? group, CancellationToken ct = default);
-    Task<List<KaroRecall>> GetRecallsAsync(string practiceSuffix, string? patientId, CancellationToken ct = default);
+    Task<List<KaroDocumentInfo>> GetDocumentsAsync(string practiceSuffix, string practiceSuffixNumeric, RoutingContext routingContext, string? patientId, string? identifier, CancellationToken ct = default);
+    Task<List<KaroLabResult>> GetLabResultsAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, CancellationToken ct = default);
+    Task<List<KaroMedication>> GetMedicationsAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, CancellationToken ct = default);
+    Task<List<KaroObservation>> GetObservationsAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? conceptId, CancellationToken ct = default);
+    Task<List<KaroProvider>> GetProviderAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? userId, CancellationToken ct = default);
+    Task<List<KaroRecallCategory>> GetRecallCategoriesAsync(string practiceSuffix, RoutingContext routingContext, string? group, CancellationToken ct = default);
+    Task<List<KaroRecall>> GetRecallsAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, CancellationToken ct = default);
     /// <summary>Legacy: `practiceId` param is always the literal "6" (a real hardcoded constant, not derived from the request).</summary>
-    Task<List<KaroScreeningCode>> GetScreeningCodesAsync(string practiceSuffix, CancellationToken ct = default);
-    Task<List<KaroPatientAttachment>> GetPatientAttachmentAsync(string practiceSuffix, string practiceSuffixNumeric, string? patientId, string? referenceId, string? sortOrder, string? subject, DateTime? dateFrom, DateTime? dateTo, CancellationToken ct = default);
+    Task<List<KaroScreeningCode>> GetScreeningCodesAsync(string practiceSuffix, RoutingContext routingContext, CancellationToken ct = default);
+    Task<List<KaroPatientAttachment>> GetPatientAttachmentAsync(string practiceSuffix, string practiceSuffixNumeric, RoutingContext routingContext, string? patientId, string? referenceId, string? sortOrder, string? subject, DateTime? dateFrom, DateTime? dateTo, CancellationToken ct = default);
 }
 
 // Legacy field names/casing preserved exactly (`Models/APIModels.cs`) - mutable classes, not records, so

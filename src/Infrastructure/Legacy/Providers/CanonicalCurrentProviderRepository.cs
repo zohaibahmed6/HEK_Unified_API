@@ -1,4 +1,4 @@
-using System.Xml;
+﻿using System.Xml;
 using HekCoreApi.Application.Common.Interfaces;
 using HekCoreApi.Application.Common.Models;
 using HekCoreApi.Contracts.Providers;
@@ -39,7 +39,7 @@ public sealed class CanonicalCurrentProviderRepository : ICanonicalCurrentProvid
 
     public async Task<CurrentProviderCanonical?> GetKaroAsync(RoutingContext routing, string? patientId, CancellationToken ct = default)
     {
-        var providers = await _karoRepository.GetProviderAsync(routing.PracticeId, patientId, userId: null, ct);
+        var providers = await _karoRepository.GetProviderAsync(routing.PracticeId, routing, patientId, userId: null, ct);
         var provider = providers.FirstOrDefault();
         return provider is null
             ? null
@@ -48,7 +48,7 @@ public sealed class CanonicalCurrentProviderRepository : ICanonicalCurrentProvid
 
     public async Task<CurrentProviderCanonical?> GetErmsAsync(RoutingContext routing, string? patientId, CancellationToken ct = default)
     {
-        var table = await _ermsRepository.GetProviderAsync(routing.PracticeId, patientId, userId: null, locationId: null, encounterId: null, ct);
+        var table = await _ermsRepository.GetProviderAsync(routing.PracticeId, routing, patientId, userId: null, locationId: null, encounterId: null, ct);
         if (table.Rows.Count == 0)
         {
             return null;

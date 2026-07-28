@@ -1,4 +1,4 @@
-using HekCoreApi.Application.Common.Interfaces;
+﻿using HekCoreApi.Application.Common.Interfaces;
 using HekCoreApi.Application.Common.Models;
 using HekCoreApi.Contracts.Screening;
 using HekCoreApi.Contracts.Security;
@@ -17,7 +17,7 @@ public sealed class CanonicalScreeningCodesRepository : ICanonicalScreeningCodes
 
     public async Task<IReadOnlyList<ScreeningCodeCanonical>> GetKaroAsync(RoutingContext routing, CancellationToken ct = default)
     {
-        var codes = await _karoRepository.GetScreeningCodesAsync(routing.PracticeId, ct);
+        var codes = await _karoRepository.GetScreeningCodesAsync(routing.PracticeId, routing, ct);
         return codes.Select(c => new ScreeningCodeCanonical(c.ConceptId, c.ScreeningShortName, c.ScreeningName, OriginScope.Karo)).ToList();
     }
 }

@@ -1,5 +1,6 @@
-using System.Data;
+﻿using System.Data;
 using HekCoreApi.Application.Common.Interfaces;
+using HekCoreApi.Application.Common.Models;
 using MediatR;
 
 namespace HekCoreApi.Application.Features.Col;
@@ -28,18 +29,22 @@ public sealed record ColSaveInvoiceResult(long ServiceMappingId, string Error);
 /// COL's own split (3rd segment overwrites), decrypt patientId, `[HSS].[uspInsertAndValidateToken]`
 /// with the real `ExpiryInDays` config, and the real two-tier failure messages
 /// ("Authentication failed!" / "Invalid credentials!"). Always HTTP 200 JSON with an `error` field.
+/// COL shares ERMS's auth/connection infrastructure (same in-process legacy controller), so its tenant-
+/// registry routing goes through <see cref="IErmsRoutingResolver"/> too.
 /// </summary>
 public sealed class ColAuthenticateQueryHandler : IRequestHandler<ColAuthenticateQuery, ColAuthenticateResult>
 {
     private readonly IColRequestParser _parser;
     private readonly IErmsAuthRepository _authRepository;
     private readonly ISecretProvider _secretProvider;
+    private readonly IErmsRoutingResolver _routingResolver;
 
-    public ColAuthenticateQueryHandler(IColRequestParser parser, IErmsAuthRepository authRepository, ISecretProvider secretProvider)
+    public ColAuthenticateQueryHandler(IColRequestParser parser, IErmsAuthRepository authRepository, ISecretProvider secretProvider, IErmsRoutingResolver routingResolver)
     {
         _parser = parser;
         _authRepository = authRepository;
         _secretProvider = secretProvider;
+        _routingResolver = routingResolver;
     }
 
     public async Task<ColAuthenticateResult> Handle(ColAuthenticateQuery request, CancellationToken ct)
@@ -48,11 +53,12 @@ public sealed class ColAuthenticateQueryHandler : IRequestHandler<ColAuthenticat
         {
             var (encounterId, practiceSuffix) = _parser.ParseEncounterId(request.EncounterId);
             var patientId = _parser.Decrypt(request.PatientId);
+            var routingContext = _routingResolver.Resolve(request.EncounterId ?? string.Empty);
 
             var expiryRaw = await _secretProvider.GetSecretAsync("Erms:ExpiryInDays", ct);
             var expiryInDays = double.TryParse(expiryRaw, out var parsed) ? parsed : 0;
 
-            var dbResult = await _authRepository.InsertAndValidateTokenAsync(practiceSuffix, request.Username, request.Password, patientId, encounterId, token: null, expiryInDays, pho: null, ct);
+            var dbResult = await _authRepository.InsertAndValidateTokenAsync(practiceSuffix, routingContext, request.Username, request.Password, patientId, encounterId, token: null, expiryInDays, pho: null, ct);
 
             if (dbResult is not null && string.IsNullOrWhiteSpace(dbResult.StatusMessage))
             {
@@ -82,28 +88,31 @@ internal sealed class ColReadPipeline
 {
     private readonly IColRequestParser _parser;
     private readonly IErmsTokenValidator _tokenValidator;
+    private readonly IErmsRoutingResolver _routingResolver;
 
-    public ColReadPipeline(IColRequestParser parser, IErmsTokenValidator tokenValidator)
+    public ColReadPipeline(IColRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver)
     {
         _parser = parser;
         _tokenValidator = tokenValidator;
+        _routingResolver = routingResolver;
     }
 
     public async Task<ColReadResult> RunAsync(string? patientId, string? encounterId, string? bearerToken,
-        Func<string, string?, string?, Task<DataTable>> fetch, CancellationToken ct = default)
+        Func<string, RoutingContext, string?, string?, Task<DataTable>> fetch, CancellationToken ct = default)
     {
         try
         {
             var (parsedEncounterId, practiceSuffix) = _parser.ParseEncounterId(encounterId);
             var parsedPatientId = _parser.Decrypt(patientId);
+            var routingContext = _routingResolver.Resolve(encounterId ?? string.Empty);
 
-            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, parsedPatientId, parsedEncounterId, bearerToken, ct);
+            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, routingContext, parsedPatientId, parsedEncounterId, bearerToken, ct);
             if (!validation.Valid)
             {
                 return new ColReadResult(false, null, validation.ErrorMessage ?? "Invalid token value!");
             }
 
-            var table = await fetch(practiceSuffix, parsedPatientId, parsedEncounterId);
+            var table = await fetch(practiceSuffix, routingContext, parsedPatientId, parsedEncounterId);
             return new ColReadResult(true, table, string.Empty);
         }
         catch (Exception ex)
@@ -118,15 +127,15 @@ public sealed class ColGetCurrentPatientDataQueryHandler : IRequestHandler<ColGe
     private readonly ColReadPipeline _pipeline;
     private readonly IColDataRepository _repository;
 
-    public ColGetCurrentPatientDataQueryHandler(IColRequestParser parser, IErmsTokenValidator tokenValidator, IColDataRepository repository)
+    public ColGetCurrentPatientDataQueryHandler(IColRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IColDataRepository repository)
     {
-        _pipeline = new ColReadPipeline(parser, tokenValidator);
+        _pipeline = new ColReadPipeline(parser, tokenValidator, routingResolver);
         _repository = repository;
     }
 
     public Task<ColReadResult> Handle(ColGetCurrentPatientDataQuery request, CancellationToken ct) =>
         _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, _) => _repository.GetCurrentPatientDataAsync(suffix, patientId, ct), ct);
+            (suffix, routingContext, patientId, _) => _repository.GetCurrentPatientDataAsync(suffix, routingContext, patientId, ct), ct);
 }
 
 public sealed class ColGetSessionDataQueryHandler : IRequestHandler<ColGetSessionDataQuery, ColReadResult>
@@ -134,15 +143,15 @@ public sealed class ColGetSessionDataQueryHandler : IRequestHandler<ColGetSessio
     private readonly ColReadPipeline _pipeline;
     private readonly IColDataRepository _repository;
 
-    public ColGetSessionDataQueryHandler(IColRequestParser parser, IErmsTokenValidator tokenValidator, IColDataRepository repository)
+    public ColGetSessionDataQueryHandler(IColRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IColDataRepository repository)
     {
-        _pipeline = new ColReadPipeline(parser, tokenValidator);
+        _pipeline = new ColReadPipeline(parser, tokenValidator, routingResolver);
         _repository = repository;
     }
 
     public Task<ColReadResult> Handle(ColGetSessionDataQuery request, CancellationToken ct) =>
         _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, _) => _repository.GetSessionDataAsync(suffix, patientId, ct), ct);
+            (suffix, routingContext, patientId, _) => _repository.GetSessionDataAsync(suffix, routingContext, patientId, ct), ct);
 }
 
 public sealed class ColGetProviderDataQueryHandler : IRequestHandler<ColGetProviderDataQuery, ColReadResult>
@@ -150,15 +159,15 @@ public sealed class ColGetProviderDataQueryHandler : IRequestHandler<ColGetProvi
     private readonly ColReadPipeline _pipeline;
     private readonly IColDataRepository _repository;
 
-    public ColGetProviderDataQueryHandler(IColRequestParser parser, IErmsTokenValidator tokenValidator, IColDataRepository repository)
+    public ColGetProviderDataQueryHandler(IColRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IColDataRepository repository)
     {
-        _pipeline = new ColReadPipeline(parser, tokenValidator);
+        _pipeline = new ColReadPipeline(parser, tokenValidator, routingResolver);
         _repository = repository;
     }
 
     public Task<ColReadResult> Handle(ColGetProviderDataQuery request, CancellationToken ct) =>
         _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, _) => _repository.GetProviderDataAsync(suffix, patientId, ct), ct);
+            (suffix, routingContext, patientId, _) => _repository.GetProviderDataAsync(suffix, routingContext, patientId, ct), ct);
 }
 
 public sealed class ColGetSurgeryDataQueryHandler : IRequestHandler<ColGetSurgeryDataQuery, ColReadResult>
@@ -166,16 +175,16 @@ public sealed class ColGetSurgeryDataQueryHandler : IRequestHandler<ColGetSurger
     private readonly ColReadPipeline _pipeline;
     private readonly IColDataRepository _repository;
 
-    public ColGetSurgeryDataQueryHandler(IColRequestParser parser, IErmsTokenValidator tokenValidator, IColDataRepository repository)
+    public ColGetSurgeryDataQueryHandler(IColRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IColDataRepository repository)
     {
-        _pipeline = new ColReadPipeline(parser, tokenValidator);
+        _pipeline = new ColReadPipeline(parser, tokenValidator, routingResolver);
         _repository = repository;
     }
 
     public Task<ColReadResult> Handle(ColGetSurgeryDataQuery request, CancellationToken ct) =>
         // Legacy: LocationId is passed raw to PHCO.GetSurgeryData - never decoded or decrypted.
         _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, encounterId) => _repository.GetSurgeryDataAsync(suffix, patientId, request.LocationId, encounterId, ct), ct);
+            (suffix, routingContext, patientId, encounterId) => _repository.GetSurgeryDataAsync(suffix, routingContext, patientId, request.LocationId, encounterId, ct), ct);
 }
 
 public sealed class ColGetDiagnosisDataQueryHandler : IRequestHandler<ColGetDiagnosisDataQuery, ColReadResult>
@@ -183,9 +192,9 @@ public sealed class ColGetDiagnosisDataQueryHandler : IRequestHandler<ColGetDiag
     private readonly ColReadPipeline _pipeline;
     private readonly IColDataRepository _repository;
 
-    public ColGetDiagnosisDataQueryHandler(IColRequestParser parser, IErmsTokenValidator tokenValidator, IColDataRepository repository)
+    public ColGetDiagnosisDataQueryHandler(IColRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IColDataRepository repository)
     {
-        _pipeline = new ColReadPipeline(parser, tokenValidator);
+        _pipeline = new ColReadPipeline(parser, tokenValidator, routingResolver);
         _repository = repository;
     }
 
@@ -196,7 +205,7 @@ public sealed class ColGetDiagnosisDataQueryHandler : IRequestHandler<ColGetDiag
 
         // Legacy quirk: COL passes pmsOrder raw (no ToUpper, unlike ERMS's date-range ops).
         return _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, _) => _repository.GetDiagnosisDataAsync(suffix, patientId, request.Order, min, max, ct), ct);
+            (suffix, routingContext, patientId, _) => _repository.GetDiagnosisDataAsync(suffix, routingContext, patientId, request.Order, min, max, ct), ct);
     }
 }
 
@@ -205,12 +214,14 @@ public sealed class ColSaveInvoiceCommandHandler : IRequestHandler<ColSaveInvoic
 {
     private readonly IColRequestParser _parser;
     private readonly IErmsTokenValidator _tokenValidator;
+    private readonly IErmsRoutingResolver _routingResolver;
     private readonly IColDataRepository _repository;
 
-    public ColSaveInvoiceCommandHandler(IColRequestParser parser, IErmsTokenValidator tokenValidator, IColDataRepository repository)
+    public ColSaveInvoiceCommandHandler(IColRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IColDataRepository repository)
     {
         _parser = parser;
         _tokenValidator = tokenValidator;
+        _routingResolver = routingResolver;
         _repository = repository;
     }
 
@@ -220,14 +231,15 @@ public sealed class ColSaveInvoiceCommandHandler : IRequestHandler<ColSaveInvoic
         {
             var (encounterId, practiceSuffix) = _parser.ParseEncounterId(request.EncounterId);
             var patientId = _parser.Decrypt(request.PatientId);
+            var routingContext = _routingResolver.Resolve(request.EncounterId ?? string.Empty);
 
-            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, patientId, encounterId, request.BearerToken, ct);
+            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, routingContext, patientId, encounterId, request.BearerToken, ct);
             if (!validation.Valid)
             {
                 return new ColSaveInvoiceResult(-1, validation.ErrorMessage ?? "Invalid token value!");
             }
 
-            var serviceMappingId = await _repository.SaveInvoiceAsync(practiceSuffix, patientId, request.AccountHolderId, encounterId,
+            var serviceMappingId = await _repository.SaveInvoiceAsync(practiceSuffix, routingContext, patientId, request.AccountHolderId, encounterId,
                 request.ServiceName, request.ServiceCode, request.AmountInclGst, request.Description, request.Payee,
                 request.ServiceProvider, request.ServiceProviderType, request.ServiceDate, request.PegasusReference, request.ClaimShortCode, ct);
 

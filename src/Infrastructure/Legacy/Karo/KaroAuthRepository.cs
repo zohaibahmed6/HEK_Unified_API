@@ -1,5 +1,6 @@
 using System.Data;
 using HekCoreApi.Application.Common.Interfaces;
+using HekCoreApi.Application.Common.Models;
 using Microsoft.Data.SqlClient;
 
 namespace HekCoreApi.Infrastructure.Legacy.Karo;
@@ -18,10 +19,10 @@ public sealed class KaroAuthRepository : IKaroAuthRepository
     }
 
     public async Task<KaroAuthResult?> InsertAndValidateTokenAsync(
-        string practiceSuffix, string? username, string? password, string? patientId,
+        string practiceSuffix, RoutingContext routingContext, string? username, string? password, string? patientId,
         string? appointmentId, string? token, string? pho, CancellationToken ct = default)
     {
-        var connectionString = await _connectionResolver.ResolveAsync(practiceSuffix, ct);
+        var connectionString = await _connectionResolver.ResolveAsync(routingContext, ct);
 
         var parameters = new List<SqlParameter>();
         if (!string.IsNullOrWhiteSpace(username))

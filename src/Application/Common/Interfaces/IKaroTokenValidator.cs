@@ -1,3 +1,5 @@
+using HekCoreApi.Application.Common.Models;
+
 namespace HekCoreApi.Application.Common.Interfaces;
 
 /// <summary>
@@ -7,7 +9,7 @@ namespace HekCoreApi.Application.Common.Interfaces;
 /// </summary>
 public interface IKaroTokenValidator
 {
-    Task<KaroTokenValidationResult> ValidateAsync(string practiceSuffix, string? patientId, string? encounterId, string? token, string? pho, CancellationToken ct = default);
+    Task<KaroTokenValidationResult> ValidateAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? encounterId, string? token, string? pho, CancellationToken ct = default);
 }
 
 public sealed record KaroTokenValidationResult(bool Valid, string? ErrorMessage);

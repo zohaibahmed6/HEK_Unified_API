@@ -13,12 +13,14 @@ public sealed class ErmsAuthenticateQueryHandler : IRequestHandler<ErmsAuthentic
     private readonly IErmsRequestParser _parser;
     private readonly IErmsAuthRepository _authRepository;
     private readonly ISecretProvider _secretProvider;
+    private readonly IErmsRoutingResolver _routingResolver;
 
-    public ErmsAuthenticateQueryHandler(IErmsRequestParser parser, IErmsAuthRepository authRepository, ISecretProvider secretProvider)
+    public ErmsAuthenticateQueryHandler(IErmsRequestParser parser, IErmsAuthRepository authRepository, ISecretProvider secretProvider, IErmsRoutingResolver routingResolver)
     {
         _parser = parser;
         _authRepository = authRepository;
         _secretProvider = secretProvider;
+        _routingResolver = routingResolver;
     }
 
     public async Task<ErmsAuthenticateResult> Handle(ErmsAuthenticateQuery request, CancellationToken ct)
@@ -27,11 +29,12 @@ public sealed class ErmsAuthenticateQueryHandler : IRequestHandler<ErmsAuthentic
         {
             var (encounterId, practiceSuffix, pho, _) = _parser.ParseEncounterId(request.EncounterId);
             var patientId = _parser.Decrypt(_parser.DecodeBase64(request.PatientId));
+            var routingContext = _routingResolver.Resolve(request.EncounterId ?? string.Empty);
 
             var expiryRaw = await _secretProvider.GetSecretAsync("Erms:ExpiryInDays", ct);
             var expiryInDays = double.TryParse(expiryRaw, out var parsed) ? parsed : 0;
 
-            var dbResult = await _authRepository.InsertAndValidateTokenAsync(practiceSuffix, request.Username, request.Password, patientId, encounterId, token: null, expiryInDays, pho, ct);
+            var dbResult = await _authRepository.InsertAndValidateTokenAsync(practiceSuffix, routingContext, request.Username, request.Password, patientId, encounterId, token: null, expiryInDays, pho, ct);
 
             if (dbResult is not null && string.IsNullOrWhiteSpace(dbResult.StatusMessage))
             {

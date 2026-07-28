@@ -107,7 +107,7 @@ export const EndpointCard = forwardRef<
         <div className="ep-result">
           <div className="ep-result-summary">{result.summary}</div>
           {(() => {
-            const friendly = status === "success" ? renderHisoResult(endpoint, result.raw) : null;
+            const friendly = status === "success" ? renderHisoResult(endpoint, result.raw, auth.sessionKey) : null;
             if (friendly) {
               return (
                 <>

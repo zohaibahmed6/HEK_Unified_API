@@ -1,0 +1,435 @@
+<title>ERMS GetScannedList — Request Flow</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default' });
+</script>
+<style>
+  :root {
+    --ink: #161a1d;
+    --paper: #f3f1ea;
+    --panel: #ffffff;
+    --line: #dcd7c9;
+    --muted: #64655c;
+    --accent: #2f6f6d;
+    --accent-strong: #1c4b49;
+    --accent-soft: #dfeae8;
+    --amber: #a8621a;
+    --amber-soft: #f4e6d4;
+    --code-bg: #eee9db;
+    --shadow: 0 1px 2px rgba(22,26,29,0.06), 0 8px 24px rgba(22,26,29,0.05);
+  }
+  :root[data-theme="dark"] {
+    --ink: #eceae3;
+    --paper: #14171a;
+    --panel: #1b1f22;
+    --line: #2c3033;
+    --muted: #9a9c93;
+    --accent: #63b8b3;
+    --accent-strong: #8fd0cb;
+    --accent-soft: #1f3634;
+    --amber: #e2984f;
+    --amber-soft: #3a2c1a;
+    --code-bg: #23272a;
+    --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.35);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #eceae3;
+      --paper: #14171a;
+      --panel: #1b1f22;
+      --line: #2c3033;
+      --muted: #9a9c93;
+      --accent: #63b8b3;
+      --accent-strong: #8fd0cb;
+      --accent-soft: #1f3634;
+      --amber: #e2984f;
+      --amber-soft: #3a2c1a;
+      --code-bg: #23272a;
+      --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.35);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    background: var(--paper);
+    color: var(--ink);
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  }
+  body {
+    padding: 48px 24px 96px;
+  }
+  .wrap {
+    max-width: 980px;
+    margin: 0 auto;
+  }
+
+  .eyebrow {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent-strong);
+    margin: 0 0 10px;
+  }
+  h1 {
+    font-family: ui-serif, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    font-weight: 600;
+    font-size: clamp(28px, 4vw, 38px);
+    line-height: 1.12;
+    letter-spacing: -0.01em;
+    margin: 0 0 12px;
+    text-wrap: balance;
+  }
+  .dek {
+    font-size: 16px;
+    line-height: 1.55;
+    color: var(--muted);
+    max-width: 62ch;
+    margin: 0 0 36px;
+  }
+  .dek code, p code, li code, td code {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 0.92em;
+    background: var(--code-bg);
+    padding: 0.08em 0.4em;
+    border-radius: 4px;
+  }
+
+  section { margin-bottom: 44px; }
+  h2 {
+    font-family: ui-serif, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 4px;
+    letter-spacing: -0.005em;
+  }
+  .section-note {
+    font-size: 13.5px;
+    color: var(--muted);
+    margin: 0 0 18px;
+  }
+
+  .diagram-frame {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    padding: 20px 18px;
+  }
+  .zoom-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .zoom-bar button {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 15px;
+    line-height: 1;
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--paper);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .zoom-bar button:hover { border-color: var(--accent); color: var(--accent-strong); }
+  .zoom-bar button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .zoom-bar .pct {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+    min-width: 46px;
+    text-align: center;
+  }
+  .zoom-bar .hint {
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-left: auto;
+  }
+  .diagram-scroll {
+    overflow: auto;
+    max-height: 78vh;
+    padding-bottom: 4px;
+    border-radius: 6px;
+  }
+  .diagram-scroll .mermaid {
+    min-width: 1400px;
+  }
+  .diagram-scroll svg {
+    display: block;
+  }
+  .diagram-scroll .mermaid text,
+  .diagram-scroll svg text {
+    font-size: 16px !important;
+  }
+  .diagram-scroll .mermaid .messageText,
+  .diagram-scroll svg .messageText {
+    font-size: 16px !important;
+  }
+  .diagram-scroll .mermaid .labelText,
+  .diagram-scroll .mermaid .loopText,
+  .diagram-scroll svg .labelText,
+  .diagram-scroll svg .loopText {
+    font-size: 15px !important;
+  }
+
+  .legend-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+  }
+  .legend-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px 20px;
+    box-shadow: var(--shadow);
+  }
+  .legend-card .tag {
+    display: inline-block;
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--amber-soft);
+    color: var(--amber);
+    margin-bottom: 10px;
+  }
+  .legend-card h3 {
+    font-size: 15.5px;
+    margin: 0 0 8px;
+    font-weight: 650;
+  }
+  .legend-card p {
+    font-size: 13.8px;
+    line-height: 1.55;
+    color: var(--muted);
+    margin: 0 0 8px;
+  }
+  .legend-card p:last-child { margin-bottom: 0; }
+
+  table.steps {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+  table.steps th, table.steps td {
+    text-align: left;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  table.steps th {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  table.steps td.n {
+    font-variant-numeric: tabular-nums;
+    color: var(--accent-strong);
+    font-weight: 700;
+    width: 28px;
+  }
+  table.steps td.src code {
+    font-size: 11.6px;
+    white-space: nowrap;
+  }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: var(--shadow); }
+  .table-wrap table.steps { border: none; box-shadow: none; }
+  .table-wrap td, .table-wrap th { border-color: var(--line); }
+
+  footer {
+    margin-top: 56px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+</style>
+
+<div class="wrap">
+  <p class="eyebrow">HEK Core API — legacy-compat wire flow</p>
+  <h1>ERMS <code>GetScannedList</code>: token check, then the AWS-branching document fetch</h1>
+  <p class="dek">
+    Traced from the real, verified source in this repo. Chosen deliberately over a simpler ERMS
+    read because it shows the same real AWS-vs-non-AWS fork just fixed in
+    <code>ErmsDataRepository.GetOtherDocsAsync</code> — every arrow and payload below is a real
+    method call / real field name, not a generic placeholder.
+  </p>
+
+  <section>
+    <h2>Sequence</h2>
+    <p class="section-note">Use the zoom controls below if the text reads small — the diagram itself scrolls both ways once zoomed in.</p>
+    <div class="diagram-frame">
+      <div class="zoom-bar">
+        <button type="button" id="zoomOut" aria-label="Zoom out">−</button>
+        <span class="pct" id="zoomPct">150%</span>
+        <button type="button" id="zoomIn" aria-label="Zoom in">+</button>
+        <button type="button" id="zoomReset" aria-label="Reset zoom" style="width:auto;padding:0 12px;">Reset</button>
+        <span class="hint">Drag the scrollbars, or scroll while hovering, to pan around</span>
+      </div>
+      <div class="diagram-scroll" id="diagramScroll">
+        <pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor Client
+    participant Ctrl as ErmsCompatController
+    participant Pipe as ErmsReadPipeline
+    participant Parser as ErmsRequestParser
+    participant Auth as ErmsTokenValidator
+    participant AuthDb as Practice DB (uspInsertAndValidateToken)
+    participant Repo as ErmsDataRepository
+    participant Aws as IAwsDocumentService
+    participant DataDb as Practice DB (uspGetOtherDocs)
+    participant Mapper as ErmsDataTableMapper
+
+    Client->>Ctrl: GET /erms/GetScannedList?pmsPatientId=..&pmsEncounterId=..<br/>&pmsOrder=desc&pmsMinDateTime=&pmsMaxDateTime=<br/>Authorization: Bearer &lt;token&gt;
+    Ctrl->>Pipe: ErmsGetScannedListQuery(PatientId, EncounterId, Order, MinDateTime, MaxDateTime, BearerToken)
+
+    Pipe->>Parser: ParseEncounterId(encounterId)
+    Parser-->>Pipe: (parsedEncounterId, practiceSuffix,<br/>pho, rawSecondSegment)
+    Note over Pipe: preValidate: Convert.ToInt32(rawSecondSegment)<br/>runs BEFORE token check — a bad segment<br/>throws into the error envelope even on a bad token (legacy quirk, kept)
+
+    Pipe->>Parser: Decrypt(DecodeBase64(patientId))
+    Parser-->>Pipe: decrypted patientId
+
+    Pipe->>Auth: ValidateAsync(practiceSuffix, patientId, encounterId, bearerToken)
+    Auth->>AuthDb: EXEC [HSS].[uspInsertAndValidateToken]<br/>@pPatientId, @pAppointmentId, @pPracticeId, @pToken
+    AuthDb-->>Auth: row with StatusMessage
+    Auth-->>Pipe: valid iff StatusMessage is empty
+
+    alt token invalid
+        Pipe-->>Ctrl: ErmsReadResult(false, null, "Invalid token value!")
+        Ctrl-->>Client: &lt;Error&gt;&lt;Message&gt;Invalid token value!&lt;/Message&gt;&lt;/Error&gt;
+    else token valid
+        Pipe->>Repo: GetOtherDocsAsync(practiceSuffix, practiceSuffixNumeric,<br/>patientId, sortOrder, minDate, maxDate, isReferral: false)
+        Repo->>Repo: resolve connection via<br/>Erms:DbCredentials:ConnIndiciDB{practiceSuffix}
+        Repo->>Aws: CheckAwsIsEnabledAsync(practiceIdInt, connectionString)
+        Aws-->>Repo: true / false (per-practice, checked live)
+
+        alt AWS enabled
+            Repo->>DataDb: EXEC [HSS].[uspGetOtherDocs_AWS]<br/>@pPatientId, @pSortOrder, @pMinDate, @pMaxDate
+            DataDb-->>Repo: rows incl. DMSID column
+            loop each row with a DMSID
+                Repo->>Aws: GetDocumentStatusFromIndiciAsync(docKey, practiceId, connectionString)
+                Aws-->>Repo: AwsDocumentStatus { DocumentType, ... }
+                Repo->>Repo: row["DataType"] += mime(DocumentType)
+            end
+        else AWS disabled
+            Repo->>DataDb: EXEC [HSS].[uspGetOtherDocs]<br/>@pPatientId, @pSortOrder, @pMinDate, @pMaxDate
+            DataDb-->>Repo: rows, plain
+        end
+
+        Repo-->>Pipe: DataTable
+        Pipe-->>Ctrl: ErmsReadResult(true, table, null, minDate, maxDate)
+        Ctrl->>Mapper: ToListHiso&lt;ScannedGroup&gt;(table)
+        Mapper-->>Ctrl: [ScannedGroup] — pipe-delimited fields split,<br/>HISO-style conceptName/conceptID pairs
+        Ctrl->>Ctrl: stamp order/min/max attributes onto each group<br/>(dateFormat from Erms:DateFormat secret)
+        Ctrl-->>Client: &lt;ScanDocumentReports&gt;&lt;ScannedGroup&gt;...&lt;/ScannedGroup&gt;&lt;/ScanDocumentReports&gt;
+    end
+        </pre>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Two branches worth knowing</h2>
+    <p class="section-note">The diagram above is drawn as the "everything succeeds" path — these are the forks it can take.</p>
+    <div class="legend-grid">
+      <div class="legend-card">
+        <span class="tag">Fail-fast</span>
+        <h3>Token check always runs first</h3>
+        <p>Every ERMS read op — not just this one — goes through the same <code>ErmsReadPipeline</code>: decode/decrypt the patient ID, validate the bearer token against <code>uspInsertAndValidateToken</code>, and only then touch the data procedure. An invalid token short-circuits to an <code>&lt;Error&gt;</code> envelope before any document query runs.</p>
+      </div>
+      <div class="legend-card">
+        <span class="tag">Conditional</span>
+        <h3>AWS-branching document fetch</h3>
+        <p>The exact same real fork implemented for KARO's <code>GetDocuments</code> and HISO's attachment procedures: <code>CheckAwsIsEnabledAsync</code> is checked live, per practice, against that practice's own DB — not a global flag — before deciding which stored procedure variant to call.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Step-by-step source index</h2>
+    <p class="section-note">Where each stage of the diagram actually lives in the codebase.</p>
+    <div class="table-wrap">
+      <table class="steps">
+        <thead>
+          <tr><th>#</th><th>Stage</th><th>Real source</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="n">1</td><td>REST entry point</td><td class="src"><code>ErmsCompatController.cs</code></td></tr>
+          <tr><td class="n">2</td><td>Shared read pipeline (decode/decrypt/validate/fetch)</td><td class="src"><code>ErmsReadQueries.cs</code> — <code>ErmsReadPipeline</code></td></tr>
+          <tr><td class="n">3</td><td>Encounter-ID parsing</td><td class="src"><code>ErmsRequestParser.cs</code></td></tr>
+          <tr><td class="n">4</td><td>Bearer-token validation</td><td class="src"><code>ErmsTokenValidator.cs</code>, <code>ErmsAuthRepository.cs</code></td></tr>
+          <tr><td class="n">5</td><td>AWS-branching document fetch</td><td class="src"><code>ErmsDataRepository.cs</code> — <code>GetOtherDocsAsync</code></td></tr>
+          <tr><td class="n">6</td><td>Connection resolution</td><td class="src"><code>ErmsPracticeConnectionResolver.cs</code></td></tr>
+          <tr><td class="n">7</td><td>Response mapping to XML</td><td class="src"><code>ErmsDataTableMapper.cs</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    Built from the verified source in <code>HEK Core API</code> — no procedure name, field, or table
+    above is inferred; each is confirmed against the real legacy source or a live DB check performed
+    earlier in this project. Companion diagram: <code>hiso-getdata-flow.html</code> in this same folder.
+  </footer>
+</div>
+
+<script>
+  (function () {
+    var scrollBox = document.getElementById('diagramScroll');
+    var zoomInBtn = document.getElementById('zoomIn');
+    var zoomOutBtn = document.getElementById('zoomOut');
+    var zoomResetBtn = document.getElementById('zoomReset');
+    var pctLabel = document.getElementById('zoomPct');
+
+    var BASE_WIDTH = 1400;
+    var scale = 1.5;
+    var svgEl = null;
+
+    function apply() {
+      if (!svgEl) return;
+      svgEl.style.width = (BASE_WIDTH * scale) + 'px';
+      svgEl.style.height = 'auto';
+      svgEl.style.maxWidth = 'none';
+      pctLabel.textContent = Math.round(scale * 100) + '%';
+    }
+
+    function findSvgAndInit() {
+      var svg = scrollBox.querySelector('svg');
+      if (!svg || svg === svgEl) return;
+      svgEl = svg;
+      apply();
+    }
+
+    var observer = new MutationObserver(findSvgAndInit);
+    observer.observe(scrollBox, { childList: true, subtree: true });
+    findSvgAndInit();
+    setTimeout(findSvgAndInit, 300);
+    setTimeout(findSvgAndInit, 1000);
+
+    zoomInBtn.addEventListener('click', function () {
+      scale = Math.min(scale + 0.25, 4);
+      apply();
+    });
+    zoomOutBtn.addEventListener('click', function () {
+      scale = Math.max(scale - 0.25, 0.5);
+      apply();
+    });
+    zoomResetBtn.addEventListener('click', function () {
+      scale = 1.5;
+      apply();
+    });
+  })();
+</script>

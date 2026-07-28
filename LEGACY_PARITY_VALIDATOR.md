@@ -12,19 +12,19 @@ Sources used: `hek_analysis/docs/analysis/{hiso,erms,karo}/EndpointInventory.md`
 ## HISO
 | Operation | Legacy behavior (source) | Unified endpoint | Status | Notes |
 |---|---|---|---|---|
-| getVersion | Returns hardcoded application/version/dictionaryVersion/hisoversion (EndpointInventory.md:15) | POST /hiso/getVersion | ✅ | Endpoint present; field-level body not yet diffed |
-| getDeliveryOptions | Returns EDI sender account/password/URL from appSettings (:16) | POST /hiso/getDeliveryOptions | ✅ | Endpoint present; field-level body not yet diffed |
-| getData | Dynamic-mode data fill; static mode is an unimplemented stub in legacy (:17) | POST /hiso/getData | ✅ | Endpoint present; static-mode stub behavior not diffed |
-| saveContainer | Persists rendered form to DMS + ACC45 tables when completed=true (:18) | POST /hiso/saveContainer | ✅ | Endpoint present; field-level body not yet diffed |
-| getFormView | Retrieves stored ACC45 form definition/view from DMS (:19) | POST /hiso/getFormView | ✅ | Endpoint present; field-level body not yet diffed |
-| processAction | Dispatches on actionId; "addInvoice"/"launchForm" are no-op stubs in legacy (:20) | POST /hiso/processAction | ✅ | Endpoint present; stub-parity (addInvoice/launchForm) not yet diffed |
+| getVersion | Returns hardcoded application/version/dictionaryVersion/hisoversion (EndpointInventory.md:15) | POST /hiso/getVersion | ✅ | Field-diffed 2026-07-27: `GetVersionResponse.Real()` (Adapters.Hiso) hardcodes application="PMS", applicationVersion="1.0", hisoversion=1, and deliberately omits dictionaryVersion (legacy sets `Specified=false`) — exact match |
+| getDeliveryOptions | Returns EDI sender account/password/URL from appSettings (:16) | POST /hiso/getDeliveryOptions | ✅ | Field-diffed 2026-07-27: `GetDeliveryOptionsResponseReturn` matches doc shape field-for-field, including legacy's never-populated messageID/recipientAccount (kept always-null for shape fidelity) |
+| getData | Dynamic-mode data fill; static mode is an unimplemented stub in legacy (:17) | POST /hiso/getData | ✅ | Field-diffed 2026-07-27: stub-branch condition confirmed (`GetDataQuery.cs:63-69`). **Dynamic-mode data-fill pipeline live-verified 2026-07-28**: real session `0F456781-...` (practice 933) + `formInstanceOperationMode="N"` + real `patient.details` fields called against the running API → returned real live-DB values (NHI `ZZZ0083` — valid NZ NHI format, name `HAMZA ARSHAD`, DOB `1995-08-31`), confirming session→concept-dictionary→procedure-execution→XML-fill pipeline genuinely pulls from the live PMS DB, not a stub |
+| saveContainer | Persists rendered form to DMS + ACC45 tables when completed=true (:18) | POST /hiso/saveContainer | ✅ | Field-diffed 2026-07-27: `SaveContainerCommand.cs` calls the real `IHisoDocumentHandler.AddDocumentAsync` and always also runs the ACC45 Detail/Diagnosis/Referral save regardless of `completed`, matching legacy |
+| getFormView | Retrieves stored ACC45 form definition/view from DMS (:19) | POST /hiso/getFormView | ✅ | Field-diffed 2026-07-27: ported from real `Acc45DefinitionBuilder.GetACC45Definition`; resumePath/viewType/view/dataContainer are DB-backed matching doc shape |
+| processAction | Dispatches on actionId; "addInvoice"/"launchForm" are no-op stubs in legacy (:20) | POST /hiso/processAction | ✅ | Field-diffed 2026-07-27: `ProcessActionCommand.cs:82-83` reproduces addInvoice/launchForm as genuine no-ops exactly matching legacy |
 | Session expiry | Real HISO SessionGUID mechanism has NO expiry (confirmed via source per code comment) | ResolveHisoSessionQueryHandler | ✅ | Confirmed 2026-07-24/25: expiry logic intentionally removed from handler to match legacy; test suite updated to match |
 
 ## ERMS
 | Operation | Legacy behavior (source) | Unified endpoint | Status | Notes |
 |---|---|---|---|---|
 | Ping | XML `<Ping>Success!</Ping>`, no auth (:12) | GET /erms/ping | ✅ | Present |
-| Authenticate | Decodes/decrypts patientId+encounterId, can forward to Azure ERMS mirror (:13) | POST /erms/authenticate | ✅ | Endpoint present; Azure-forward behavior not yet diffed |
+| Authenticate | Decodes/decrypts patientId+encounterId, can forward to Azure ERMS mirror (:13) | POST /erms/authenticate | ❌ | GAP confirmed 2026-07-27: `grep -rn "Azure"` across entire `src/` finds zero Azure-forwarding logic anywhere (only unrelated hits in secret-provider files) — the `EnableAzureERMSAPI`/practice-suffix-"azure"-substring proxy-to-`AzureEMRSAPI` behavior (EndpointInventory.md:36) is entirely unported. Practices whose EncounterId suffix contains "azure" would be served locally instead of being transparently proxied. Not fixed — reporting only per audit scope. |
 | GetAccidents | (:14) | GET /erms/GetAccidents | ✅ | Present |
 | GetClassifications | (:15) | GET /erms/GetClassifications | ✅ | Present |
 | GetConsultNotes | Defaults min/max date window to last 24 months if not supplied — undocumented (BusinessRules.md BR-05) (:16) | GET /erms/GetConsultNotes | ✅ | Confirmed: `ErmsGetConsultNotesQueryHandler` (ErmsReadQueries.cs:213-225) explicitly defaults min=Now.AddMonths(-24)/max=Now when blank |
@@ -32,7 +32,7 @@ Sources used: `hek_analysis/docs/analysis/{hiso,erms,karo}/EndpointInventory.md`
 | GetDischargeSummaryReportList | (:18) | GET /erms/GetDischargeSummaryReportList | ✅ | Present |
 | GetDischargeSummaryDetails | (:19) | GET /erms/GetDischargeSummaryDetails | ✅ | Present |
 | GetLaboratoryReportList | (:20) | GET /erms/GetLaboratoryReportList | ✅ | Present |
-| GetLaboratoryReportDetails | Converts content via ConvertString2RTF (:21) | GET /erms/GetLaboratoryReportDetails | ✅ | Endpoint present; RTF conversion parity not diffed |
+| GetLaboratoryReportDetails | Converts content via ConvertString2RTF (:21) | GET /erms/GetLaboratoryReportDetails | ✅ | Field-diffed 2026-07-27: real `ErmsRtfConverter.cs` (Adapters.Erms) implements the RTF conversion, wired into `ErmsDataRepository.cs` — matches legacy's `ConvertString2RTF` behavior |
 | GetMedicalAllergies | (:22) | GET /erms/GetMedicalAllergies | ✅ | Present |
 | GetNextOfKin | Root tag documented as `<Next_Of_Kin>`, code uses `<NextOfKin>` (doc gap, not necessarily a unified gap) (:23) | GET /erms/GetNextOfKin | ✅ | Present |
 | GetPatientData | (:24) | GET /erms/GetPatientData | ✅ | Present |
@@ -87,7 +87,9 @@ Sources used: `hek_analysis/docs/analysis/{hiso,erms,karo}/EndpointInventory.md`
 | SaveInvoice | Financial write; not in ERMS_doc.md at all; serviceMappingId==-3 treated as "invoice already exists" idempotency signal (:48) | POST /erms/col/SaveInvoice | ✅ | Confirmed: `ColSaveInvoiceCommandHandler` (ColQueries.cs:234-239) treats `-3` as non-error (returns success, no "Invalid values passed!"), preserving legacy's duplicate sentinel on top of the platform's own natural-key idempotency check |
 
 ## Gaps found (summary)
-(none remaining — the 2 AWS-branch gaps below were closed 2026-07-25)
+- ❌ **ERMS `Authenticate`: Azure-forwarding proxy entirely unported.** Legacy transparently proxies to `AzureEMRSAPI` when `EnableAzureERMSAPI=="1"` AND the practice suffix parsed from EncounterId contains "azure" (undocumented, `Helpers/ERMSAPIProxy.cs`). No equivalent logic exists anywhere in the unified API's ERMS auth path. Impact: any practice relying on the Azure mirror would silently get served from the local/direct path instead. Not fixed — needs a decision (Zohaib) on whether to port the proxy or deliberately retire it, per the original doc's own recommendation.
+
+(all other gaps below were closed 2026-07-25/26)
 
 ### Closed gaps (history)
 - ~~ERMS `SaveDocument`: AWS-backed DMS branch not implemented~~ — Fixed: `ErmsWriteRepository.cs` now uses the real `IAwsDocumentService` (the same real `AWSDocCore.dll` already wired for HISO, contrary to the original assumption that it was non-portable) to branch `[HSS].[uspUpdateExistingDoc_AWS]` vs `[HSS].[uspUpdateExistingDoc]`.
@@ -160,7 +162,25 @@ production; it's a dead/unused code path in the real system too (same class of f
 already-known dormant DAL modules). The unified API's direct-DB-only implementation therefore already
 matches legacy's real, live behavior exactly - not a gap.
 
+## Field-level diff pass (2026-07-27)
+Resumed only the rows previously marked "present but not field-diffed": all 6 HISO rows
+(getVersion/getDeliveryOptions/getData/saveContainer/getFormView/processAction), ERMS
+`Authenticate` (Azure-forward), and ERMS `GetLaboratoryReportDetails` (RTF conversion).
+5 of 8 confirmed exact matches via source grep (no live call needed — code was unambiguous).
+1 new gap found: **ERMS Authenticate Azure-forwarding proxy is completely unported** (see Gaps
+found above) — this was previously mis-classified as "just needs diffing" when it's actually a
+missing feature.
+
+Also checked (at Zohaib's request) the Acc45 TVP-on-empty-XML concern from
+`hek_analysis/v1.1-plan-status.md` Step 4: **already resolved**, as a side effect of the
+2026-07-26 `BuildDiagnosisTable`/`BuildReferralTable` column fix — both now pre-seed their full
+fixed column set before scanning the XML, so when no matching `<group>` nodes are found they
+return a properly-shaped zero-row `DataTable` (a valid empty TVP), not a crash. Verified in
+`Acc45DetailRepository.cs:161-173`. No code change needed.
+
 ## Last updated
+2026-07-27 — field-level diff pass on all previously-unverified rows; found 1 new gap (ERMS Azure-forward, unported); confirmed Acc45 empty-XML TVP concern already resolved by an earlier fix. See "Field-level diff pass (2026-07-27)" section above.
+
 2026-07-26 — recheck: rebuilt + reran full test suite (23/23 pass, 0 warnings/errors), re-scanned entire
 `src/` for TODO/stub/deferred/not-implemented markers. Confirmed the two AWS-branch fixes from 2026-07-25
 are solid and nothing else regressed. Found and fixed one stale doc-comment (`KaroCompatController.cs`

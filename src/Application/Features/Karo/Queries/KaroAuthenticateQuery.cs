@@ -21,11 +21,13 @@ public sealed class KaroAuthenticateQueryHandler : IRequestHandler<KaroAuthentic
 {
     private readonly IKaroRequestParser _parser;
     private readonly IKaroAuthRepository _authRepository;
+    private readonly IKaroRoutingResolver _routingResolver;
 
-    public KaroAuthenticateQueryHandler(IKaroRequestParser parser, IKaroAuthRepository authRepository)
+    public KaroAuthenticateQueryHandler(IKaroRequestParser parser, IKaroAuthRepository authRepository, IKaroRoutingResolver routingResolver)
     {
         _parser = parser;
         _authRepository = authRepository;
+        _routingResolver = routingResolver;
     }
 
     public async Task<KaroAuthenticateResult> Handle(KaroAuthenticateQuery request, CancellationToken cancellationToken)
@@ -34,9 +36,10 @@ public sealed class KaroAuthenticateQueryHandler : IRequestHandler<KaroAuthentic
         {
             var (encounterId, practiceSuffix, _) = _parser.ParseEncounterId(request.EncounterId);
             var patientId = _parser.Decrypt(request.PatientId);
+            var routingContext = _routingResolver.Resolve(request.EncounterId ?? string.Empty);
 
             var dbResult = await _authRepository.InsertAndValidateTokenAsync(
-                practiceSuffix, request.Username, request.Password, patientId, encounterId, token: null, request.Pho, cancellationToken);
+                practiceSuffix, routingContext, request.Username, request.Password, patientId, encounterId, token: null, request.Pho, cancellationToken);
 
             if (dbResult is not null && string.IsNullOrWhiteSpace(dbResult.StatusMessage))
             {

@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using System.Xml;
 using HekCoreApi.Application.Common.Interfaces;
 using HekCoreApi.Application.Common.Models;
@@ -35,7 +35,7 @@ public sealed class CanonicalRadiologyRepository : ICanonicalRadiologyRepository
 
     public async Task<IReadOnlyList<RadiologyReportCanonical>> GetErmsAsync(RoutingContext routing, string? patientId, CancellationToken ct = default)
     {
-        var table = await _ermsRepository.GetRadsAsync(routing.PracticeId, patientId, sortOrder: null, DateTime.MinValue, DateTime.MinValue, ct);
+        var table = await _ermsRepository.GetRadsAsync(routing.PracticeId, routing, patientId, sortOrder: null, DateTime.MinValue, DateTime.MinValue, ct);
         var results = new List<RadiologyReportCanonical>();
 
         foreach (DataRow row in table.Rows)

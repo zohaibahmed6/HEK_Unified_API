@@ -1,4 +1,5 @@
 using System.Data;
+using HekCoreApi.Application.Common.Models;
 
 namespace HekCoreApi.Application.Common.Interfaces;
 
@@ -10,5 +11,5 @@ namespace HekCoreApi.Application.Common.Interfaces;
 /// </summary>
 public interface IErmsDemographicsRepository
 {
-    Task<DataTable> GetDemographicsAsync(string practiceSuffix, string? patientId, CancellationToken ct = default);
+    Task<DataTable> GetDemographicsAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, CancellationToken ct = default);
 }

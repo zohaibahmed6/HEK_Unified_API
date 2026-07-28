@@ -1,4 +1,5 @@
-using HekCoreApi.Application.Common.Interfaces;
+﻿using HekCoreApi.Application.Common.Interfaces;
+using HekCoreApi.Application.Common.Models;
 using MediatR;
 
 namespace HekCoreApi.Application.Features.Karo.Queries;
@@ -25,29 +26,35 @@ internal sealed class KaroPipeline
 {
     private readonly IKaroRequestParser _parser;
     private readonly IKaroTokenValidator _tokenValidator;
+    private readonly IKaroRoutingResolver _routingResolver;
 
-    public KaroPipeline(IKaroRequestParser parser, IKaroTokenValidator tokenValidator)
+    public KaroPipeline(IKaroRequestParser parser, IKaroTokenValidator tokenValidator, IKaroRoutingResolver routingResolver)
     {
         _parser = parser;
         _tokenValidator = tokenValidator;
+        _routingResolver = routingResolver;
     }
 
     public async Task<KaroListResult<T>> RunAsync<T>(
         string? pho, string? patientId, string? encounterId, string? bearerToken,
-        Func<string, string?, CancellationToken, Task<List<T>>> repositoryCall, CancellationToken ct)
+        Func<string, RoutingContext, string?, CancellationToken, Task<List<T>>> repositoryCall, CancellationToken ct)
     {
         try
         {
             var (parsedEncounterId, practiceSuffix, _) = _parser.ParseEncounterId(encounterId);
             var decryptedPatientId = _parser.Decrypt(patientId);
 
-            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, decryptedPatientId, parsedEncounterId, bearerToken, pho, ct);
+            // Tenant-registry routing context (ADR-001), built independently of the legacy
+            // practiceSuffix quirks preserved above (those still feed the DMS resolver only).
+            var routingContext = _routingResolver.Resolve(encounterId ?? string.Empty);
+
+            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, routingContext, decryptedPatientId, parsedEncounterId, bearerToken, pho, ct);
             if (!validation.Valid)
             {
                 return new KaroListResult<T>(false, null, null, "Invalid token value!");
             }
 
-            var entries = await repositoryCall(practiceSuffix, decryptedPatientId, ct);
+            var entries = await repositoryCall(practiceSuffix, routingContext, decryptedPatientId, ct);
             return new KaroListResult<T>(true, decryptedPatientId, entries, null);
         }
         catch (Exception ex)
@@ -61,31 +68,32 @@ public sealed class KaroClinicalNotesQueryHandler : IRequestHandler<KaroClinical
 {
     private readonly KaroPipeline _pipeline;
     private readonly IKaroDataRepository _repository;
-    public KaroClinicalNotesQueryHandler(IKaroRequestParser parser, IKaroTokenValidator validator, IKaroDataRepository repository)
-    { _pipeline = new KaroPipeline(parser, validator); _repository = repository; }
+    public KaroClinicalNotesQueryHandler(IKaroRequestParser parser, IKaroTokenValidator validator, IKaroRoutingResolver routingResolver, IKaroDataRepository repository)
+    { _pipeline = new KaroPipeline(parser, validator, routingResolver); _repository = repository; }
     public Task<KaroListResult<KaroConsultNote>> Handle(KaroClinicalNotesQuery request, CancellationToken ct) =>
         _pipeline.RunAsync(request.Pho, request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, c) => _repository.GetConsultNotesAsync(suffix, patientId, c), ct);
+            (suffix, routingContext, patientId, c) => _repository.GetConsultNotesAsync(suffix, routingContext, patientId, c), ct);
 }
 
 public sealed class KaroConditionsQueryHandler : IRequestHandler<KaroConditionsQuery, KaroListResult<KaroDiagnosis>>
 {
     private readonly KaroPipeline _pipeline;
     private readonly IKaroDataRepository _repository;
-    public KaroConditionsQueryHandler(IKaroRequestParser parser, IKaroTokenValidator validator, IKaroDataRepository repository)
-    { _pipeline = new KaroPipeline(parser, validator); _repository = repository; }
+    public KaroConditionsQueryHandler(IKaroRequestParser parser, IKaroTokenValidator validator, IKaroRoutingResolver routingResolver, IKaroDataRepository repository)
+    { _pipeline = new KaroPipeline(parser, validator, routingResolver); _repository = repository; }
     public Task<KaroListResult<KaroDiagnosis>> Handle(KaroConditionsQuery request, CancellationToken ct) =>
         _pipeline.RunAsync(request.Pho, request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, c) => _repository.GetConditionsAsync(suffix, patientId, c), ct);
+            (suffix, routingContext, patientId, c) => _repository.GetConditionsAsync(suffix, routingContext, patientId, c), ct);
 }
 
 public sealed class KaroDocumentsQueryHandler : IRequestHandler<KaroDocumentsQuery, KaroListResult<KaroDocumentInfo>>
 {
     private readonly IKaroRequestParser _parser;
     private readonly IKaroTokenValidator _tokenValidator;
+    private readonly IKaroRoutingResolver _routingResolver;
     private readonly IKaroDataRepository _repository;
-    public KaroDocumentsQueryHandler(IKaroRequestParser parser, IKaroTokenValidator tokenValidator, IKaroDataRepository repository)
-    { _parser = parser; _tokenValidator = tokenValidator; _repository = repository; }
+    public KaroDocumentsQueryHandler(IKaroRequestParser parser, IKaroTokenValidator tokenValidator, IKaroRoutingResolver routingResolver, IKaroDataRepository repository)
+    { _parser = parser; _tokenValidator = tokenValidator; _routingResolver = routingResolver; _repository = repository; }
 
     public async Task<KaroListResult<KaroDocumentInfo>> Handle(KaroDocumentsQuery request, CancellationToken ct)
     {
@@ -93,14 +101,15 @@ public sealed class KaroDocumentsQueryHandler : IRequestHandler<KaroDocumentsQue
         {
             var (encounterId, practiceSuffix, practiceSuffixNumeric) = _parser.ParseEncounterId(request.EncounterId);
             var patientId = _parser.Decrypt(request.PatientId);
+            var routingContext = _routingResolver.Resolve(request.EncounterId ?? string.Empty);
 
-            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, patientId, encounterId, request.BearerToken, request.Pho, ct);
+            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, routingContext, patientId, encounterId, request.BearerToken, request.Pho, ct);
             if (!validation.Valid)
             {
                 return new KaroListResult<KaroDocumentInfo>(false, null, null, "Invalid token value!");
             }
 
-            var entries = await _repository.GetDocumentsAsync(practiceSuffix, practiceSuffixNumeric, patientId, request.Identifier, ct);
+            var entries = await _repository.GetDocumentsAsync(practiceSuffix, practiceSuffixNumeric, routingContext, patientId, request.Identifier, ct);
             return new KaroListResult<KaroDocumentInfo>(true, patientId, entries, null);
         }
         catch (Exception ex)
@@ -114,33 +123,33 @@ public sealed class KaroLabResultsQueryHandler : IRequestHandler<KaroLabResultsQ
 {
     private readonly KaroPipeline _pipeline;
     private readonly IKaroDataRepository _repository;
-    public KaroLabResultsQueryHandler(IKaroRequestParser parser, IKaroTokenValidator validator, IKaroDataRepository repository)
-    { _pipeline = new KaroPipeline(parser, validator); _repository = repository; }
+    public KaroLabResultsQueryHandler(IKaroRequestParser parser, IKaroTokenValidator validator, IKaroRoutingResolver routingResolver, IKaroDataRepository repository)
+    { _pipeline = new KaroPipeline(parser, validator, routingResolver); _repository = repository; }
     public Task<KaroListResult<KaroLabResult>> Handle(KaroLabResultsQuery request, CancellationToken ct) =>
         _pipeline.RunAsync(request.Pho, request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, c) => _repository.GetLabResultsAsync(suffix, patientId, c), ct);
+            (suffix, routingContext, patientId, c) => _repository.GetLabResultsAsync(suffix, routingContext, patientId, c), ct);
 }
 
 public sealed class KaroMedicationsQueryHandler : IRequestHandler<KaroMedicationsQuery, KaroListResult<KaroMedication>>
 {
     private readonly KaroPipeline _pipeline;
     private readonly IKaroDataRepository _repository;
-    public KaroMedicationsQueryHandler(IKaroRequestParser parser, IKaroTokenValidator validator, IKaroDataRepository repository)
-    { _pipeline = new KaroPipeline(parser, validator); _repository = repository; }
+    public KaroMedicationsQueryHandler(IKaroRequestParser parser, IKaroTokenValidator validator, IKaroRoutingResolver routingResolver, IKaroDataRepository repository)
+    { _pipeline = new KaroPipeline(parser, validator, routingResolver); _repository = repository; }
     public Task<KaroListResult<KaroMedication>> Handle(KaroMedicationsQuery request, CancellationToken ct) =>
         _pipeline.RunAsync(request.Pho, request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, c) => _repository.GetMedicationsAsync(suffix, patientId, c), ct);
+            (suffix, routingContext, patientId, c) => _repository.GetMedicationsAsync(suffix, routingContext, patientId, c), ct);
 }
 
 public sealed class KaroObservationsQueryHandler : IRequestHandler<KaroObservationsQuery, KaroListResult<KaroObservation>>
 {
     private readonly KaroPipeline _pipeline;
     private readonly IKaroDataRepository _repository;
-    public KaroObservationsQueryHandler(IKaroRequestParser parser, IKaroTokenValidator validator, IKaroDataRepository repository)
-    { _pipeline = new KaroPipeline(parser, validator); _repository = repository; }
+    public KaroObservationsQueryHandler(IKaroRequestParser parser, IKaroTokenValidator validator, IKaroRoutingResolver routingResolver, IKaroDataRepository repository)
+    { _pipeline = new KaroPipeline(parser, validator, routingResolver); _repository = repository; }
     public Task<KaroListResult<KaroObservation>> Handle(KaroObservationsQuery request, CancellationToken ct) =>
         _pipeline.RunAsync(request.Pho, request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, c) => _repository.GetObservationsAsync(suffix, patientId, request.ConceptId, c), ct);
+            (suffix, routingContext, patientId, c) => _repository.GetObservationsAsync(suffix, routingContext, patientId, request.ConceptId, c), ct);
 }
 
 /// <summary>Legacy: only the first `Provider` row is ever returned (`ListProvider[0]`), not the full list.</summary>
@@ -149,13 +158,13 @@ public sealed class KaroProviderQueryHandler : IRequestHandler<KaroProviderQuery
     private readonly IKaroRequestParser _parser;
     private readonly KaroPipeline _pipeline;
     private readonly IKaroDataRepository _repository;
-    public KaroProviderQueryHandler(IKaroRequestParser parser, IKaroTokenValidator validator, IKaroDataRepository repository)
-    { _parser = parser; _pipeline = new KaroPipeline(parser, validator); _repository = repository; }
+    public KaroProviderQueryHandler(IKaroRequestParser parser, IKaroTokenValidator validator, IKaroRoutingResolver routingResolver, IKaroDataRepository repository)
+    { _parser = parser; _pipeline = new KaroPipeline(parser, validator, routingResolver); _repository = repository; }
     public async Task<KaroListResult<KaroProvider>> Handle(KaroProviderQuery request, CancellationToken ct)
     {
         var userId = _parser.Decrypt(request.UserId);
         var result = await _pipeline.RunAsync(request.Pho, request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, c) => _repository.GetProviderAsync(suffix, patientId, userId, c), ct);
+            (suffix, routingContext, patientId, c) => _repository.GetProviderAsync(suffix, routingContext, patientId, userId, c), ct);
 
         return result.Entries is { Count: > 0 } ? result with { Entries = [result.Entries[0]] } : result;
     }
@@ -165,11 +174,11 @@ public sealed class KaroRecallCategoriesQueryHandler : IRequestHandler<KaroRecal
 {
     private readonly KaroPipeline _pipeline;
     private readonly IKaroDataRepository _repository;
-    public KaroRecallCategoriesQueryHandler(IKaroRequestParser parser, IKaroTokenValidator validator, IKaroDataRepository repository)
-    { _pipeline = new KaroPipeline(parser, validator); _repository = repository; }
+    public KaroRecallCategoriesQueryHandler(IKaroRequestParser parser, IKaroTokenValidator validator, IKaroRoutingResolver routingResolver, IKaroDataRepository repository)
+    { _pipeline = new KaroPipeline(parser, validator, routingResolver); _repository = repository; }
     public Task<KaroListResult<KaroRecallCategory>> Handle(KaroRecallCategoriesQuery request, CancellationToken ct) =>
         _pipeline.RunAsync(request.Pho, request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, c) => _repository.GetRecallCategoriesAsync(suffix, request.Group, c), ct);
+            (suffix, routingContext, patientId, c) => _repository.GetRecallCategoriesAsync(suffix, routingContext, request.Group, c), ct);
 }
 
 public sealed record KaroRecallsQuery(string? System, string? Pho, string? PatientId, string? EncounterId, string? BearerToken) : IRequest<KaroListResult<KaroRecall>>;
@@ -178,11 +187,11 @@ public sealed class KaroRecallsQueryHandler : IRequestHandler<KaroRecallsQuery, 
 {
     private readonly KaroPipeline _pipeline;
     private readonly IKaroDataRepository _repository;
-    public KaroRecallsQueryHandler(IKaroRequestParser parser, IKaroTokenValidator validator, IKaroDataRepository repository)
-    { _pipeline = new KaroPipeline(parser, validator); _repository = repository; }
+    public KaroRecallsQueryHandler(IKaroRequestParser parser, IKaroTokenValidator validator, IKaroRoutingResolver routingResolver, IKaroDataRepository repository)
+    { _pipeline = new KaroPipeline(parser, validator, routingResolver); _repository = repository; }
     public Task<KaroListResult<KaroRecall>> Handle(KaroRecallsQuery request, CancellationToken ct) =>
         _pipeline.RunAsync(request.Pho, request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, c) => _repository.GetRecallsAsync(suffix, patientId, c), ct);
+            (suffix, routingContext, patientId, c) => _repository.GetRecallsAsync(suffix, routingContext, patientId, c), ct);
 }
 
 /// <summary>Legacy: real `@pPracticeId` is always the literal "6", not derived from the request.</summary>
@@ -192,11 +201,11 @@ public sealed class KaroScreeningCodesQueryHandler : IRequestHandler<KaroScreeni
 {
     private readonly KaroPipeline _pipeline;
     private readonly IKaroDataRepository _repository;
-    public KaroScreeningCodesQueryHandler(IKaroRequestParser parser, IKaroTokenValidator validator, IKaroDataRepository repository)
-    { _pipeline = new KaroPipeline(parser, validator); _repository = repository; }
+    public KaroScreeningCodesQueryHandler(IKaroRequestParser parser, IKaroTokenValidator validator, IKaroRoutingResolver routingResolver, IKaroDataRepository repository)
+    { _pipeline = new KaroPipeline(parser, validator, routingResolver); _repository = repository; }
     public Task<KaroListResult<KaroScreeningCode>> Handle(KaroScreeningCodesQuery request, CancellationToken ct) =>
         _pipeline.RunAsync(request.Pho, request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, c) => _repository.GetScreeningCodesAsync(suffix, c), ct);
+            (suffix, routingContext, patientId, c) => _repository.GetScreeningCodesAsync(suffix, routingContext, c), ct);
 }
 
 /// <summary>
@@ -209,9 +218,10 @@ public sealed class KaroPatientAttachmentQueryHandler : IRequestHandler<KaroPati
 {
     private readonly IKaroRequestParser _parser;
     private readonly IKaroTokenValidator _tokenValidator;
+    private readonly IKaroRoutingResolver _routingResolver;
     private readonly IKaroDataRepository _repository;
-    public KaroPatientAttachmentQueryHandler(IKaroRequestParser parser, IKaroTokenValidator tokenValidator, IKaroDataRepository repository)
-    { _parser = parser; _tokenValidator = tokenValidator; _repository = repository; }
+    public KaroPatientAttachmentQueryHandler(IKaroRequestParser parser, IKaroTokenValidator tokenValidator, IKaroRoutingResolver routingResolver, IKaroDataRepository repository)
+    { _parser = parser; _tokenValidator = tokenValidator; _routingResolver = routingResolver; _repository = repository; }
 
     public async Task<KaroListResult<KaroPatientAttachment>> Handle(KaroPatientAttachmentQuery request, CancellationToken ct)
     {
@@ -219,14 +229,15 @@ public sealed class KaroPatientAttachmentQueryHandler : IRequestHandler<KaroPati
         {
             var (encounterId, practiceSuffix, practiceSuffixNumeric) = _parser.ParseEncounterId(request.EncounterId);
             var patientId = _parser.Decrypt(request.PatientId);
+            var routingContext = _routingResolver.Resolve(request.EncounterId ?? string.Empty);
 
-            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, patientId, encounterId, request.BearerToken, request.Pho, ct);
+            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, routingContext, patientId, encounterId, request.BearerToken, request.Pho, ct);
             if (!validation.Valid)
             {
                 return new KaroListResult<KaroPatientAttachment>(false, null, null, "Invalid token value!");
             }
 
-            var entries = await _repository.GetPatientAttachmentAsync(practiceSuffix, practiceSuffixNumeric, patientId, request.ReferenceId, request.SortOrder, request.Subject, request.DateFrom, request.DateTo, ct);
+            var entries = await _repository.GetPatientAttachmentAsync(practiceSuffix, practiceSuffixNumeric, routingContext, patientId, request.ReferenceId, request.SortOrder, request.Subject, request.DateFrom, request.DateTo, ct);
             return new KaroListResult<KaroPatientAttachment>(true, patientId, entries, null);
         }
         catch (Exception ex)
@@ -250,19 +261,22 @@ public sealed class KaroEncounterSummaryQueryHandler : IRequestHandler<KaroEncou
 {
     private readonly IKaroRequestParser _parser;
     private readonly IKaroTokenValidator _tokenValidator;
+    private readonly IKaroRoutingResolver _routingResolver;
 
-    public KaroEncounterSummaryQueryHandler(IKaroRequestParser parser, IKaroTokenValidator tokenValidator)
+    public KaroEncounterSummaryQueryHandler(IKaroRequestParser parser, IKaroTokenValidator tokenValidator, IKaroRoutingResolver routingResolver)
     {
         _parser = parser;
         _tokenValidator = tokenValidator;
+        _routingResolver = routingResolver;
     }
 
     public async Task<KaroRawJsonResult> Handle(KaroEncounterSummaryQuery request, CancellationToken ct)
     {
         var (encounterId, practiceSuffix, _) = _parser.ParseEncounterId(request.EncounterId);
         var patientId = _parser.Decrypt(request.PatientId);
+        var routingContext = _routingResolver.Resolve(request.EncounterId ?? string.Empty);
 
-        var validation = await _tokenValidator.ValidateAsync(practiceSuffix, patientId, encounterId, request.BearerToken, request.Pho, ct);
+        var validation = await _tokenValidator.ValidateAsync(practiceSuffix, routingContext, patientId, encounterId, request.BearerToken, request.Pho, ct);
         if (!validation.Valid)
         {
             return new KaroRawJsonResult(false, "{\"status\":\"fail\",\"message\":\"Invalid token value!\"}");

@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using System.Xml;
 using HekCoreApi.Application.Common.Interfaces;
 using HekCoreApi.Application.Common.Models;
@@ -42,7 +42,7 @@ public sealed class CanonicalMedicationsRepository : ICanonicalMedicationsReposi
 
     public async Task<IReadOnlyList<MedicationCanonical>> GetKaroAsync(RoutingContext routing, string? patientId, CancellationToken ct = default)
     {
-        var medications = await _karoRepository.GetMedicationsAsync(routing.PracticeId, patientId, ct);
+        var medications = await _karoRepository.GetMedicationsAsync(routing.PracticeId, routing, patientId, ct);
         return medications.Select(m => new MedicationCanonical(
             m.Sctid,
             m.MedicineName ?? string.Empty,
@@ -59,7 +59,7 @@ public sealed class CanonicalMedicationsRepository : ICanonicalMedicationsReposi
 
         foreach (var isLongTerm in new[] { false, true })
         {
-            var table = await _ermsRepository.GetMedicationsAsync(routing.PracticeId, patientId, sortOrder: null, DateTime.MinValue, DateTime.MinValue, isLongTerm, ct);
+            var table = await _ermsRepository.GetMedicationsAsync(routing.PracticeId, routing, patientId, sortOrder: null, DateTime.MinValue, DateTime.MinValue, isLongTerm, ct);
             foreach (DataRow row in table.Rows)
             {
                 results.Add(new MedicationCanonical(

@@ -308,6 +308,9 @@ nav { display: flex; flex-direction: column; gap: 4px; }
   gap: 14px;
 }
 
+.dash-record-full { margin-bottom: 14px; }
+.dash-record-full .ep-card { width: 100%; }
+
 .ep-card {
   background: var(--card);
   border: 1px solid var(--line);
@@ -445,7 +448,7 @@ nav { display: flex; flex-direction: column; gap: 4px; }
 .hiso-field-list { display: flex; flex-direction: column; gap: 0; margin: 0; }
 .hiso-field-row {
   display: grid;
-  grid-template-columns: 160px 1fr;
+  grid-template-columns: 160px minmax(0, 1fr);
   gap: 10px;
   padding: 5px 0;
   border-bottom: 1px solid var(--line);
@@ -453,7 +456,7 @@ nav { display: flex; flex-direction: column; gap: 4px; }
 }
 .hiso-field-row:last-child { border-bottom: none; }
 .hiso-field-row dt { color: var(--sub); font-weight: 600; }
-.hiso-field-row dd { margin: 0; word-break: break-word; }
+.hiso-field-row dd { margin: 0; overflow-wrap: break-word; min-width: 0; }
 .hiso-empty-val { color: var(--sub); opacity: 0.6; }
 .hiso-empty { font-size: 13px; color: var(--sub); padding: 6px 0; }
 
@@ -476,3 +479,99 @@ nav { display: flex; flex-direction: column; gap: 4px; }
   padding: 8px;
   border-radius: 6px;
 }
+
+.hiso-record { display: flex; gap: 16px; align-items: flex-start; }
+.hiso-record-tabs {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 190px;
+  gap: 2px;
+  border-right: 1px solid var(--line);
+  padding-right: 12px;
+}
+.hiso-tab-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  cursor: pointer;
+}
+.hiso-tab-btn:hover { background: var(--bg); }
+.hiso-tab-btn.is-active { background: var(--accent); color: #fff; font-weight: 600; }
+.hiso-tab-btn-label { font-weight: 600; }
+.hiso-tab-btn-summary { font-size: 11px; color: var(--sub); font-weight: 400; }
+.hiso-tab-btn.is-active .hiso-tab-btn-summary { color: rgba(255, 255, 255, 0.85); }
+.hiso-record-panel { flex: 1 1 0%; min-width: 0; }
+.hiso-tab-section { margin-bottom: 14px; }
+.hiso-tab-section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--sub); margin-bottom: 6px; }
+
+.hiso-patient-form { display: flex; flex-direction: column; gap: 14px; }
+.hiso-form-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.hiso-form-title { font-size: 16px; font-weight: 700; margin-right: auto; }
+.hiso-advanced { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+.hiso-advanced > summary { cursor: pointer; font-size: 13px; color: var(--sub); }
+.hiso-advanced[open] > summary { margin-bottom: 10px; }
+
+.hiso-doc-list { display: flex; flex-direction: column; gap: 0; }
+.hiso-doc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.hiso-doc-row:last-child { border-bottom: none; }
+.hiso-doc-name { font-weight: 600; }
+.hiso-doc-meta { color: var(--sub); font-size: 12px; }
+.hiso-doc-download {
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.hiso-doc-download:hover { background: var(--accent); color: #fff; }
+.hiso-doc-download:disabled { opacity: 0.6; cursor: not-allowed; }
+.hiso-doc-download-na { color: var(--sub); opacity: 0.5; font-size: 12px; }
+.hiso-doc-error { width: 100%; color: #dc3545; font-size: 12px; }
+
+@media (max-width: 640px) {
+  .hiso-record { flex-direction: column; }
+  .hiso-record-tabs { flex-direction: row; flex-wrap: wrap; border-right: none; border-bottom: 1px solid var(--line); padding-right: 0; padding-bottom: 8px; width: 100%; }
+}
+
+.hiso-unified-card { display: flex; flex-direction: column; gap: 10px; }
+.hiso-unified-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.hiso-unified-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  cursor: pointer;
+}
+.hiso-unified-tab:hover { background: var(--bg); }
+.hiso-unified-tab.is-active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.hiso-unified-tab.is-active .ep-status { color: #fff; }

@@ -1,0 +1,276 @@
+<title>KARO/HSS Authenticate — Simple Flow</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default' });
+</script>
+<style>
+  :root {
+    --ink: #161a1d;
+    --paper: #f3f1ea;
+    --panel: #ffffff;
+    --line: #dcd7c9;
+    --muted: #64655c;
+    --accent: #2f6f6d;
+    --accent-strong: #1c4b49;
+    --accent-soft: #dfeae8;
+    --amber: #a8621a;
+    --amber-soft: #f4e6d4;
+    --code-bg: #eee9db;
+    --shadow: 0 1px 2px rgba(22,26,29,0.06), 0 8px 24px rgba(22,26,29,0.05);
+  }
+  :root[data-theme="dark"] {
+    --ink: #eceae3;
+    --paper: #14171a;
+    --panel: #1b1f22;
+    --line: #2c3033;
+    --muted: #9a9c93;
+    --accent: #63b8b3;
+    --accent-strong: #8fd0cb;
+    --accent-soft: #1f3634;
+    --amber: #e2984f;
+    --amber-soft: #3a2c1a;
+    --code-bg: #23272a;
+    --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.35);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #eceae3; --paper: #14171a; --panel: #1b1f22; --line: #2c3033; --muted: #9a9c93;
+      --accent: #63b8b3; --accent-strong: #8fd0cb; --accent-soft: #1f3634; --amber: #e2984f;
+      --amber-soft: #3a2c1a; --code-bg: #23272a; --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.35);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { background: var(--paper); color: var(--ink); margin: 0; font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+  body { padding: 48px 24px 96px; }
+  .wrap { max-width: 980px; margin: 0 auto; }
+
+  .eyebrow {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12.5px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--accent-strong); margin: 0 0 10px;
+  }
+  h1 {
+    font-family: ui-serif, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    font-weight: 600; font-size: clamp(28px, 4vw, 38px); line-height: 1.12;
+    letter-spacing: -0.01em; margin: 0 0 12px; text-wrap: balance;
+  }
+  .dek { font-size: 16px; line-height: 1.55; color: var(--muted); max-width: 62ch; margin: 0 0 36px; }
+  .dek code, p code, li code, td code {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 0.92em; background: var(--code-bg); padding: 0.08em 0.4em; border-radius: 4px;
+  }
+
+  section { margin-bottom: 44px; }
+  h2 {
+    font-family: ui-serif, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    font-size: 20px; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.005em;
+  }
+  .section-note { font-size: 13.5px; color: var(--muted); margin: 0 0 18px; }
+
+  .analogy {
+    background: var(--accent-soft);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px 20px;
+    font-size: 15px;
+    line-height: 1.6;
+    margin-bottom: 20px;
+  }
+  .analogy b { color: var(--accent-strong); }
+
+  .diagram-frame { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 20px 18px; }
+  .zoom-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .zoom-bar button {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 15px; line-height: 1; width: 34px; height: 34px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--paper); color: var(--ink); cursor: pointer;
+  }
+  .zoom-bar button:hover { border-color: var(--accent); color: var(--accent-strong); }
+  .zoom-bar button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .zoom-bar .pct {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 13px; font-variant-numeric: tabular-nums; color: var(--muted); min-width: 46px; text-align: center;
+  }
+  .zoom-bar .hint { font-size: 12.5px; color: var(--muted); margin-left: auto; }
+  .diagram-scroll { overflow: auto; max-height: 78vh; padding-bottom: 4px; border-radius: 6px; }
+  .diagram-scroll .mermaid { min-width: 1100px; }
+  .diagram-scroll svg { display: block; }
+  .diagram-scroll .mermaid text, .diagram-scroll svg text { font-size: 17px !important; }
+  .diagram-scroll .mermaid .messageText, .diagram-scroll svg .messageText { font-size: 17px !important; }
+  .diagram-scroll .mermaid .labelText, .diagram-scroll .mermaid .loopText,
+  .diagram-scroll svg .labelText, .diagram-scroll svg .loopText { font-size: 16px !important; }
+
+  .legend-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+  .legend-card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; box-shadow: var(--shadow); }
+  .legend-card .tag {
+    display: inline-block; font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 11.5px; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px;
+    border-radius: 999px; background: var(--amber-soft); color: var(--amber); margin-bottom: 10px;
+  }
+  .legend-card h3 { font-size: 15.5px; margin: 0 0 8px; font-weight: 650; }
+  .legend-card p { font-size: 13.8px; line-height: 1.55; color: var(--muted); margin: 0 0 8px; }
+  .legend-card p:last-child { margin-bottom: 0; }
+
+  table.steps { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  table.steps th, table.steps td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.steps th {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600;
+  }
+  table.steps td.n { font-variant-numeric: tabular-nums; color: var(--accent-strong); font-weight: 700; width: 28px; }
+  table.steps td.src code { font-size: 11.6px; white-space: nowrap; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: var(--shadow); }
+  .table-wrap table.steps { border: none; box-shadow: none; }
+  .table-wrap td, .table-wrap th { border-color: var(--line); }
+
+  footer { margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+</style>
+
+<div class="wrap">
+  <p class="eyebrow">HEK Core API — asaan zabaan mein flow</p>
+  <h1>KARO/HSS <code>Authenticate</code>: username/password check karke ticket dena</h1>
+  <p class="dek">
+    Yeh diagram ek 10 saal ke bachay ke liye bhi samajh mein aaye, is tarah banaya gaya hai — koi code,
+    koi tabri lafz nahi, sirf real steps jo asal mein code mein hote hain, lekin aasan lafzon mein.
+  </p>
+
+  <section>
+    <div class="analogy">
+      <b>Socho ek school hai.</b> Tum gate pe apna ID card aur password dikhate ho. Guard tumhara card
+      leke ek bade office (jahan sab schools ka record rakha hai) mein check karta hai ke "yeh bacha
+      kis school ka hai, aur uska school kis building mein hai". Phir woh building ke apne register mein
+      check karta hai ke tumhara password sahi hai ya nahi. Agar sahi hai, tumhe ek "entry pass" (token)
+      mil jata hai jo thodi der ke liye valid hota hai.
+    </div>
+  </section>
+
+  <section>
+    <h2>Flow (asaan steps)</h2>
+    <p class="section-note">Zoom buttons use karo agar text chhota lage.</p>
+    <div class="diagram-frame">
+      <div class="zoom-bar">
+        <button type="button" id="zoomOut" aria-label="Zoom out">−</button>
+        <span class="pct" id="zoomPct">150%</span>
+        <button type="button" id="zoomIn" aria-label="Zoom in">+</button>
+        <button type="button" id="zoomReset" aria-label="Reset zoom" style="width:auto;padding:0 12px;">Reset</button>
+        <span class="hint">Scrollbar drag karo ya hover karke scroll karo</span>
+      </div>
+      <div class="diagram-scroll" id="diagramScroll">
+        <pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor App as Clinic App
+    participant Door as Front Door
+    participant Brain as Login Checker
+    participant Book as Address Book
+    participant Clinic as Clinic Computer
+
+    App->>Door: Yeh mera username, password,<br/>patient number aur visit number hai
+    Door->>Brain: is jaankari ko samajh kar<br/>aage bhejo
+
+    Brain->>Brain: visit number ke andar<br/>chhupa hua clinic number nikalo
+    Note over Brain: jaise ek parcel ke<br/>upar likha address number
+
+    Brain->>Book: yeh clinic number hai,<br/>iska computer kahan hai
+    Note over Book: bada register jisme<br/>har clinic ka apna page hai
+    Book-->>Brain: yeh raha us clinic ka<br/>computer ka address
+
+    Brain->>Clinic: is username/password ko<br/>apne register mein check karo
+    Clinic-->>Brain: sahi hai ya ghalat, batao
+
+    alt password ghalat
+        Brain-->>Door: nahi, yeh sahi nahi hai
+        Door-->>App: Maazrat, login fail ho gaya
+    else password sahi
+        Brain-->>Door: haan, yeh raha entry pass
+        Door-->>App: Yeh lo tumhara pass,<br/>ye kuch der valid rahega
+    end
+        </pre>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Do zaroori baatein</h2>
+    <div class="legend-grid">
+      <div class="legend-card">
+        <span class="tag">Nayi cheez</span>
+        <h3>Address Book (Tenant Registry) se pata chalta hai konsa computer</h3>
+        <p>Pehle system har clinic ka computer-address seedha apni settings file mein likha rakhta tha
+        — matlab har naye clinic ke liye file mein tabdeeli karni parti thi. Ab ek "Address Book" (Tenant
+        Registry) hai jahan sab clinics ka record hai — nayi clinic add karne ke liye sirf ek naya
+        register-entry chahiye, koi file change nahi.</p>
+      </div>
+      <div class="legend-card">
+        <span class="tag">Zaroori farq</span>
+        <h3>Ek hi clinic number, do alag jagah ho sakta hai</h3>
+        <p>Kabhi kabhi ek hi clinic number (jaise 901) do alag computers pe hota hai — jaise ek "test"
+        wala aur ek "asal" wala. Address Book mein clinic number ke sath ek chhota sa extra code bhi
+        dekha jata hai (jaisa visit number ke andar chhupa hota hai), taake sahi computer hi milay,
+        confuse na ho.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Technical index (agar code dekhna ho)</h2>
+    <p class="section-note">Har simple step asal code mein kahan hai — is table se seedha file tak pohonch sakte hain.</p>
+    <div class="table-wrap">
+      <table class="steps">
+        <thead><tr><th>#</th><th>Simple step</th><th>Real source</th></tr></thead>
+        <tbody>
+          <tr><td class="n">1</td><td>Front Door (request receive)</td><td class="src"><code>KaroCompatController.cs</code> — <code>AuthenticateGet</code>/<code>AuthenticatePost</code></td></tr>
+          <tr><td class="n">2</td><td>Login Checker (orchestration)</td><td class="src"><code>KaroAuthenticateQuery.cs</code> — <code>KaroAuthenticateQueryHandler</code></td></tr>
+          <tr><td class="n">3</td><td>Visit-number split (clinic number nikalna)</td><td class="src"><code>KaroRequestParser.cs</code> — <code>ParseEncounterId</code></td></tr>
+          <tr><td class="n">4</td><td>Address Book lookup</td><td class="src"><code>KaroRoutingResolver.cs</code>, <code>KaroPracticeConnectionResolver.cs</code>, <code>TenantRegistryService.cs</code></td></tr>
+          <tr><td class="n">5</td><td>Clinic Computer check</td><td class="src"><code>KaroAuthRepository.cs</code> — stored procedure <code>uspInsertAndValidateToken</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    Yeh HEK Core API ke asal, verified source se banaya gaya hai — koi step guess nahi kiya gaya.
+    Agli diagrams (HISO, ERMS, COL) isi asaan style mein banengi.
+  </footer>
+</div>
+
+<script>
+  (function () {
+    var scrollBox = document.getElementById('diagramScroll');
+    var zoomInBtn = document.getElementById('zoomIn');
+    var zoomOutBtn = document.getElementById('zoomOut');
+    var zoomResetBtn = document.getElementById('zoomReset');
+    var pctLabel = document.getElementById('zoomPct');
+
+    var BASE_WIDTH = 1100;
+    var scale = 1.5;
+    var svgEl = null;
+
+    function apply() {
+      if (!svgEl) return;
+      svgEl.style.width = (BASE_WIDTH * scale) + 'px';
+      svgEl.style.height = 'auto';
+      svgEl.style.maxWidth = 'none';
+      pctLabel.textContent = Math.round(scale * 100) + '%';
+    }
+
+    function findSvgAndInit() {
+      var svg = scrollBox.querySelector('svg');
+      if (!svg || svg === svgEl) return;
+      svgEl = svg;
+      apply();
+    }
+
+    var observer = new MutationObserver(findSvgAndInit);
+    observer.observe(scrollBox, { childList: true, subtree: true });
+    findSvgAndInit();
+    setTimeout(findSvgAndInit, 300);
+    setTimeout(findSvgAndInit, 1000);
+
+    zoomInBtn.addEventListener('click', function () { scale = Math.min(scale + 0.25, 4); apply(); });
+    zoomOutBtn.addEventListener('click', function () { scale = Math.max(scale - 0.25, 0.5); apply(); });
+    zoomResetBtn.addEventListener('click', function () { scale = 1.5; apply(); });
+  })();
+</script>

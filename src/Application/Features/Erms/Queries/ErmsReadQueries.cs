@@ -1,5 +1,7 @@
 ﻿using System.Data;
 using HekCoreApi.Application.Common.Interfaces;
+using HekCoreApi.Application.Common.Models;
+using HekCoreApi.Contracts.Security;
 using MediatR;
 
 namespace HekCoreApi.Application.Features.Erms.Queries;
@@ -28,33 +30,40 @@ internal sealed class ErmsReadPipeline
 {
     private readonly IErmsRequestParser _parser;
     private readonly IErmsTokenValidator _tokenValidator;
+    private readonly IErmsRoutingResolver _routingResolver;
 
-    public ErmsReadPipeline(IErmsRequestParser parser, IErmsTokenValidator tokenValidator)
+    public ErmsReadPipeline(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver)
     {
         _parser = parser;
         _tokenValidator = tokenValidator;
+        _routingResolver = routingResolver;
     }
 
     public async Task<ErmsReadResult> RunAsync(string? patientId, string? encounterId, string? bearerToken,
-        Func<string, string?, string?, string?, Task<DataTable>> fetch, DateTime minDate = default, DateTime maxDate = default, CancellationToken ct = default,
+        Func<string, RoutingContext, string?, string?, string?, Task<DataTable>> fetch, DateTime minDate = default, DateTime maxDate = default, CancellationToken ct = default,
         Action<string?>? preValidate = null)
     {
         try
         {
             var (parsedEncounterId, practiceSuffix, _, rawSecondSegment) = _parser.ParseEncounterId(encounterId);
 
+            // Tenant-registry routing context (ADR-001): built from the same raw encounterId ParseEncounterId
+            // consumes, via the dedicated IErmsRoutingResolver (composite PracticeId/PracticeCode/Environment
+            // key - independent of the legacy practiceSuffix quirks preserved above for the DMS resolver).
+            var routingContext = _routingResolver.Resolve(encounterId ?? string.Empty);
+
             // Legacy computes actualPracticeID (Convert.ToInt32) inside the split block, BEFORE token
             // validation - a non-numeric segment throws into the error envelope even on a bad token.
             preValidate?.Invoke(rawSecondSegment);
             var parsedPatientId = _parser.Decrypt(_parser.DecodeBase64(patientId));
 
-            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, parsedPatientId, parsedEncounterId, bearerToken, ct);
+            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, routingContext, parsedPatientId, parsedEncounterId, bearerToken, ct);
             if (!validation.Valid)
             {
                 return new ErmsReadResult(false, null, validation.ErrorMessage ?? "Invalid token value!");
             }
 
-            var table = await fetch(practiceSuffix, parsedPatientId, parsedEncounterId, rawSecondSegment);
+            var table = await fetch(practiceSuffix, routingContext, parsedPatientId, parsedEncounterId, rawSecondSegment);
             return new ErmsReadResult(true, table, null, minDate, maxDate);
         }
         catch (Exception ex)
@@ -79,15 +88,15 @@ public sealed class ErmsGetPatientMeasurementQueryHandler : IRequestHandler<Erms
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetPatientMeasurementQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsDataRepository repository)
+    public ErmsGetPatientMeasurementQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
         _repository = repository;
     }
 
     public Task<ErmsReadResult> Handle(ErmsGetPatientMeasurementQuery request, CancellationToken ct) =>
         _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, _, _) => _repository.GetMeasurementAsync(suffix, patientId, ct), ct: ct);
+            (suffix, routingContext, patientId, _, _) => _repository.GetMeasurementAsync(suffix, routingContext, patientId, ct), ct: ct);
 }
 
 public sealed class ErmsGetSmokingStatusQueryHandler : IRequestHandler<ErmsGetSmokingStatusQuery, ErmsReadResult>
@@ -95,15 +104,15 @@ public sealed class ErmsGetSmokingStatusQueryHandler : IRequestHandler<ErmsGetSm
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetSmokingStatusQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsDataRepository repository)
+    public ErmsGetSmokingStatusQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
         _repository = repository;
     }
 
     public Task<ErmsReadResult> Handle(ErmsGetSmokingStatusQuery request, CancellationToken ct) =>
         _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, _, _) => _repository.GetSmokingStatusAsync(suffix, patientId, ct), ct: ct);
+            (suffix, routingContext, patientId, _, _) => _repository.GetSmokingStatusAsync(suffix, routingContext, patientId, ct), ct: ct);
 }
 
 public sealed class ErmsGetCurrentUserQueryHandler : IRequestHandler<ErmsGetCurrentUserQuery, ErmsReadResult>
@@ -111,9 +120,9 @@ public sealed class ErmsGetCurrentUserQueryHandler : IRequestHandler<ErmsGetCurr
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetCurrentUserQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsDataRepository repository)
+    public ErmsGetCurrentUserQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
         _repository = repository;
     }
 
@@ -124,7 +133,7 @@ public sealed class ErmsGetCurrentUserQueryHandler : IRequestHandler<ErmsGetCurr
         var locationId = _pipeline.Decrypt(request.LocationId);
 
         return _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, encounterId, _) => _repository.GetProviderAsync(suffix, patientId, userId, locationId, encounterId, ct), ct: ct);
+            (suffix, routingContext, patientId, encounterId, _) => _repository.GetProviderAsync(suffix, routingContext, patientId, userId, locationId, encounterId, ct), ct: ct);
     }
 }
 
@@ -133,15 +142,15 @@ public sealed class ErmsGetNextOfKinQueryHandler : IRequestHandler<ErmsGetNextOf
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetNextOfKinQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsDataRepository repository)
+    public ErmsGetNextOfKinQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
         _repository = repository;
     }
 
     public Task<ErmsReadResult> Handle(ErmsGetNextOfKinQuery request, CancellationToken ct) =>
         _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, _, _) => _repository.GetNextOfKinAsync(suffix, patientId, ct), ct: ct);
+            (suffix, routingContext, patientId, _, _) => _repository.GetNextOfKinAsync(suffix, routingContext, patientId, ct), ct: ct);
 }
 
 public sealed class ErmsGetRegisteredPractitionersQueryHandler : IRequestHandler<ErmsGetRegisteredPractitionersQuery, ErmsReadResult>
@@ -149,16 +158,16 @@ public sealed class ErmsGetRegisteredPractitionersQueryHandler : IRequestHandler
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetRegisteredPractitionersQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsDataRepository repository)
+    public ErmsGetRegisteredPractitionersQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
         _repository = repository;
     }
 
     public Task<ErmsReadResult> Handle(ErmsGetRegisteredPractitionersQuery request, CancellationToken ct) =>
         // Legacy (`APIController.cs:1312`): pmsLocationId is passed raw - never decoded or decrypted.
         _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, _, _) => _repository.GetRegisteredPractitionersAsync(suffix, patientId, request.LocationId, ct), ct: ct);
+            (suffix, routingContext, patientId, _, _) => _repository.GetRegisteredPractitionersAsync(suffix, routingContext, patientId, request.LocationId, ct), ct: ct);
 }
 
 public sealed class ErmsGetAccidentsQueryHandler : IRequestHandler<ErmsGetAccidentsQuery, ErmsReadResult>
@@ -166,9 +175,9 @@ public sealed class ErmsGetAccidentsQueryHandler : IRequestHandler<ErmsGetAccide
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetAccidentsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsDataRepository repository)
+    public ErmsGetAccidentsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
         _repository = repository;
     }
 
@@ -176,7 +185,7 @@ public sealed class ErmsGetAccidentsQueryHandler : IRequestHandler<ErmsGetAccide
     {
         var (min, max) = ErmsReadPipeline.ParseDates(request.MinDateTime, request.MaxDateTime);
         return _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, _, _) => _repository.GetAcc45Async(suffix, patientId, request.Order.ToUpper(), min, max, ct), min, max, ct);
+            (suffix, routingContext, patientId, _, _) => _repository.GetAcc45Async(suffix, routingContext, patientId, request.Order.ToUpper(), min, max, ct), min, max, ct);
     }
 }
 
@@ -185,9 +194,9 @@ public sealed class ErmsGetClassificationsQueryHandler : IRequestHandler<ErmsGet
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetClassificationsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsDataRepository repository)
+    public ErmsGetClassificationsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
         _repository = repository;
     }
 
@@ -195,7 +204,7 @@ public sealed class ErmsGetClassificationsQueryHandler : IRequestHandler<ErmsGet
     {
         var (min, max) = ErmsReadPipeline.ParseDates(request.MinDateTime, request.MaxDateTime);
         return _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, _, _) => _repository.GetConditionsAsync(suffix, patientId, request.Order.ToUpper(), min, max, ct), min, max, ct);
+            (suffix, routingContext, patientId, _, _) => _repository.GetConditionsAsync(suffix, routingContext, patientId, request.Order.ToUpper(), min, max, ct), min, max, ct);
     }
 }
 
@@ -204,9 +213,9 @@ public sealed class ErmsGetConsultNotesQueryHandler : IRequestHandler<ErmsGetCon
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetConsultNotesQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsDataRepository repository)
+    public ErmsGetConsultNotesQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
         _repository = repository;
     }
 
@@ -226,7 +235,7 @@ public sealed class ErmsGetConsultNotesQueryHandler : IRequestHandler<ErmsGetCon
         }
 
         return _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, _, _) => _repository.GetConsultNotesAsync(suffix, patientId, request.Order.ToUpper(), min, max, ct), min, max, ct);
+            (suffix, routingContext, patientId, _, _) => _repository.GetConsultNotesAsync(suffix, routingContext, patientId, request.Order.ToUpper(), min, max, ct), min, max, ct);
     }
 }
 
@@ -235,9 +244,9 @@ public sealed class ErmsGetMedicalAllergiesQueryHandler : IRequestHandler<ErmsGe
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetMedicalAllergiesQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsDataRepository repository)
+    public ErmsGetMedicalAllergiesQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
         _repository = repository;
     }
 
@@ -245,7 +254,7 @@ public sealed class ErmsGetMedicalAllergiesQueryHandler : IRequestHandler<ErmsGe
     {
         var (min, max) = ErmsReadPipeline.ParseDates(request.MinDateTime, request.MaxDateTime);
         return _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, _, _) => _repository.GetMedicalAllergiesAsync(suffix, patientId, request.Order.ToUpper(), min, max, ct), min, max, ct);
+            (suffix, routingContext, patientId, _, _) => _repository.GetMedicalAllergiesAsync(suffix, routingContext, patientId, request.Order.ToUpper(), min, max, ct), min, max, ct);
     }
 }
 
@@ -266,9 +275,9 @@ public sealed class ErmsGetPrescribedMedicationsQueryHandler : IRequestHandler<E
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetPrescribedMedicationsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsDataRepository repository)
+    public ErmsGetPrescribedMedicationsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
         _repository = repository;
     }
 
@@ -276,7 +285,7 @@ public sealed class ErmsGetPrescribedMedicationsQueryHandler : IRequestHandler<E
     {
         var (min, max) = ErmsReadPipeline.ParseDates(request.MinDateTime, request.MaxDateTime);
         return _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, _, _) => _repository.GetMedicationsAsync(suffix, patientId, request.Order.ToUpper(), min, max, isLongTerm: false, ct), min, max, ct);
+            (suffix, routingContext, patientId, _, _) => _repository.GetMedicationsAsync(suffix, routingContext, patientId, request.Order.ToUpper(), min, max, isLongTerm: false, ct), min, max, ct);
     }
 }
 
@@ -285,9 +294,9 @@ public sealed class ErmsGetRegularMedicationsQueryHandler : IRequestHandler<Erms
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetRegularMedicationsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsDataRepository repository)
+    public ErmsGetRegularMedicationsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
         _repository = repository;
     }
 
@@ -295,7 +304,7 @@ public sealed class ErmsGetRegularMedicationsQueryHandler : IRequestHandler<Erms
     {
         var (min, max) = ErmsReadPipeline.ParseDates(request.MinDateTime, request.MaxDateTime);
         return _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, _, _) => _repository.GetMedicationsAsync(suffix, patientId, request.Order.ToUpper(), min, max, isLongTerm: true, ct), min, max, ct);
+            (suffix, routingContext, patientId, _, _) => _repository.GetMedicationsAsync(suffix, routingContext, patientId, request.Order.ToUpper(), min, max, isLongTerm: true, ct), min, max, ct);
     }
 }
 
@@ -304,9 +313,9 @@ public sealed class ErmsGetLaboratoryReportListQueryHandler : IRequestHandler<Er
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetLaboratoryReportListQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsDataRepository repository)
+    public ErmsGetLaboratoryReportListQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
         _repository = repository;
     }
 
@@ -314,7 +323,7 @@ public sealed class ErmsGetLaboratoryReportListQueryHandler : IRequestHandler<Er
     {
         var (min, max) = ErmsReadPipeline.ParseDates(request.MinDateTime, request.MaxDateTime);
         return _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, _, _) => _repository.GetLabsAsync(suffix, patientId, request.Order.ToUpper(), min, max, ct), min, max, ct);
+            (suffix, routingContext, patientId, _, _) => _repository.GetLabsAsync(suffix, routingContext, patientId, request.Order.ToUpper(), min, max, ct), min, max, ct);
     }
 }
 
@@ -323,9 +332,9 @@ public sealed class ErmsGetRadiologyReportListQueryHandler : IRequestHandler<Erm
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetRadiologyReportListQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsDataRepository repository)
+    public ErmsGetRadiologyReportListQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
         _repository = repository;
     }
 
@@ -333,7 +342,7 @@ public sealed class ErmsGetRadiologyReportListQueryHandler : IRequestHandler<Erm
     {
         var (min, max) = ErmsReadPipeline.ParseDates(request.MinDateTime, request.MaxDateTime);
         return _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, _, _) => _repository.GetRadsAsync(suffix, patientId, request.Order.ToUpper(), min, max, ct), min, max, ct);
+            (suffix, routingContext, patientId, _, _) => _repository.GetRadsAsync(suffix, routingContext, patientId, request.Order.ToUpper(), min, max, ct), min, max, ct);
     }
 }
 
@@ -343,9 +352,9 @@ public sealed class ErmsGetDischargeSummaryReportListQueryHandler : IRequestHand
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetDischargeSummaryReportListQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsDataRepository repository)
+    public ErmsGetDischargeSummaryReportListQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
         _repository = repository;
     }
 
@@ -353,7 +362,7 @@ public sealed class ErmsGetDischargeSummaryReportListQueryHandler : IRequestHand
     {
         var (min, max) = ErmsReadPipeline.ParseDates(request.MinDateTime, request.MaxDateTime);
         return _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, _, suffixNumeric) => _repository.GetOtherDocsAsync(suffix, suffixNumeric ?? string.Empty, patientId, request.Order.ToUpper(), min, max, isReferral: true, ct), min, max, ct, rs => Convert.ToInt32(rs));
+            (suffix, routingContext, patientId, _, suffixNumeric) => _repository.GetOtherDocsAsync(suffix, suffixNumeric ?? string.Empty, routingContext, patientId, request.Order.ToUpper(), min, max, isReferral: true, ct), min, max, ct, rs => Convert.ToInt32(rs));
     }
 }
 
@@ -362,9 +371,9 @@ public sealed class ErmsGetScannedListQueryHandler : IRequestHandler<ErmsGetScan
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetScannedListQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsDataRepository repository)
+    public ErmsGetScannedListQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
         _repository = repository;
     }
 
@@ -372,7 +381,7 @@ public sealed class ErmsGetScannedListQueryHandler : IRequestHandler<ErmsGetScan
     {
         var (min, max) = ErmsReadPipeline.ParseDates(request.MinDateTime, request.MaxDateTime);
         return _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, _, suffixNumeric) => _repository.GetOtherDocsAsync(suffix, suffixNumeric ?? string.Empty, patientId, request.Order.ToUpper(), min, max, isReferral: false, ct), min, max, ct, rs => Convert.ToInt32(rs));
+            (suffix, routingContext, patientId, _, suffixNumeric) => _repository.GetOtherDocsAsync(suffix, suffixNumeric ?? string.Empty, routingContext, patientId, request.Order.ToUpper(), min, max, isReferral: false, ct), min, max, ct, rs => Convert.ToInt32(rs));
     }
 }
 
@@ -381,15 +390,15 @@ public sealed class ErmsGetLaboratoryReportDetailsQueryHandler : IRequestHandler
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetLaboratoryReportDetailsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsDataRepository repository)
+    public ErmsGetLaboratoryReportDetailsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
         _repository = repository;
     }
 
     public Task<ErmsReadResult> Handle(ErmsGetLaboratoryReportDetailsQuery request, CancellationToken ct) =>
         _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, _, _) => _repository.GetLabResultsAsync(suffix, patientId, request.ReferenceId, ct), ct: ct);
+            (suffix, routingContext, patientId, _, _) => _repository.GetLabResultsAsync(suffix, routingContext, patientId, request.ReferenceId, ct), ct: ct);
 }
 
 public sealed class ErmsGetRadiologyReportDetailsQueryHandler : IRequestHandler<ErmsGetRadiologyReportDetailsQuery, ErmsReadResult>
@@ -397,15 +406,15 @@ public sealed class ErmsGetRadiologyReportDetailsQueryHandler : IRequestHandler<
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetRadiologyReportDetailsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsDataRepository repository)
+    public ErmsGetRadiologyReportDetailsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
         _repository = repository;
     }
 
     public Task<ErmsReadResult> Handle(ErmsGetRadiologyReportDetailsQuery request, CancellationToken ct) =>
         _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, _, _) => _repository.GetRadResultsAsync(suffix, patientId, request.ReferenceId, ct), ct: ct);
+            (suffix, routingContext, patientId, _, _) => _repository.GetRadResultsAsync(suffix, routingContext, patientId, request.ReferenceId, ct), ct: ct);
 }
 
 public sealed class ErmsGetDischargeSummaryDetailsQueryHandler : IRequestHandler<ErmsGetDischargeSummaryDetailsQuery, ErmsReadResult>
@@ -413,15 +422,15 @@ public sealed class ErmsGetDischargeSummaryDetailsQueryHandler : IRequestHandler
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetDischargeSummaryDetailsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsDataRepository repository)
+    public ErmsGetDischargeSummaryDetailsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
         _repository = repository;
     }
 
     public Task<ErmsReadResult> Handle(ErmsGetDischargeSummaryDetailsQuery request, CancellationToken ct) =>
         _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, _, suffixNumeric) => _repository.GetDocResultsAsync(suffix, suffixNumeric ?? string.Empty, request.ReferenceId, isDischarge: true, ct), ct: ct, preValidate: rs => Convert.ToInt32(rs));
+            (suffix, routingContext, patientId, _, suffixNumeric) => _repository.GetDocResultsAsync(suffix, suffixNumeric ?? string.Empty, routingContext, request.ReferenceId, isDischarge: true, ct), ct: ct, preValidate: rs => Convert.ToInt32(rs));
 }
 
 public sealed class ErmsGetScannedDetailsQueryHandler : IRequestHandler<ErmsGetScannedDetailsQuery, ErmsReadResult>
@@ -429,15 +438,15 @@ public sealed class ErmsGetScannedDetailsQueryHandler : IRequestHandler<ErmsGetS
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetScannedDetailsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsDataRepository repository)
+    public ErmsGetScannedDetailsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
         _repository = repository;
     }
 
     public Task<ErmsReadResult> Handle(ErmsGetScannedDetailsQuery request, CancellationToken ct) =>
         _pipeline.RunAsync(request.PatientId, request.EncounterId, request.BearerToken,
-            (suffix, patientId, _, suffixNumeric) => _repository.GetDocResultsAsync(suffix, suffixNumeric ?? string.Empty, request.ReferenceId, isDischarge: false, ct), ct: ct, preValidate: rs => Convert.ToInt32(rs));
+            (suffix, routingContext, patientId, _, suffixNumeric) => _repository.GetDocResultsAsync(suffix, suffixNumeric ?? string.Empty, routingContext, request.ReferenceId, isDischarge: false, ct), ct: ct, preValidate: rs => Convert.ToInt32(rs));
 }
 
 

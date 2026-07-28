@@ -1,4 +1,4 @@
-using HekCoreApi.Application.Common.Interfaces;
+﻿using HekCoreApi.Application.Common.Interfaces;
 using HekCoreApi.Application.Common.Models;
 using HekCoreApi.Contracts.Recalls;
 using HekCoreApi.Contracts.Security;
@@ -17,7 +17,7 @@ public sealed class CanonicalRecallsRepository : ICanonicalRecallsRepository
 
     public async Task<IReadOnlyList<RecallCanonical>> GetKaroAsync(RoutingContext routing, string? patientId, CancellationToken ct = default)
     {
-        var recalls = await _karoRepository.GetRecallsAsync(routing.PracticeId, patientId, ct);
+        var recalls = await _karoRepository.GetRecallsAsync(routing.PracticeId, routing, patientId, ct);
         return recalls.Select(r => new RecallCanonical(r.CategoryId, r.Priority, r.DueDate, r.Reason, r.Notes, OriginScope.Karo)).ToList();
     }
 }

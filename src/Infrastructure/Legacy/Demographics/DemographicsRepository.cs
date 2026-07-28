@@ -1,4 +1,4 @@
-using System.Xml;
+﻿using System.Xml;
 using HekCoreApi.Application.Common.Interfaces;
 using HekCoreApi.Application.Common.Models;
 using HekCoreApi.Contracts.Demographics;
@@ -146,7 +146,7 @@ public sealed class DemographicsRepository : IDemographicsRepository
         // ERMS's own connection routing (IErmsPracticeConnectionResolver, separate from the tenant
         // registry) still keys by a flat practiceSuffix - RoutingContext.PracticeId doubles as that
         // suffix today (see FLAGGED ASSUMPTION above).
-        var table = await _ermsDemographicsRepository.GetDemographicsAsync(routing.PracticeId, patientId.ToString(), ct);
+        var table = await _ermsDemographicsRepository.GetDemographicsAsync(routing.PracticeId, routing, patientId.ToString(), ct);
 
         if (table.Rows.Count == 0)
         {

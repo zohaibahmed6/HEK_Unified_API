@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using System.Xml;
 using HekCoreApi.Application.Common.Interfaces;
 using HekCoreApi.Application.Common.Models;
@@ -34,7 +34,7 @@ public sealed class CanonicalNextOfKinRepository : ICanonicalNextOfKinRepository
 
     public async Task<IReadOnlyList<NextOfKinCanonical>> GetErmsAsync(RoutingContext routing, string? patientId, CancellationToken ct = default)
     {
-        var table = await _ermsRepository.GetNextOfKinAsync(routing.PracticeId, patientId, ct);
+        var table = await _ermsRepository.GetNextOfKinAsync(routing.PracticeId, routing, patientId, ct);
         var results = new List<NextOfKinCanonical>();
 
         foreach (DataRow row in table.Rows)

@@ -1,3 +1,5 @@
+using HekCoreApi.Application.Common.Models;
+
 namespace HekCoreApi.Application.Common.Interfaces;
 
 /// <summary>
@@ -14,6 +16,7 @@ public interface IKaroAuthRepository
     /// </summary>
     Task<KaroAuthResult?> InsertAndValidateTokenAsync(
         string practiceSuffix,
+        RoutingContext routingContext,
         string? username,
         string? password,
         string? patientId,

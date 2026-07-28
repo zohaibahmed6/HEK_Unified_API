@@ -1,9 +1,11 @@
+using HekCoreApi.Application.Common.Models;
+
 namespace HekCoreApi.Application.Common.Interfaces;
 
 /// <summary>Ported from `HSSDA.GetHSSDemographics` (`HSSDA.cs:1164`) - real proc `[HSS].[uspGetDemographics]`.</summary>
 public interface IKaroDemographicsRepository
 {
-    Task<KaroDemographicsResult> GetAsync(string practiceSuffix, string? patientId, CancellationToken ct = default);
+    Task<KaroDemographicsResult> GetAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, CancellationToken ct = default);
 }
 
 public sealed record KaroDemographicsResult(KaroDemographicInfo? Demographic, IReadOnlyList<KaroCardInfo> Cards);

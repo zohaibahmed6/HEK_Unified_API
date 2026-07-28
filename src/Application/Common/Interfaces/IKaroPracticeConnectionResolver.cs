@@ -1,20 +1,21 @@
+using HekCoreApi.Application.Common.Models;
+
 namespace HekCoreApi.Application.Common.Interfaces;
 
 /// <summary>
-/// KARO/HSS's real connection-routing mechanism (confirmed from
-/// legacy-reference/hsswebapi/DevLocal/DAL/South/HSSDA.cs, `InsertAndValidateToken`):
-/// `ConfigurationManager.ConnectionStrings["ConnIndiciDB" + practiceid]` - the practice suffix
-/// (parsed out of the request's own `encounterId`, e.g. "_485", "_LOCAL") is concatenated directly
-/// onto the base connection-string name. This is a fundamentally different routing model than HISO's
-/// tenant-registry-by-PracticeId (<see cref="ILegacyPracticeConnectionResolver"/>) - KARO has no
-/// separate practice registry, the suffix from the caller's own request selects the target.
+/// KARO/HSS's connection routing, now backed by the central tenant registry (ADR-001) instead of the
+/// old flat per-practice `Karo:DbCredentials:ConnIndiciDB{practiceSuffix}` secret convention. The
+/// composite <see cref="RoutingContext"/> (PracticeId + PracticeCode + Environment) lets the same
+/// practiceId route to different rows when a practice runs multiple environments/PHO codes on
+/// different servers - same model as <see cref="ILegacyPracticeConnectionResolver"/>, kept as a
+/// separate interface per Zohaib's isolation requirement.
 /// </summary>
 public interface IKaroPracticeConnectionResolver
 {
     /// <summary>
-    /// Resolves the real connection string for `practiceSuffix` (e.g. "", "_485", "_LOCAL").
-    /// Throws <see cref="Domain.Exceptions.NotFoundException"/> if no `Karo:DbCredentials:ConnIndiciDB{practiceSuffix}`
-    /// secret is configured for this suffix - never falls back to a different target silently.
+    /// Resolves the real connection string for <paramref name="context"/> via the tenant registry.
+    /// Throws <see cref="Domain.Exceptions.NotFoundException"/> if no matching practice route is
+    /// registered - never falls back to a different target silently.
     /// </summary>
-    Task<string> ResolveAsync(string practiceSuffix, CancellationToken ct = default);
+    Task<string> ResolveAsync(RoutingContext context, CancellationToken ct = default);
 }

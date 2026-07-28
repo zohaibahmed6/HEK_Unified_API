@@ -1,0 +1,296 @@
+<title>KARO/HSS Authenticate — Request Flow</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default' });
+</script>
+<style>
+  :root {
+    --ink: #161a1d;
+    --paper: #f3f1ea;
+    --panel: #ffffff;
+    --line: #dcd7c9;
+    --muted: #64655c;
+    --accent: #2f6f6d;
+    --accent-strong: #1c4b49;
+    --accent-soft: #dfeae8;
+    --amber: #a8621a;
+    --amber-soft: #f4e6d4;
+    --code-bg: #eee9db;
+    --shadow: 0 1px 2px rgba(22,26,29,0.06), 0 8px 24px rgba(22,26,29,0.05);
+  }
+  :root[data-theme="dark"] {
+    --ink: #eceae3;
+    --paper: #14171a;
+    --panel: #1b1f22;
+    --line: #2c3033;
+    --muted: #9a9c93;
+    --accent: #63b8b3;
+    --accent-strong: #8fd0cb;
+    --accent-soft: #1f3634;
+    --amber: #e2984f;
+    --amber-soft: #3a2c1a;
+    --code-bg: #23272a;
+    --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.35);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #eceae3; --paper: #14171a; --panel: #1b1f22; --line: #2c3033; --muted: #9a9c93;
+      --accent: #63b8b3; --accent-strong: #8fd0cb; --accent-soft: #1f3634; --amber: #e2984f;
+      --amber-soft: #3a2c1a; --code-bg: #23272a; --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.35);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { background: var(--paper); color: var(--ink); margin: 0; font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+  body { padding: 48px 24px 96px; }
+  .wrap { max-width: 980px; margin: 0 auto; }
+
+  .eyebrow {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12.5px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--accent-strong); margin: 0 0 10px;
+  }
+  h1 {
+    font-family: ui-serif, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    font-weight: 600; font-size: clamp(28px, 4vw, 38px); line-height: 1.12;
+    letter-spacing: -0.01em; margin: 0 0 12px; text-wrap: balance;
+  }
+  .dek { font-size: 16px; line-height: 1.55; color: var(--muted); max-width: 62ch; margin: 0 0 36px; }
+  .dek code, p code, li code, td code {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 0.92em; background: var(--code-bg); padding: 0.08em 0.4em; border-radius: 4px;
+  }
+
+  section { margin-bottom: 44px; }
+  h2 {
+    font-family: ui-serif, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    font-size: 20px; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.005em;
+  }
+  .section-note { font-size: 13.5px; color: var(--muted); margin: 0 0 18px; }
+
+  .diagram-frame { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 20px 18px; }
+  .zoom-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .zoom-bar-bottom { margin-bottom: 0; margin-top: 14px; }
+  .zoom-bar button {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 15px; line-height: 1; width: 34px; height: 34px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--paper); color: var(--ink); cursor: pointer;
+  }
+  .zoom-bar button:hover { border-color: var(--accent); color: var(--accent-strong); }
+  .zoom-bar button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .zoom-bar .pct {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 13px; font-variant-numeric: tabular-nums; color: var(--muted); min-width: 46px; text-align: center;
+  }
+  .zoom-bar .hint { font-size: 12.5px; color: var(--muted); margin-left: auto; }
+  .diagram-scroll { overflow: auto; max-height: 78vh; padding-bottom: 4px; border-radius: 6px; }
+  .diagram-scroll .mermaid { min-width: 1400px; }
+  .diagram-scroll svg { display: block; }
+  .diagram-scroll .mermaid text, .diagram-scroll svg text { font-size: 16px !important; }
+  .diagram-scroll .mermaid .messageText, .diagram-scroll svg .messageText { font-size: 16px !important; }
+  .diagram-scroll .mermaid .labelText, .diagram-scroll .mermaid .loopText,
+  .diagram-scroll svg .labelText, .diagram-scroll svg .loopText { font-size: 15px !important; }
+
+  .legend-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+  .legend-card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; box-shadow: var(--shadow); }
+  .legend-card .tag {
+    display: inline-block; font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 11.5px; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px;
+    border-radius: 999px; background: var(--amber-soft); color: var(--amber); margin-bottom: 10px;
+  }
+  .legend-card h3 { font-size: 15.5px; margin: 0 0 8px; font-weight: 650; }
+  .legend-card p { font-size: 13.8px; line-height: 1.55; color: var(--muted); margin: 0 0 8px; }
+  .legend-card p:last-child { margin-bottom: 0; }
+
+  table.steps { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  table.steps th, table.steps td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.steps th {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600;
+  }
+  table.steps td.n { font-variant-numeric: tabular-nums; color: var(--accent-strong); font-weight: 700; width: 28px; }
+  table.steps td.src code { font-size: 11.6px; white-space: nowrap; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: var(--shadow); }
+  .table-wrap table.steps { border: none; box-shadow: none; }
+  .table-wrap td, .table-wrap th { border-color: var(--line); }
+
+  footer { margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+</style>
+
+<div class="wrap">
+  <p class="eyebrow">HEK Core API — legacy-compat wire flow</p>
+  <h1>KARO/HSS <code>Authenticate</code>: credential check, tenant-registry routing, token mint</h1>
+  <p class="dek">
+    Traced from the real, verified source in this repo — GET and POST both converge on the same
+    handler. Includes the tenant-registry connection routing just wired up
+    (<code>KaroPracticeConnectionResolver</code>, <code>ITenantRegistryService</code>). Every arrow
+    and payload below is a real method call / real field name, not a generic placeholder.
+  </p>
+
+  <section>
+    <h2>Sequence</h2>
+    <p class="section-note">Use the zoom controls below if the text reads small — the diagram itself scrolls both ways once zoomed in.</p>
+    <div class="diagram-frame">
+      <div class="zoom-bar">
+        <button type="button" id="zoomOut" aria-label="Zoom out">−</button>
+        <span class="pct" id="zoomPct">150%</span>
+        <button type="button" id="zoomIn" aria-label="Zoom in">+</button>
+        <button type="button" id="zoomReset" aria-label="Reset zoom" style="width:auto;padding:0 12px;">Reset</button>
+        <span class="hint">Drag the scrollbars, or scroll while hovering, to pan around</span>
+      </div>
+      <div class="diagram-scroll" id="diagramScroll">
+        <pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor Client
+    participant Ctrl as KaroCompatController
+    participant Hnd as KaroAuthenticateQueryHandler
+    participant Parser as KaroRequestParser
+    participant Route as KaroRoutingResolver
+    participant AuthRepo as KaroAuthRepository
+    participant Conn as KaroPracticeConnectionResolver
+    participant Tenant as TenantRegistryService
+    participant Secret as ISecretProvider
+    participant PracticeDb as Practice DB
+
+    Client->>Ctrl: GET or POST Authenticate, with Username,<br/>Password, PatientId, EncounterId, System, Pho
+    Ctrl->>Hnd: KaroAuthenticateQuery Username, Password,<br/>PatientId, EncounterId, System, Pho
+
+    Hnd->>Parser: ParseEncounterId EncounterId
+    Note over Parser: splits encounterId on double or single<br/>underscore, decrypts the first segment,<br/>keeps the raw practiceId segment separately
+    Parser-->>Hnd: encounterId, practiceSuffix,<br/>practiceSuffixNumeric
+
+    Hnd->>Parser: Decrypt PatientId
+    Parser-->>Hnd: decrypted patientId
+
+    Hnd->>Route: Resolve EncounterId
+    Note over Route: builds the composite lookup key from<br/>practiceId plus code plus environment segments
+    Route-->>Hnd: RoutingContext with PracticeId,<br/>PracticeCode, Environment, Karo
+
+    Hnd->>AuthRepo: InsertAndValidateTokenAsync practiceSuffix,<br/>routingContext, username, password,<br/>patientId, encounterId, pho
+
+    AuthRepo->>Conn: ResolveAsync routingContext
+    Conn->>Tenant: ResolveRouteAsync routingContext
+    Note over Tenant: matches the one Practices row whose<br/>PracticeId, PracticeCode, Environment and<br/>SourceSystem equal this triple — same PracticeId<br/>on a different server or environment is a<br/>separate row, never ambiguous
+    Tenant-->>Conn: PracticeRoute with DbServerHost, DbName
+    Conn->>Secret: GetRequiredSecretAsync for the<br/>DbServerHost credential
+    Secret-->>Conn: credential, scoped per server not per practice
+    Conn-->>AuthRepo: full connection string
+
+    AuthRepo->>PracticeDb: EXEC HSS.uspInsertAndValidateToken<br/>with pUsername, pPassword, pPatientID,<br/>pAppointmentID, pPHO
+    PracticeDb-->>AuthRepo: row with StatusMessage, Expiry,<br/>Token, PracticeId
+
+    alt StatusMessage present, credential rejected
+        AuthRepo-->>Hnd: KaroAuthResult with StatusMessage set
+        Hnd-->>Ctrl: KaroAuthenticateResult false,<br/>Authentication failed
+        Ctrl-->>Client: HssAuthenticateResponse.Fail
+    else StatusMessage empty but Expiry is MinValue
+        AuthRepo-->>Hnd: KaroAuthResult with no usable Expiry
+        Hnd-->>Ctrl: KaroAuthenticateResult false,<br/>Invalid credentials
+        Ctrl-->>Client: HssAuthenticateResponse.Fail
+    else StatusMessage empty, Expiry set
+        AuthRepo-->>Hnd: KaroAuthResult with Expiry, Token, PracticeId
+        Hnd-->>Ctrl: KaroAuthenticateResult true, token,<br/>expiry, practiceId
+        Ctrl-->>Client: HssAuthenticateResponse.Success
+    end
+        </pre>
+      </div>
+      <div class="zoom-bar zoom-bar-bottom">
+        <button type="button" id="zoomOutBottom" aria-label="Zoom out">−</button>
+        <span class="pct" id="zoomPctBottom">150%</span>
+        <button type="button" id="zoomInBottom" aria-label="Zoom in">+</button>
+        <button type="button" id="zoomResetBottom" aria-label="Reset zoom" style="width:auto;padding:0 12px;">Reset</button>
+        <span class="hint">Drag the scrollbars, or scroll while hovering, to pan around</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Two things worth knowing</h2>
+    <p class="section-note">The diagram above is drawn as the everything-succeeds path — these are the parts that aren't purely linear.</p>
+    <div class="legend-grid">
+      <div class="legend-card">
+        <span class="tag">Routing</span>
+        <h3>Connection is resolved by composite key, not a flat secret</h3>
+        <p>Before this fix, <code>KaroPracticeConnectionResolver</code> built the key
+        <code>Karo:DbCredentials:ConnIndiciDB</code> plus the practice suffix directly — one config
+        entry per practice. Now it asks <code>TenantRegistryService</code> for the row matching
+        PracticeId, PracticeCode and Environment, and only the DB server host needs its own secret.
+        Onboarding a practice onto an existing server needs a registry row, not a config change.</p>
+      </div>
+      <div class="legend-card">
+        <span class="tag">Legacy quirk kept</span>
+        <h3>Two distinct failure messages, on purpose</h3>
+        <p>Legacy returns "Invalid credentials!" when the stored procedure runs clean but produces no
+        real expiry, and a separate "Authentication failed!" when it returns a StatusMessage at all.
+        The handler reproduces both paths exactly rather than collapsing them into one generic error.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Step-by-step source index</h2>
+    <p class="section-note">Where each stage of the diagram actually lives in the codebase.</p>
+    <div class="table-wrap">
+      <table class="steps">
+        <thead><tr><th>#</th><th>Stage</th><th>Real source</th></tr></thead>
+        <tbody>
+          <tr><td class="n">1</td><td>REST entry point, GET and POST overloads</td><td class="src"><code>KaroCompatController.cs</code></td></tr>
+          <tr><td class="n">2</td><td>Query handler orchestration</td><td class="src"><code>KaroAuthenticateQuery.cs</code></td></tr>
+          <tr><td class="n">3</td><td>Encounter-ID parsing</td><td class="src"><code>KaroRequestParser.cs</code></td></tr>
+          <tr><td class="n">4</td><td>Composite routing context</td><td class="src"><code>KaroRoutingResolver.cs</code></td></tr>
+          <tr><td class="n">5</td><td>Token validation stored procedure</td><td class="src"><code>KaroAuthRepository.cs</code></td></tr>
+          <tr><td class="n">6</td><td>Tenant-registry connection resolution</td><td class="src"><code>KaroPracticeConnectionResolver.cs</code>, <code>TenantRegistryService.cs</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    Built from the verified source in <code>HEK Core API</code> — no procedure name, field, or table
+    above is inferred; each is confirmed against the real legacy source or the code just fixed for
+    tenant-registry routing. Companion diagrams in this same folder: <code>hiso-getdata-flow.html</code>,
+    <code>erms-getscannedlist-flow.html</code>, <code>erms-authenticate-flow.html</code>,
+    <code>karo-authenticate-flow-simple.html</code> (plain-language version of this one).
+  </footer>
+</div>
+
+<script>
+  (function () {
+    var scrollBox = document.getElementById('diagramScroll');
+    var pctLabels = [document.getElementById('zoomPct'), document.getElementById('zoomPctBottom')];
+
+    var BASE_WIDTH = 1400;
+    var scale = 1.5;
+    var svgEl = null;
+
+    function apply() {
+      if (!svgEl) return;
+      svgEl.style.width = (BASE_WIDTH * scale) + 'px';
+      svgEl.style.height = 'auto';
+      svgEl.style.maxWidth = 'none';
+      pctLabels.forEach(function (el) { el.textContent = Math.round(scale * 100) + '%'; });
+    }
+
+    function findSvgAndInit() {
+      var svg = scrollBox.querySelector('svg');
+      if (!svg || svg === svgEl) return;
+      svgEl = svg;
+      apply();
+    }
+
+    var observer = new MutationObserver(findSvgAndInit);
+    observer.observe(scrollBox, { childList: true, subtree: true });
+    findSvgAndInit();
+    setTimeout(findSvgAndInit, 300);
+    setTimeout(findSvgAndInit, 1000);
+
+    function zoomIn() { scale = Math.min(scale + 0.25, 4); apply(); }
+    function zoomOut() { scale = Math.max(scale - 0.25, 0.5); apply(); }
+    function zoomReset() { scale = 1.5; apply(); }
+
+    ['zoomIn', 'zoomInBottom'].forEach(function (id) { document.getElementById(id).addEventListener('click', zoomIn); });
+    ['zoomOut', 'zoomOutBottom'].forEach(function (id) { document.getElementById(id).addEventListener('click', zoomOut); });
+    ['zoomReset', 'zoomResetBottom'].forEach(function (id) { document.getElementById(id).addEventListener('click', zoomReset); });
+  })();
+</script>

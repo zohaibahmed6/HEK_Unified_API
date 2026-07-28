@@ -1,6 +1,7 @@
 using System.Data;
 using System.Text.Json;
 using HekCoreApi.Application.Common.Interfaces;
+using HekCoreApi.Application.Common.Models;
 using Microsoft.Data.SqlClient;
 
 namespace HekCoreApi.Infrastructure.Legacy.Karo;
@@ -37,11 +38,11 @@ public sealed class KaroDataRepository : IKaroDataRepository
         _awsDocumentService = awsDocumentService;
     }
 
-    public async Task<List<KaroConsultNote>> GetConsultNotesAsync(string practiceSuffix, string? patientId, CancellationToken ct = default) =>
-        await RunAsync<KaroConsultNote>(practiceSuffix, "[HSS].[uspGetConsultNotes]", Param("@pPatientId", patientId), ct);
+    public async Task<List<KaroConsultNote>> GetConsultNotesAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, CancellationToken ct = default) =>
+        await RunAsync<KaroConsultNote>(routingContext, "[HSS].[uspGetConsultNotes]", Param("@pPatientId", patientId), ct);
 
-    public async Task<List<KaroDiagnosis>> GetConditionsAsync(string practiceSuffix, string? patientId, CancellationToken ct = default) =>
-        await RunAsync<KaroDiagnosis>(practiceSuffix, "[HSS].[uspGetConditions]", Param("@pPatientId", patientId), ct);
+    public async Task<List<KaroDiagnosis>> GetConditionsAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, CancellationToken ct = default) =>
+        await RunAsync<KaroDiagnosis>(routingContext, "[HSS].[uspGetConditions]", Param("@pPatientId", patientId), ct);
 
     /// <summary>
     /// Legacy (`hsswebapi/DAL/South/HSSDA.cs:262-373`): `CheckAWSIsEnabled(practiceSuffixNumeric,
@@ -52,9 +53,9 @@ public sealed class KaroDataRepository : IKaroDataRepository
     /// `DocumentGetByDocumentKeyJsonResult(identifier, practiceId, connectionString, dmsConnectionString)`
     /// and overwrites the first row's MessageData/MessageTitle/ContentType from it.
     /// </summary>
-    public async Task<List<KaroDocumentInfo>> GetDocumentsAsync(string practiceSuffix, string practiceSuffixNumeric, string? patientId, string? identifier, CancellationToken ct = default)
+    public async Task<List<KaroDocumentInfo>> GetDocumentsAsync(string practiceSuffix, string practiceSuffixNumeric, RoutingContext routingContext, string? patientId, string? identifier, CancellationToken ct = default)
     {
-        var connectionString = await _connectionResolver.ResolveAsync(practiceSuffix, ct);
+        var connectionString = await _connectionResolver.ResolveAsync(routingContext, ct);
         var parameters = new List<SqlParameter> { new("@pPatientId", (object?)patientId ?? DBNull.Value) };
         if (!string.IsNullOrWhiteSpace(identifier))
         {
@@ -96,7 +97,7 @@ public sealed class KaroDataRepository : IKaroDataRepository
             return results;
         }
 
-        var dmsConnectionString = await _dmsConnectionResolver.ResolveAsync(practiceSuffix, ct);
+        var dmsConnectionString = await _dmsConnectionResolver.ResolveAsync(routingContext, ct);
         var singleDocJson = await _awsDocumentService.DocumentGetByDocumentKeyJsonResultAsync(identifier.ToUpperInvariant(), practiceIdInt, dmsConnectionString, connectionString, ct);
         if (string.IsNullOrEmpty(singleDocJson) || results.Count == 0)
         {
@@ -119,16 +120,16 @@ public sealed class KaroDataRepository : IKaroDataRepository
 
     private sealed record KaroAwsSingleDocument(byte[]? DocumentData, string? DocumentName, string? DocumentType);
 
-    public async Task<List<KaroLabResult>> GetLabResultsAsync(string practiceSuffix, string? patientId, CancellationToken ct = default) =>
-        await RunAsync<KaroLabResult>(practiceSuffix, "[HSS].[uspGetLabResults]", Param("@pPatientId", patientId), ct);
+    public async Task<List<KaroLabResult>> GetLabResultsAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, CancellationToken ct = default) =>
+        await RunAsync<KaroLabResult>(routingContext, "[HSS].[uspGetLabResults]", Param("@pPatientId", patientId), ct);
 
-    public async Task<List<KaroMedication>> GetMedicationsAsync(string practiceSuffix, string? patientId, CancellationToken ct = default)
+    public async Task<List<KaroMedication>> GetMedicationsAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, CancellationToken ct = default)
     {
         var parameters = new List<SqlParameter> { new("@pPatientId", (object?)patientId ?? DBNull.Value), new("@pShowStop", false) };
-        return await RunAsync<KaroMedication>(practiceSuffix, "[HSS].[uspGetMedications]", parameters, ct);
+        return await RunAsync<KaroMedication>(routingContext, "[HSS].[uspGetMedications]", parameters, ct);
     }
 
-    public async Task<List<KaroObservation>> GetObservationsAsync(string practiceSuffix, string? patientId, string? conceptId, CancellationToken ct = default)
+    public async Task<List<KaroObservation>> GetObservationsAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? conceptId, CancellationToken ct = default)
     {
         var parameters = new List<SqlParameter> { new("@pPatientId", (object?)patientId ?? DBNull.Value) };
         if (!string.IsNullOrWhiteSpace(conceptId))
@@ -136,10 +137,10 @@ public sealed class KaroDataRepository : IKaroDataRepository
             parameters.Add(new SqlParameter("@pScreeningCode", conceptId));
         }
 
-        return await RunAsync<KaroObservation>(practiceSuffix, "[HSS].[uspGetObservations]", parameters, ct);
+        return await RunAsync<KaroObservation>(routingContext, "[HSS].[uspGetObservations]", parameters, ct);
     }
 
-    public async Task<List<KaroProvider>> GetProviderAsync(string practiceSuffix, string? patientId, string? userId, CancellationToken ct = default)
+    public async Task<List<KaroProvider>> GetProviderAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? userId, CancellationToken ct = default)
     {
         var parameters = new List<SqlParameter> { new("@pPatientId", (object?)patientId ?? DBNull.Value) };
         if (!string.IsNullOrWhiteSpace(userId))
@@ -147,25 +148,25 @@ public sealed class KaroDataRepository : IKaroDataRepository
             parameters.Add(new SqlParameter("@pUserId", userId));
         }
 
-        return await RunAsync<KaroProvider>(practiceSuffix, "[HSS].[uspGetProvider]", parameters, ct);
+        return await RunAsync<KaroProvider>(routingContext, "[HSS].[uspGetProvider]", parameters, ct);
     }
 
     /// <summary>Legacy: `practiceid2` (`@pPracticeid`) is a real dead variable in `APIController.cs` - declared but never assigned, always the empty string. Reproduced exactly.</summary>
-    public async Task<List<KaroRecallCategory>> GetRecallCategoriesAsync(string practiceSuffix, string? group, CancellationToken ct = default)
+    public async Task<List<KaroRecallCategory>> GetRecallCategoriesAsync(string practiceSuffix, RoutingContext routingContext, string? group, CancellationToken ct = default)
     {
         var parameters = new List<SqlParameter> { new("@pRecallGroup", (object?)group ?? DBNull.Value), new("@pPracticeid", string.Empty) };
-        return await RunAsync<KaroRecallCategory>(practiceSuffix, "[HSS].[uspGetRecallCategories]", parameters, ct);
+        return await RunAsync<KaroRecallCategory>(routingContext, "[HSS].[uspGetRecallCategories]", parameters, ct);
     }
 
-    public async Task<List<KaroRecall>> GetRecallsAsync(string practiceSuffix, string? patientId, CancellationToken ct = default) =>
-        await RunAsync<KaroRecall>(practiceSuffix, "[HSS].[uspGetRecalls]", Param("@pPatientId", patientId), ct);
+    public async Task<List<KaroRecall>> GetRecallsAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, CancellationToken ct = default) =>
+        await RunAsync<KaroRecall>(routingContext, "[HSS].[uspGetRecalls]", Param("@pPatientId", patientId), ct);
 
-    public async Task<List<KaroScreeningCode>> GetScreeningCodesAsync(string practiceSuffix, CancellationToken ct = default) =>
-        await RunAsync<KaroScreeningCode>(practiceSuffix, "[HSS].[uspGetScreeningCodes]", Param("@pPracticeId", "6"), ct);
+    public async Task<List<KaroScreeningCode>> GetScreeningCodesAsync(string practiceSuffix, RoutingContext routingContext, CancellationToken ct = default) =>
+        await RunAsync<KaroScreeningCode>(routingContext, "[HSS].[uspGetScreeningCodes]", Param("@pPracticeId", "6"), ct);
 
-    public async Task<List<KaroPatientAttachment>> GetPatientAttachmentAsync(string practiceSuffix, string practiceSuffixNumeric, string? patientId, string? referenceId, string? sortOrder, string? subject, DateTime? dateFrom, DateTime? dateTo, CancellationToken ct = default)
+    public async Task<List<KaroPatientAttachment>> GetPatientAttachmentAsync(string practiceSuffix, string practiceSuffixNumeric, RoutingContext routingContext, string? patientId, string? referenceId, string? sortOrder, string? subject, DateTime? dateFrom, DateTime? dateTo, CancellationToken ct = default)
     {
-        var connectionString = await _connectionResolver.ResolveAsync(practiceSuffix, ct);
+        var connectionString = await _connectionResolver.ResolveAsync(routingContext, ct);
         var parameters = new List<SqlParameter>();
         if (!string.IsNullOrEmpty(patientId))
         {
@@ -221,9 +222,9 @@ public sealed class KaroDataRepository : IKaroDataRepository
     private static string? Str(DataRow row, string column) =>
         row.Table.Columns.Contains(column) && row[column] is not DBNull ? row[column].ToString() : null;
 
-    private async Task<List<T>> RunAsync<T>(string practiceSuffix, string procedureName, List<SqlParameter> parameters, CancellationToken ct) where T : new()
+    private async Task<List<T>> RunAsync<T>(RoutingContext routingContext, string procedureName, List<SqlParameter> parameters, CancellationToken ct) where T : new()
     {
-        var connectionString = await _connectionResolver.ResolveAsync(practiceSuffix, ct);
+        var connectionString = await _connectionResolver.ResolveAsync(routingContext, ct);
         var table = await LegacyDbExecutor.ExecuteDataTableAsync(connectionString, CommandType.StoredProcedure, procedureName, parameters, ct);
         return HekCoreApi.Infrastructure.Legacy.Hiso.DataTableMapper.ToList<T>(table);
     }

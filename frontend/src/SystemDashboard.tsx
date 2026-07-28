@@ -2,9 +2,51 @@ import { useMemo, useRef, useState } from "react";
 import type { SystemId } from "./systems";
 import { endpointsForSystem, sharedParams } from "./catalog";
 import { EndpointCard, type EndpointCardHandle } from "./EndpointCard";
+import { UnifiedActionCard, type UnifiedActionCardHandle } from "./UnifiedActionCard";
+import { HisoPatientForm, type HisoPatientFormHandle, renderHisoResult } from "./hisoView";
+import { renderKaroResult } from "./karoView";
+import { renderErmsResult } from "./ermsView";
+import { renderColResult } from "./colView";
+import { PatientRecordForm, type PatientRecordFormHandle } from "./patientRecordForm";
+import type { EndpointDef } from "./catalog";
 import type { RunStatus } from "./runner";
 import type { SystemAuthState } from "./store";
 import { karoAuthenticate, ermsAuthenticate, colAuthenticate } from "./api";
+
+// KARO(HSS)/ERMS/COL now all get the same HISO-style tabbed patient-record form (see
+// PatientRecordForm) - one "Load Patient Record" click runs every plain read in parallel, shown as
+// tabs. Endpoints that need a real ID from a prior response (drill-down "Details" calls,
+// provider/document/location lookups) plus all writes stay in a collapsed "Advanced" panel
+// underneath, same placement as HISO's Advanced panel.
+const RECORD_SYSTEMS: SystemId[] = ["karo", "erms", "col"];
+
+// Reads that need an ID pulled from another response first (referenceID, identifier, userId, etc.)
+// can't be usefully auto-run with blank defaults - they live in the Advanced panel instead.
+const DRILLDOWN_READ_IDS = new Set([
+  "karo-documents",
+  "karo-observations-get",
+  "karo-provider",
+  "karo-recallcategories",
+  "karo-encountersummary",
+  "karo-patientattachment",
+  "erms-GetCurrentUser",
+  "erms-GetRegisteredPractitioners",
+  "erms-GetLaboratoryReportDetails",
+  "erms-GetRadiologyReportDetails",
+  "erms-GetDischargeSummaryDetails",
+  "erms-GetScannedDetails",
+  "col-GetSurgeryData",
+]);
+
+const UNIFIED_RENDERERS: Partial<Record<SystemId, (ep: EndpointDef, raw: string, auth: { token?: string; sessionKey?: string }) => React.ReactNode | null>> = {
+  karo: (ep, raw) => renderKaroResult(ep, raw),
+  erms: (ep, raw) => renderErmsResult(ep, raw),
+  col: (ep, raw) => renderColResult(ep, raw),
+};
+
+// The remaining HISO calls (session/version/administrative) aren't part of the patient record -
+// tucked away in a collapsed "advanced" panel instead of cluttering the main form.
+const HISO_ADVANCED_IDS = new Set(["hiso-getVersion", "hiso-getDeliveryOptions", "hiso-getFormView", "hiso-processAction", "hiso-saveContainer"]);
 
 const AUTH_DEFAULTS: Record<Exclude<SystemId, "hiso">, { username: string; password: string }> = {
   karo: { username: "hsslive", password: "H$$L1v3005" },
@@ -24,8 +66,9 @@ export function SystemDashboard({
   onSetAuth: (patch: Partial<Pick<SystemAuthState, "token" | "sessionKey" | "practiceId">>) => void;
 }) {
   const endpoints = useMemo(() => endpointsForSystem(system), [system]);
-  const reads = endpoints.filter((e) => e.kind === "read");
+  const allReads = endpoints.filter((e) => e.kind === "read");
   const writes = endpoints.filter((e) => e.kind === "write");
+  const reads = allReads;
 
   const [statuses, setStatuses] = useState<Record<string, RunStatus>>({});
   const [authing, setAuthing] = useState(false);
@@ -34,7 +77,21 @@ export function SystemDashboard({
   const [password, setPassword] = useState(system === "hiso" ? "" : AUTH_DEFAULTS[system].password);
   const [runningAll, setRunningAll] = useState(false);
 
+  const isHiso = system === "hiso";
+  const isRecord = RECORD_SYSTEMS.includes(system);
   const cardRefs = useRef<Record<string, EndpointCardHandle | null>>({});
+  const unifiedCardRef = useRef<UnifiedActionCardHandle | null>(null);
+  const hisoFormRef = useRef<HisoPatientFormHandle | null>(null);
+  const recordFormRef = useRef<PatientRecordFormHandle | null>(null);
+  const hisoAdvancedEndpoints = useMemo(() => endpoints.filter((e) => HISO_ADVANCED_IDS.has(e.id)), [endpoints]);
+  const recordEndpoints = useMemo(
+    () => (isRecord ? reads.filter((e) => !DRILLDOWN_READ_IDS.has(e.id) && !e.id.endsWith("-ping")) : []),
+    [isRecord, reads],
+  );
+  const recordAdvancedEndpoints = useMemo(
+    () => (isRecord ? endpoints.filter((e) => DRILLDOWN_READ_IDS.has(e.id) || e.kind === "write") : []),
+    [isRecord, endpoints],
+  );
 
   const handleResult = (id: string, status: RunStatus) => {
     setStatuses((prev) => ({ ...prev, [id]: status }));
@@ -70,13 +127,19 @@ export function SystemDashboard({
 
   const runAllReads = async () => {
     setRunningAll(true);
-    for (const ep of reads) {
-      await cardRefs.current[ep.id]?.run();
+    if (isHiso) {
+      await hisoFormRef.current?.run();
+    } else if (isRecord) {
+      await recordFormRef.current?.run();
+    } else {
+      for (const ep of allReads) {
+        await cardRefs.current[ep.id]?.run();
+      }
     }
     setRunningAll(false);
   };
 
-  const counts = reads.reduce(
+  const counts = allReads.reduce(
     (acc, ep) => {
       const s = statuses[ep.id] ?? "idle";
       acc[s] = (acc[s] ?? 0) + 1;
@@ -155,30 +218,82 @@ export function SystemDashboard({
         <div className="dash-hint">{system === "hiso" ? "Enter a session key above to enable calls." : "Authenticate above to enable calls."}</div>
       )}
 
-      <section className="dash-grid">
-        {reads.map((ep) => (
-          <EndpointCard
-            key={ep.id}
-            ref={(el) => {
-              cardRefs.current[ep.id] = el;
-            }}
-            endpoint={ep}
+      {isHiso ? (
+        <section className="dash-record-full">
+          <HisoPatientForm
+            ref={hisoFormRef}
+            contextValues={contextValues}
+            sessionKey={contextValues.sessionKey}
+            onStatus={(s) => handleResult("hiso-getData-record", s)}
+          />
+          {hisoAdvancedEndpoints.length > 0 && (
+            <details className="hiso-advanced">
+              <summary>Advanced: session/version/administrative calls</summary>
+              <UnifiedActionCard
+                endpoints={hisoAdvancedEndpoints}
+                contextValues={contextValues}
+                auth={authContext}
+                onResult={handleResult}
+                renderResult={(ep, raw, a) => renderHisoResult(ep, raw, a.sessionKey)}
+              />
+            </details>
+          )}
+        </section>
+      ) : isRecord ? (
+        <section className="dash-record-full">
+          <PatientRecordForm
+            key={system}
+            ref={recordFormRef}
+            endpoints={recordEndpoints}
             contextValues={contextValues}
             auth={authContext}
-            onResult={handleResult}
+            onStatus={handleResult}
+            renderResult={(ep, raw) => UNIFIED_RENDERERS[system]!(ep, raw, authContext)}
+            isAuthed={isAuthed}
           />
-        ))}
-      </section>
-
-      {writes.length > 0 && (
+          {recordAdvancedEndpoints.length > 0 && (
+            <details className="hiso-advanced">
+              <summary>Advanced: lookups needing an ID, and writes</summary>
+              <UnifiedActionCard
+                key={system}
+                ref={unifiedCardRef}
+                endpoints={recordAdvancedEndpoints}
+                contextValues={contextValues}
+                auth={authContext}
+                onResult={handleResult}
+                renderResult={UNIFIED_RENDERERS[system]}
+              />
+            </details>
+          )}
+        </section>
+      ) : (
         <>
-          <h2 className="dash-section-title">Writes</h2>
-          <p className="dash-section-hint">These call real write endpoints against real data - fill in fields and Save individually, not included in "Run all reads".</p>
           <section className="dash-grid">
-            {writes.map((ep) => (
-              <EndpointCard key={ep.id} endpoint={ep} contextValues={contextValues} auth={authContext} onResult={handleResult} />
+            {reads.map((ep) => (
+              <EndpointCard
+                key={ep.id}
+                ref={(el) => {
+                  cardRefs.current[ep.id] = el;
+                }}
+                endpoint={ep}
+                contextValues={contextValues}
+                auth={authContext}
+                onResult={handleResult}
+              />
             ))}
           </section>
+
+          {writes.length > 0 && (
+            <>
+              <h2 className="dash-section-title">Writes</h2>
+              <p className="dash-section-hint">These call real write endpoints against real data - fill in fields and Save individually, not included in "Run all reads".</p>
+              <section className="dash-grid">
+                {writes.map((ep) => (
+                  <EndpointCard key={ep.id} endpoint={ep} contextValues={contextValues} auth={authContext} onResult={handleResult} />
+                ))}
+              </section>
+            </>
+          )}
         </>
       )}
     </div>

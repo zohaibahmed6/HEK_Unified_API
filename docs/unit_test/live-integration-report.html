@@ -1,0 +1,742 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>HEK Core API — Live Integration Test Evidence</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f4f5f3; --surface: #ffffff; --ink: #1c211e; --ink-dim: #5c645d;
+    --border: #dde0db; --accent: #2f5d4f; --accent-soft: #e4ede9;
+    --pass: #1a7a4c; --pass-bg: #e2f3e7; --fail: #b3402a; --fail-bg: #fbe8e3;
+    --code-bg: #eef0ec; --shadow: 0 1px 2px rgba(28,33,30,0.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14180f; --surface: #1c221a; --ink: #e7ebe3; --ink-dim: #98a293;
+      --border: #2c342a; --accent: #7dbf9e; --accent-soft: #223129;
+      --pass: #6fd39a; --pass-bg: #1a3324; --fail: #ea8f79; --fail-bg: #3a1f18;
+      --code-bg: #232a20; --shadow: 0 1px 2px rgba(0,0,0,0.3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14180f; --surface: #1c221a; --ink: #e7ebe3; --ink-dim: #98a293;
+    --border: #2c342a; --accent: #7dbf9e; --accent-soft: #223129;
+    --pass: #6fd39a; --pass-bg: #1a3324; --fail: #ea8f79; --fail-bg: #3a1f18;
+    --code-bg: #232a20; --shadow: 0 1px 2px rgba(0,0,0,0.3);
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f5f3; --surface: #ffffff; --ink: #1c211e; --ink-dim: #5c645d;
+    --border: #dde0db; --accent: #2f5d4f; --accent-soft: #e4ede9;
+    --pass: #1a7a4c; --pass-bg: #e2f3e7; --fail: #b3402a; --fail-bg: #fbe8e3;
+    --code-bg: #eef0ec; --shadow: 0 1px 2px rgba(28,33,30,0.06);
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    margin: 0; padding: 2.5rem 1.5rem; background: var(--bg); color: var(--ink); line-height: 1.5;
+  }
+  .page { max-width: 980px; margin: 0 auto; }
+  h1 {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 1.65rem; font-weight: 700; margin: 0 0 0.3rem; text-wrap: balance; letter-spacing: -0.01em;
+  }
+  .subtitle { font-size: 0.92rem; color: var(--ink-dim); margin-bottom: 1.75rem; }
+  .subtitle code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; }
+  .summary { display: flex; gap: 0.75rem; margin-bottom: 2.25rem; flex-wrap: wrap; }
+  .stat {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 0.9rem 1.4rem; box-shadow: var(--shadow); min-width: 110px;
+  }
+  .stat .num { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 1.7rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat .label { font-size: 0.72rem; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 0.15rem; }
+  .stat.total .num { color: var(--accent); }
+  .stat.pass .num { color: var(--pass); }
+  .stat.fail .num { color: var(--fail); }
+  .group { margin-bottom: 2rem; }
+  .group h2 {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 1rem; font-weight: 600; border-bottom: 1px solid var(--border);
+    padding-bottom: 0.5rem; margin-bottom: 0.75rem; display: flex; align-items: baseline; gap: 0.6rem;
+  }
+  .group-count {
+    font-weight: 500; font-size: 0.78rem; color: var(--ink-dim);
+    font-variant-numeric: tabular-nums; background: var(--accent-soft); padding: 0.1rem 0.5rem; border-radius: 999px;
+  }
+  .cards { display: flex; flex-direction: column; gap: 0.45rem; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); overflow: hidden; }
+  .card.fail { border-color: color-mix(in srgb, var(--fail) 45%, var(--border)); }
+  summary {
+    cursor: pointer; padding: 0.6rem 1rem; display: flex; align-items: center; gap: 0.75rem; list-style: none;
+  }
+  summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸"; color: var(--ink-dim); font-size: 0.7rem; transition: transform 0.15s ease; }
+  details[open] summary::before { transform: rotate(90deg); }
+  @media (prefers-reduced-motion: reduce) { details[open] summary::before { transition: none; } }
+  .badge {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 0.66rem; font-weight: 700; padding: 0.18rem 0.5rem; border-radius: 4px; letter-spacing: 0.04em;
+    flex-shrink: 0;
+  }
+  .badge-pass { background: var(--pass-bg); color: var(--pass); }
+  .badge-fail { background: var(--fail-bg); color: var(--fail); }
+  .method { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem; flex: 1; word-break: break-word; }
+  .duration {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.72rem; color: var(--ink-dim); white-space: nowrap; font-variant-numeric: tabular-nums;
+  }
+  .card-body { padding: 0 1rem 1rem 1rem; }
+  .call { margin-bottom: 0.5rem; }
+  .call code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem; background: var(--code-bg); padding: 0.2rem 0.45rem; border-radius: 4px;
+  }
+  .block { margin-top: 0.55rem; }
+  .block-label {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-dim); margin-bottom: 0.3rem;
+  }
+  .block.error .block-label { color: var(--fail); }
+  .wide-scroll { overflow-x: auto; }
+  pre {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: var(--code-bg); padding: 0.6rem 0.75rem; border-radius: 6px; overflow-x: auto;
+    font-size: 0.76rem; white-space: pre-wrap; word-break: break-word; margin: 0; max-height: 260px; overflow-y: auto;
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <h1>HEK Core API — Live Integration Test Evidence</h1>
+    <div class="subtitle">Real HTTP calls against the live docker stack (<code>dbserver-local</code> → <code>PMS_NZ_V2</code> / <code>DMS_PMS</code>) — 2026-07-28</div>
+    <div class="summary">
+      <div class="stat total"><div class="num">43</div><div class="label">Total</div></div>
+      <div class="stat pass"><div class="num">43</div><div class="label">Passed</div></div>
+      <div class="stat fail"><div class="num">0</div><div class="label">Failed</div></div>
+    </div>
+    <section class="group">
+    <h2>ErmsCompatTests <span class="group-count">17/17</span></h2>
+    <div class="cards">
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">ListReads_RespondSuccessfully(path: "/erms/GetPrescribedMedications")</span>
+          <span class="duration">00:00:03.0127110</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /erms/GetPrescribedMedications?pmsPatientId=2459731&amp;pmsEncounterId=2147488418__901__-__local</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>&lt;?xml version="1.0" encoding="utf-16"?&gt;&lt;PrescribedMedications xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" conceptType="List" /&gt;</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">ListReads_RespondSuccessfully(path: "/erms/GetConsultNotes")</span>
+          <span class="duration">00:00:02.6015294</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /erms/GetConsultNotes?pmsPatientId=2459731&amp;pmsEncounterId=2147488418__901__-__local</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>&lt;?xml version="1.0" encoding="utf-16"?&gt;&lt;ConsultNotes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" conceptType="List"&gt;&lt;Patient_Consult order="dateDescend" conceptID="554:1000111/1000156" referenceID="192DD50D-0D56-4036-BEFD-0DE72A6E18B3"&gt;&lt;Patient_Consult_Date conceptID="554:1000111/1000156/6"&gt;2026-06-23T08:16:03&lt;/Patient_Consult_Date&gt;&lt;Patient_Consult_Exam conceptID="554:1000111/1000156/3" /&gt;&lt;Patient_Consult_History conceptID="554:1000111/1000156/1" /&gt;&lt;Patient_Consult_Assessment conceptID="554:1000111/1000156/99" /&gt;&lt;Patient_Consult_Plan conceptID="554:1000111/1000156/98" /&gt;&lt;/Patient_Consult&gt;&lt;Patient_Consult order="dateDescend" conceptID="554:1000111/1000156" referenceID="BD8B0DAB-9FC4-496C-AB83-4609138C9702"&gt;&lt;Patient_Consult_Date conceptID="554:1000111/1000156/6"&gt;2026-06-09T10:34:01&lt;/Patient_Consult_Date&gt;&lt;Patient_Consult_Exam conceptID="554:1000111/1000156/3" /&gt;&lt;Patient_Consult_History conceptID="554:1000111/1000156/1"&gt;testing
+
+testing 
+testing testing 
+testing 
+testing testing testing testing testing 
+testing testing testing testing testing testing testing testing testing 
+testing &lt;/Patient_Consult_History&gt;&lt;Patient_Consult_Assessment conceptID="554:1000111/1000156/99" /&gt;&lt;Patient_Consult_Plan conceptID="554:1000111/1000156/98" /&gt;&lt;/Patient_Consult&gt;&lt;Patient_Consult order="dateDescend" conceptID="554:1000111/1000156" referenceID="34734F91-34D2-42C3-A0B5-1078B7EF7A8C"&gt;&lt;Patient_Consult_Date conceptID="554:1000111/1000156/6"&gt;2026-04-06T08:48:52&lt;/Patient_Consult_Date&gt;&lt;Patient_Consult_Exam conceptID="554:1000111/1000156/3" /&gt;&lt;Patient_Consult_History conceptID="554:1000111/1000156/1"&gt;\bp 154/99.&lt;/Patient_Consult_History&gt;&lt;Patient_Consult_Assessment conceptID="554:1000111/1000156/99" /&gt;&lt;Patient_Consult_Plan conceptID="554:1000111/1000156/98" /&gt;&lt;/Patient_Consult&gt;&lt;Patient_Consult order="dateDescend" conceptID="554:1000111/1000156" referenceID="288AB5D9-4343-4318-918D-B0638D9793E9"&gt;&lt;Patient_Consult_Date conceptID="554:1000111/1000156/6"&gt;2026-03-24T09:26:03&lt;/Patient_Consult_Date&gt;&lt;Patient_Consult_Exam conceptID="554:1000111/1000156/3" /&gt;&lt;Patient_Consult_History conceptID="554:1000111/1000156/1"&gt;\bgl 6.4&lt;/Patient_Consult_History&gt;&lt;Patient_Consult_Assessment conceptID="554:1000111/1000156/99" /&gt;&lt;Patient_Consult_Plan conceptID="554:1000111/1000156/98" /&gt;&lt;/Patient_Consult&gt;&lt;Patient_Consult order="dateDescend" conceptID="554:1000111/1000156" referenceID="288AB5D9-4343-4318-918D-B0638D9793E9"&gt;&lt;Patient_Consult_Date conceptID="554:1000111/1000156/6"&gt;2026-03-24T09:26:03&lt;/Patient_Consult_Date&gt;&lt;Patient_Consult_Exam conceptID="554:1000111/1000156/3" /&gt;&lt;Patient_Consult_History conceptID="554:1000111/1000156/1"&gt;\bgl 6.4&lt;/Patient_Consult_History&gt;&lt;Patient_Consult_Assessment conceptID="554:1000111/1000156/99" /&gt;&lt;Patient_Consult_Plan conceptID="554:1000111/1000156/98" /&gt;&lt;/Patient_Consult&gt;&lt;Patient_Consult order="dateDescend" conceptID="554:1000111/1000156" referenceID="E25D84DF-F637-4280-B767-8EA28C870B40"&gt;&lt;Patient_Consult_Date conceptID="554:1000111/1000156/6"&gt;2026-02-13T12:14:36&lt;/Patient_Consult_Date&gt;&lt;Patient_Consult_Exam conceptID="554:1000111/1000156/3" /&gt;&lt;Patient_Consult_History conceptID="554:1000111/1000156/1"&gt;ism2
+
+
+
+ &lt;/Patient_Consult_History&gt;&lt;Patient_Consult_Assessment conceptID="554:1000111/1000156/99" /&gt;&lt;Patient_Consult_Plan conceptID="554:1000111/1000156/98" /&gt;&lt;/Patient_Consult&gt;&lt;Patient_Consult order="dateDescend" conceptID="554:1000111/1000156" referenceID="216858FC-9444-4D82-8E89-29165FD8A144"&gt;&lt;Patient_Consult_Date conceptID="554:1000111/1000156/6"&gt;2025-10-03T12:29:25&lt;/Patient_Consult_Date&gt;&lt;Patient_Consult_Exam conceptID="554:1000111/1000156/3" /&gt;&lt;Patient_Consult_History conceptID="554:1000111/1000156/1"&gt;&amp;lt;p&amp;gt;ttttttt&amp;lt;/p&amp;gt;&lt;/Patient_Consult_History&gt;&lt;Patient_Consult_Assessment conceptID="554:1000111/1000156/99" /&gt;&lt;Patient_Consult_Plan conceptID="554:1000111/1000156/98" /&gt;&lt;/Patient_Consult&gt;&lt;/ConsultNotes&gt;</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">ListReads_RespondSuccessfully(path: "/erms/GetScannedList")</span>
+          <span class="duration">00:00:02.1962815</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /erms/GetScannedList?pmsPatientId=2459731&amp;pmsEncounterId=2147488418__901__-__local</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>&lt;?xml version="1.0" encoding="utf-16"?&gt;&lt;Error&gt;&lt;Message&gt;Column 'DataType' is read only.&lt;/Message&gt;&lt;/Error&gt;</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">ListReads_RespondSuccessfully(path: "/erms/GetSmokingStatus")</span>
+          <span class="duration">00:00:02.5740572</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /erms/GetSmokingStatus?pmsPatientId=2459731&amp;pmsEncounterId=2147488418__901__-__local</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>&lt;?xml version="1.0" encoding="utf-16"?&gt;&lt;SmokingStatus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" conceptType="List"&gt;&lt;Patient_Smoking conceptID="554:1000111/1000471" referenceID="2459731"&gt;&lt;Patient_Smoking_ConsumptionDescription conceptID="554:1000111/1000471/4" /&gt;&lt;Patient_Smoking_Code conceptID="554:1000111/1000471/7" /&gt;&lt;Patient_Smoking_CodingSystem conceptID="554:1000111/1000471/8"&gt;Read code&lt;/Patient_Smoking_CodingSystem&gt;&lt;Patient_Smoking_Date conceptID="554:1000111/1000471/1"&gt;2026-07-27T18:32:06.003&lt;/Patient_Smoking_Date&gt;&lt;/Patient_Smoking&gt;&lt;/SmokingStatus&gt;</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">ListReads_RespondSuccessfully(path: "/erms/GetLaboratoryReportList")</span>
+          <span class="duration">00:00:02.6323580</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /erms/GetLaboratoryReportList?pmsPatientId=2459731&amp;pmsEncounterId=2147488418__901__-__local</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>&lt;?xml version="1.0" encoding="utf-16"?&gt;&lt;LaboratoryReports xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" conceptType="List"&gt;&lt;Patient_LaboratoryReport conceptID="554:1000111/1000450" referenceID="14A242EF-EB86-4EA9-9A0F-E7C86E5D6B26"&gt;&lt;Patient_LaboratoryReport_SendingFacility conceptID="554:1000111/1000450/2" /&gt;&lt;Patient_LaboratoryReport_Subject conceptID="554:1000111/1000450/3"&gt;security test&lt;/Patient_LaboratoryReport_Subject&gt;&lt;Patient_LaboratoryReport_Name conceptID="554:1000111/1000450/17"&gt;security test&lt;/Patient_LaboratoryReport_Name&gt;&lt;Patient_LaboratoryReport_Date_Received conceptID="554:1000111/1000450/1"&gt;2026-04-03T00:00:00&lt;/Patient_LaboratoryReport_Date_Received&gt;&lt;Patient_LaboratoryReport_DataType conceptID="554:1000111/1000450/15"&gt;application/rtf&lt;/Patient_LaboratoryReport_DataType&gt;&lt;Patient_LaboratoryReport_Comments conceptID="554:1000111/1000450/27" /&gt;&lt;Order&gt;dateDescend&lt;/Order&gt;&lt;/Patient_LaboratoryReport&gt;&lt;Patient_LaboratoryReport conceptID="554:1000111/1000450" referenceID="2090C8B6-26BA-4671-800E-89AD50747FBA"&gt;&lt;Patient_LaboratoryReport_SendingFacility conceptID="554:1000111/1000450/2" /&gt;&lt;Patient_LaboratoryReport_Subject conceptID="554:1000111/1000450/3"&gt;ORTHOPAEDIC.&lt;/Patient_LaboratoryReport_Subject&gt;&lt;Patient_LaboratoryReport_Name conceptID="554:1000111/1000450/17"&gt;ORTHOPAEDIC.&lt;/Patient_LaboratoryReport_Name&gt;&lt;Patient_LaboratoryReport_Date_Received conceptID="554:1000111/1000450/1"&gt;2026-04-03T00:00:00&lt;/Patient_LaboratoryReport_Date_Received&gt;&lt;Patient_LaboratoryReport_DataType conceptID="554:1000111/1000450/15"&gt;application/rtf&lt;/Patient_LaboratoryReport_DataType&gt;&lt;Patient_LaboratoryReport_Comments conceptID="554:1000111/1000450/27" /&gt;&lt;Order&gt;dateDescend&lt;/Order&gt;&lt;/Patient_LaboratoryReport&gt;&lt;Patient_LaboratoryReport conceptID="554:1000111/1000450" referenceID="2496F611-4763-4FB8-AAF4-8BF27930A487"&gt;&lt;Patient_LaboratoryReport_SendingFacility conceptID="554:1000111/1000450/2" /&gt;&lt;Patient_LaboratoryReport_Subject conceptID="554:1000111/1000450/3"&gt;lab doc&lt;/Patient_LaboratoryReport_Subject&gt;&lt;Patient_LaboratoryReport_Name conceptID="554:1000111/1000450/17"&gt;lab doc&lt;/Patient_LaboratoryReport_Name&gt;&lt;Patient_LaboratoryReport_Date_Received conceptID="554:1000111/1000450/1"&gt;2026-04-01T00:00:00&lt;/Patient_LaboratoryReport_Date_Received&gt;&lt;Patient_LaboratoryReport_DataType conceptID="554:1000111/1000450/15"&gt;application/rtf&lt;/Patient_LaboratoryReport_DataType&gt;&lt;Patient_LaboratoryReport_Comments conceptID="554:1000111/1000450/27" /&gt;&lt;Order&gt;dateDescend&lt;/Order&gt;&lt;/Patient_LaboratoryReport&gt;&lt;Patient_LaboratoryReport conceptID="554:1000111/1000450" referenceID="3455E0F1-4F5D-4883-B431-1B1898328410"&gt;&lt;Patient_LaboratoryReport_SendingFacility conceptID="554:1000111/1000450/2" /&gt;&lt;Patient_LaboratoryReport_Subject conceptID="554:1000111/1000450/3"&gt;Lab new Value&lt;/Patient_LaboratoryReport_Subject&gt;&lt;Patient_LaboratoryReport_Name conceptID="554:1000111/1000450/17"&gt;Lab new Value&lt;/Patient_LaboratoryReport_Name&gt;&lt;Patient_LaboratoryReport_Date_Received conceptID="554:1000111/1000450/1"&gt;2026-04-01T00:00:00&lt;/Patient_LaboratoryReport_Date_Received&gt;&lt;Patient_LaboratoryReport_DataType conceptID="554:1000111/1000450/15"&gt;application/rtf&lt;/Patient_LaboratoryReport_DataType&gt;&lt;Patient_LaboratoryReport_Comments conceptID="554:1000111/1000450/27" /&gt;&lt;Order&gt;dateDescend&lt;/Order&gt;&lt;/Patient_LaboratoryReport&gt;&lt;/LaboratoryReports&gt;</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">ListReads_RespondSuccessfully(path: "/erms/GetMedicalAllergies")</span>
+          <span class="duration">00:00:02.5936307</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /erms/GetMedicalAllergies?pmsPatientId=2459731&amp;pmsEncounterId=2147488418__901__-__local</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>&lt;?xml version="1.0" encoding="utf-16"?&gt;&lt;MedicalWarnings xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" conceptType="List"&gt;&lt;Patient_MedicalWarning order="dateDescend" conceptID="554:1000111/1000490" referenceID="5F0B4FBD-A06A-420C-9584-9ED404DA8109"&gt;&lt;Patient_MedicalWarning_Comments conceptID="554:1000111/1000490/6" /&gt;&lt;Patient_MedicalWarning_Date conceptID="554:1000111/1000490/1"&gt;2026-04-15T00:00:00&lt;/Patient_MedicalWarning_Date&gt;&lt;Patient_MedicalWarning_Description conceptID="554:1000111/1000490/3"&gt;-Allergy&lt;/Patient_MedicalWarning_Description&gt;&lt;Patient_MedicalWarning_RecordedByID conceptID="554:1000111/1000490/2"&gt;1763690&lt;/Patient_MedicalWarning_RecordedByID&gt;&lt;/Patient_MedicalWarning&gt;&lt;Patient_MedicalWarning order="dateDescend" conceptID="554:1000111/1000490" referenceID="F36F5F5E-FF9D-4712-A8B8-C41E7AA02B75"&gt;&lt;Patient_MedicalWarning_Comments conceptID="554:1000111/1000490/6"&gt;imran saeeed 123&lt;/Patient_MedicalWarning_Comments&gt;&lt;Patient_MedicalWarning_Date conceptID="554:1000111/1000490/1"&gt;2025-11-28T00:00:00&lt;/Patient_MedicalWarning_Date&gt;&lt;Patient_MedicalWarning_Description conceptID="554:1000111/1000490/3"&gt;Cows milk hypocalcemia of newborn-Allergy&lt;/Patient_MedicalWarning_Description&gt;&lt;Patient_MedicalWarning_RecordedByID conceptID="554:1000111/1000490/2"&gt;1763690&lt;/Patient_MedicalWarning_RecordedByID&gt;&lt;/Patient_MedicalWarning&gt;&lt;/MedicalWarnings&gt;</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">ListReads_RespondSuccessfully(path: "/erms/GetRadiologyReportList")</span>
+          <span class="duration">00:00:02.6142694</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /erms/GetRadiologyReportList?pmsPatientId=2459731&amp;pmsEncounterId=2147488418__901__-__local</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>&lt;?xml version="1.0" encoding="utf-16"?&gt;&lt;RadiologyReports xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" name="clinical.RadiologyReport" conceptType="List" /&gt;</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">ListReads_RespondSuccessfully(path: "/erms/GetClassifications")</span>
+          <span class="duration">00:00:02.5843029</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /erms/GetClassifications?pmsPatientId=2459731&amp;pmsEncounterId=2147488418__901__-__local</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>&lt;?xml version="1.0" encoding="utf-16"?&gt;&lt;Problems xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" name="Patient_Problem" conceptType="List"&gt;&lt;Patient_Problem order="dateDescend" conceptName="Problems" conceptID="554:1000111/1000461" referenceID="A9873524-4A10-44BE-9543-DA0DE82C055E"&gt;&lt;Patient_Problem_Comments conceptID="554:1000111/1000461/5"&gt;erer&lt;/Patient_Problem_Comments&gt;&lt;Patient_Problem_Description conceptID="554:1000111/1000461/2"&gt;Jake paralysis&lt;/Patient_Problem_Description&gt;&lt;Patient_Problem_DateOfOnset conceptID="554:1000111/1000461/4" /&gt;&lt;Patient_Problem_Code conceptID="554:1000111/1000461/3"&gt;7287001&lt;/Patient_Problem_Code&gt;&lt;Patient_Problem_CodingSystem conceptID="554:1000111/1000461/8"&gt;SNOMED&lt;/Patient_Problem_CodingSystem&gt;&lt;Patient_Problem_DateRecorded conceptID="554:1000111/1000461/1"&gt;2026-07-27T00:00:00&lt;/Patient_Problem_DateRecorded&gt;&lt;Patient_Problem_IsLongTerm conceptID="554:1000111/1000461"&gt;true&lt;/Patient_Problem_IsLongTerm&gt;&lt;/Patient_Problem&gt;&lt;Patient_Problem order="dateDescend" conceptName="Problems" conceptID="554:1000111/1000461" referenceID="4287081C-F71A-4804-B634-37C1E0C38952"&gt;&lt;Patient_Problem_Comments conceptID="554:1000111/1000461/5"&gt;QA test condition entry from HEK dashboard&lt;/Patient_Problem_Comments&gt;&lt;Patient_Problem_Description conceptID="554:1000111/1000461/2"&gt;Type 2 diabetes mellitus&lt;/Patient_Problem_Description&gt;&lt;Patient_Problem_DateOfOnset conceptID="554:1000111/1000461/4"&gt;2026-07-27T00:00:00&lt;/Patient_Problem_DateOfOnset&gt;&lt;Patient_Problem_Code conceptID="554:1000111/1000461/3"&gt;44054006&lt;/Patient_Problem_Code&gt;&lt;Patient_Problem_CodingSystem conceptID="554:1000111/1000461/8"&gt;SNOMED&lt;/Patient_Problem_CodingSystem&gt;&lt;Patient_Problem_DateRecorded conceptID="554:1000111/1000461/1"&gt;2026-07-27T00:00:00&lt;/Patient_Problem_DateRecorded&gt;&lt;Patient_Problem_IsLongTerm conceptID="554:1000111/1000461"&gt;false&lt;/Patient_Problem_IsLongTerm&gt;&lt;/Patient_Problem&gt;&lt;Patient_Problem order="dateDescend" conceptName="Problems" conceptID="554:1000111/1000461" referenceID="527DF304-0FEA-4CD9-B373-922E49380404"&gt;&lt;Patient_Problem_Comments conceptID="554:1000111/1000461/5" /&gt;&lt;Patient_Problem_Description conceptID="554:1000111/1000461/2"&gt;[D]Chills with fever (situation)&lt;/Patient_Problem_Description&gt;&lt;Patient_Problem_DateOfOnset conceptID="554:1000111/1000461/4" /&gt;&lt;Patient_Problem_Code conceptID="554:1000111/1000461/3"&gt;206760004&lt;/Patient_Problem_Code&gt;&lt;Patient_Problem_CodingSystem conceptID="554:1000111/1000461/8"&gt;SNOMED&lt;/Patient_Problem_CodingSystem&gt;&lt;Patient_Problem_DateRecorded conceptID="554:1000111/1000461/1"&gt;2026-03-26T00:00:00&lt;/Patient_Problem_DateRecorded&gt;&lt;Patient_Problem_IsLongTerm conceptID="554:1000111/1000461"&gt;false&lt;/Patient_Problem_IsLongTerm&gt;&lt;/Patient_Problem&gt;&lt;/Problems&gt;</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">SaveDocument_Write_FailsWithKnownStoredProcedureRollbackBug</span>
+          <span class="duration">00:00:02.6346848</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>POST /erms/SaveDocument</code></div>
+          <div class="block"><div class="block-label">Request</div><pre>&lt;ReferralDocument&gt;&lt;ReferralDocument_Referral_ID&gt;&lt;/ReferralDocument_Referral_ID&gt;&lt;ReferralDocument_Document_ID&gt;INTEG-TEST-001&lt;/ReferralDocument_Document_ID&gt;&lt;ReferralDocument_Patient_PMS_ID&gt;2459731&lt;/ReferralDocument_Patient_PMS_ID&gt;&lt;ReferralDocument_Encounter_ID&gt;2147488418__901__-__local&lt;/ReferralDocument_Encounter_ID&gt;&lt;ReferralDocument_Referrer_PMS_ID&gt;1&lt;/ReferralDocument_Referrer_PMS_ID&gt;&lt;ReferralDocument_Referral_Type&gt;Letter&lt;/ReferralDocument_Referral_Type&gt;&lt;ReferralDocument_Item_Type&gt;Referral&lt;/ReferralDocument_Item_Type&gt;&lt;ReferralDocument_Created_Date&gt;2026-07-28&lt;/ReferralDocument_Created_Date&gt;&lt;ReferralDocument_Content_Type&gt;text/plain&lt;/ReferralDocument_Content_Type&gt;&lt;ReferralDocument_Content&gt;SW50ZWdyYXRpb24gdGVzdCBFUk1TIGRvY3VtZW50IGNvbnRlbnQ=&lt;/ReferralDocument_Content&gt;&lt;/ReferralDocument&gt;</pre></div>
+          <div class="block"><div class="block-label">Response (HTTP 400)</div><pre>BadRequest</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">ListReads_RespondSuccessfully(path: "/erms/GetAccidents")</span>
+          <span class="duration">00:00:02.6538364</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /erms/GetAccidents?pmsPatientId=2459731&amp;pmsEncounterId=2147488418__901__-__local</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>&lt;?xml version="1.0" encoding="utf-16"?&gt;&lt;Accidents xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" conceptType="List"&gt;&lt;Patient_Accident order="dateDescend" conceptID="554:1000111/1000300" referenceID="92FDA624-D6D1-4A67-AE09-ED13BA9DFBE9"&gt;&lt;Patient_Accident_RegistrationNumber conceptID="554:1000111/1000300/2"&gt;______&lt;/Patient_Accident_RegistrationNumber&gt;&lt;Patient_Accident_Date conceptID="554:1000111/1000300/1"&gt;2026-04-01T00:00:00&lt;/Patient_Accident_Date&gt;&lt;Patient_Accident_DiagnosisDescription conceptID="554:1000111/1000300/4"&gt;jj &lt;/Patient_Accident_DiagnosisDescription&gt;&lt;Patient_Accident_IsWorkRelated conceptID="554:1000111/1000300/5"&gt;false&lt;/Patient_Accident_IsWorkRelated&gt;&lt;Patient_Accident_Location_Description conceptID="554:1000111/1000300/6" /&gt;&lt;/Patient_Accident&gt;&lt;Patient_Accident order="dateDescend" conceptID="554:1000111/1000300" referenceID="6E8A48C2-8E0A-42FD-A852-005EDD3B73A1"&gt;&lt;Patient_Accident_RegistrationNumber conceptID="554:1000111/1000300/2"&gt;11111223&lt;/Patient_Accident_RegistrationNumber&gt;&lt;Patient_Accident_Date conceptID="554:1000111/1000300/1"&gt;2025-12-15T00:00:00&lt;/Patient_Accident_Date&gt;&lt;Patient_Accident_DiagnosisDescription conceptID="554:1000111/1000300/4" /&gt;&lt;Patient_Accident_IsWorkRelated conceptID="554:1000111/1000300/5" /&gt;&lt;Patient_Accident_Location_Description conceptID="554:1000111/1000300/6" /&gt;&lt;/Patient_Accident&gt;&lt;/Accidents&gt;</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">ListReads_RespondSuccessfully(path: "/erms/GetNextOfKin")</span>
+          <span class="duration">00:00:02.6179706</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /erms/GetNextOfKin?pmsPatientId=2459731&amp;pmsEncounterId=2147488418__901__-__local</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>&lt;?xml version="1.0" encoding="utf-16"?&gt;&lt;Next_Of_Kin xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" conceptType="List"&gt;&lt;PatientNOK conceptID="554:1000111/1000760" referenceID="398338"&gt;&lt;PatientNOK_Address_AdditionalLine conceptID="554:1000111/1000760/4" /&gt;&lt;PatientNOK_Address_City conceptID="554:1000111/1000760/7"&gt;Akaroa&lt;/PatientNOK_Address_City&gt;&lt;PatientNOK_Address_Postcode conceptID="554:1000111/1000760/6" /&gt;&lt;PatientNOK_Address_StreetName conceptID="554:1000111/1000760/3"&gt;11a+pinestead+reach,r+d+3, Silverdale+0993,0993,572%40wdhb&lt;/PatientNOK_Address_StreetName&gt;&lt;PatientNOK_Address_StreetNumber conceptID="554:1000111/1000760/2" /&gt;&lt;PatientNOK_Address_Suburb conceptID="554:1000111/1000760/5" /&gt;&lt;PatientNOK_Firstname conceptID="554:1000111/1000710/1"&gt;LnB&lt;/PatientNOK_Firstname&gt;&lt;PatientNOK_Middlename conceptID="554:1000111/1000710/3" /&gt;&lt;PatientNOK_Surname conceptID="554:1000111/1000710/2"&gt;WMKCU&lt;/PatientNOK_Surname&gt;&lt;PatientNOK_Mobile conceptID="554:1000111/1000731"&gt;+64211234567&lt;/PatientNOK_Mobile&gt;&lt;PatientNOK_PreferredNumber /&gt;&lt;PatientNOK_Relationship conceptID="554:1000111/1000710/5" /&gt;&lt;PatientNOK_ResidentialPhone conceptID="554:1000111/1000730"&gt;+64211234567&lt;/PatientNOK_ResidentialPhone&gt;&lt;PatientNOK_WorkPhone conceptID="554:1000111/1000732" /&gt;&lt;PatientNOK_IsDefault conceptID="554:1000111/1000710/6"&gt;true&lt;/PatientNOK_IsDefault&gt;&lt;/PatientNOK&gt;&lt;/Next_Of_Kin&gt;</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">ListReads_RespondSuccessfully(path: "/erms/GetRegularMedications")</span>
+          <span class="duration">00:00:03.0351851</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /erms/GetRegularMedications?pmsPatientId=2459731&amp;pmsEncounterId=2147488418__901__-__local</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>&lt;?xml version="1.0" encoding="utf-16"?&gt;&lt;RegularMedications xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" conceptType="List"&gt;&lt;Patient_RegularMedication order="dateDescend" conceptID="554:1000111/1000501" referenceID="2DD77B05-BD1F-4EAD-8FE8-2D7B207EA61A"&gt;&lt;Patient_RegularMedication_StartedDate conceptID="554:1000111/1000501/7"&gt;2026-04-03T00:00:00&lt;/Patient_RegularMedication_StartedDate&gt;&lt;Patient_RegularMedication_Name conceptID="554:1000111/1000501/9"&gt;aminophylline 250 mg/10 mL injection, ampoule&lt;/Patient_RegularMedication_Name&gt;&lt;Patient_RegularMedication_Code conceptID="554:1000111/1000501/3"&gt;10039571000116108&lt;/Patient_RegularMedication_Code&gt;&lt;Patient_RegularMedication_CodingSystem conceptID="554:1000111/1000501/11"&gt;SNOMED&lt;/Patient_RegularMedication_CodingSystem&gt;&lt;Patient_RegularMedication_DispenseQuantity conceptID="554:1000111/1000501/4" /&gt;&lt;Patient_RegularMedication_DispenseUnit conceptID="554:1000111/1000501/10" /&gt;&lt;Patient_RegularMedication_DosageQuantity conceptID="554:1000111/1000501/14"&gt;3&lt;/Patient_RegularMedication_DosageQuantity&gt;&lt;Patient_RegularMedication_DosageUnit conceptID="554:1000111/1000501/16"&gt;ampoule&lt;/Patient_RegularMedication_DosageUnit&gt;&lt;Patient_RegularMedication_Administrationinstructions conceptID="554:1000111/1000501/6"&gt;Take: Three &lt;/Patient_RegularMedication_Administrationinstructions&gt;&lt;Patient_RegularMedication_LastPrescribedDate /&gt;&lt;/Patient_RegularMedication&gt;&lt;Patient_RegularMedication order="dateDescend" conceptID="554:1000111/1000501" referenceID="F9D4E812-D338-46DF-B4F6-E4CB093F52E5"&gt;&lt;Patient_RegularMedication_StartedDate conceptID="554:1000111/1000501/7"&gt;2026-04-03T00:00:00&lt;/Patient_RegularMedication_StartedDate&gt;&lt;Patient_RegularMedication_Name conceptID="554:1000111/1000501/9"&gt;Panadol - paracetamol 120 mg/5 mL oral liquid&lt;/Patient_RegularMedication_Name&gt;&lt;Patient_RegularMedication_Code conceptID="554:1000111/1000501/3"&gt;20063021000116106&lt;/Patient_RegularMedication_Code&gt;&lt;Patient_RegularMedication_CodingSystem conceptID="554:1000111/1000501/11"&gt;SNOMED&lt;/Patient_RegularMedication_CodingSystem&gt;&lt;Patient_RegularMedication_DispenseQuantity conceptID="554:1000111/1000501/4" /&gt;&lt;Patient_RegularMedication_DispenseUnit conceptID="554:1000111/1000501/10" /&gt;&lt;Patient_RegularMedication_DosageQuantity conceptID="554:1000111/1000501/14"&gt;3&lt;/Patient_RegularMedication_DosageQuantity&gt;&lt;Patient_RegularMedication_DosageUnit conceptID="554:1000111/1000501/16"&gt;mL&lt;/Patient_RegularMedication_DosageUnit&gt;&lt;Patient_RegularMedication_Administrationinstructions conceptID="554:1000111/1000501/6"&gt;Take Three mL twice daily&lt;/Patient_RegularMedication_Administrationinstructions&gt;&lt;Patient_RegularMedication_LastPrescribedDate /&gt;&lt;/Patient_RegularMedication&gt;&lt;Patient_RegularMedication order="dateDescend" conceptID="554:1000111/1000501" referenceID="BD5CD12C-7462-486F-9AE4-5AF1D2A40627"&gt;&lt;Patient_RegularMedication_StartedDate conceptID="554:1000111/1000501/7"&gt;2026-04-03T00:00:00&lt;/Patient_RegularMedication_StartedDate&gt;&lt;Patient_RegularMedication_Name conceptID="554:1000111/1000501/9"&gt;morphine sulfate 5 mg/mL injection, ampoule&lt;/Patient_RegularMedication_Name&gt;&lt;Patient_RegularMedication_Code conceptID="554:1000111/1000501/3"&gt;10471661000116109&lt;/Patient_RegularMedication_Code&gt;&lt;Patient_RegularMedication_CodingSystem conceptID="554:1000111/1000501/11"&gt;SNOMED&lt;/Patient_RegularMedication_CodingSystem&gt;&lt;Patient_RegularMedication_DispenseQuantity conceptID="554:1000111/1000501/4" /&gt;&lt;Patient_RegularMedication_DispenseUnit conceptID="554:1000111/1000501/10" /&gt;&lt;Patient_RegularMedication_DosageQuantity conceptID="554:1000111/1000501/14"&gt;1&lt;/Patient_RegularMedication_DosageQuantity&gt;&lt;Patient_RegularMedication_DosageUnit conceptID="554:1000111/1000501/16"&gt;ampoule&lt;/Patient_RegularMedication_DosageUnit&gt;&lt;Patient_RegularMedication_Administrationinstructions conceptID="554:1000111/1000501/6"&gt;Inject One Unit once daily&lt;/Patient_RegularMedication_Administrationinstructions&gt;&lt;Patient_RegularMedication_LastPrescribedDate /&gt;&lt;/Patient_RegularMedication&gt;&lt;/RegularMedications&gt;</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">GetCurrentUser_WithLocationAndUserId_ReturnsRealProvider</span>
+          <span class="duration">00:00:02.6039507</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /erms/GetCurrentUser?pmsPatientId=2459731&amp;pmsEncounterId=2147488418__901__-__local&amp;LocationId=901&amp;pmsUserId=1</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>&lt;?xml version="1.0" encoding="utf-16"?&gt;&lt;CurrentUser xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema"&gt;&lt;CurrentUser_FirstName conceptID="554:1000123/1000310/1"&gt;Super Admin&lt;/CurrentUser_FirstName&gt;&lt;CurrentUser_Surname conceptID="554:1000123/1000310/2"&gt;User&lt;/CurrentUser_Surname&gt;&lt;CurrentUser_Middlename conceptID="554:1000123/1000310/3"&gt;Admin&lt;/CurrentUser_Middlename&gt;&lt;CurrentUser_FullName conceptID="554:1000123/1000310/7"&gt;Super Admin USER&lt;/CurrentUser_FullName&gt;&lt;CurrentUser_RegisteringBody conceptID="554:1000123/1000421"&gt;Registration No&lt;/CurrentUser_RegisteringBody&gt;&lt;CurrentUser_RegistrationNumber conceptID="554:1000123/1000420" /&gt;&lt;CurrentUser_PersonalHPI conceptID="554:1000123/1000410" /&gt;&lt;CurrentUser_Application_UserID conceptID="554:1000123/1000310/8"&gt;1&lt;/CurrentUser_Application_UserID&gt;&lt;CurrentUserOrganisation_FacilityHPI conceptID="554:1000123/1000745"&gt;f&lt;/CurrentUserOrganisation_FacilityHPI&gt;&lt;CurrentUserOrganisation_HealthlinkEDI conceptID="554:1000123/1000409"&gt;TEST~1234567HCMA&lt;/CurrentUserOrganisation_HealthlinkEDI&gt;&lt;CurrentUser_PMSID conceptID="554:1000123/1000310/9"&gt;SuperAdmin&lt;/CurrentUser_PMSID&gt;&lt;/CurrentUser&gt;</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">GetRegisteredPractitioners_WithLocationId_RespondsSuccessfully</span>
+          <span class="duration">00:00:02.5855179</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /erms/GetRegisteredPractitioners?pmsPatientId=2459731&amp;pmsEncounterId=2147488418__901__-__local&amp;pmsLocationId=901</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>&lt;?xml version="1.0" encoding="utf-16"?&gt;&lt;RegisteredPractitioners xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" conceptType="List" /&gt;</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">ListReads_RespondSuccessfully(path: "/erms/GetPatientMeasurement")</span>
+          <span class="duration">00:00:02.6184876</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /erms/GetPatientMeasurement?pmsPatientId=2459731&amp;pmsEncounterId=2147488418__901__-__local</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>&lt;?xml version="1.0" encoding="utf-16"?&gt;&lt;Patient_Measurement xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" name="measurements"&gt;&lt;Measurement_BP_SYS qualifierName="systolic" qualifierID="271649006" conceptID="554:1000111/1002031" name="measurement.bloodPressure.systolic" dateTaken="2026-07-27T16:55:40"&gt;120&lt;/Measurement_BP_SYS&gt;&lt;Measurement_BP_DIA qualifierName="diastolic" qualifierID="271650006" conceptID="554:1000111/1002031" name="measurement.bloodPressure.diastolic" dateTaken="2026-07-27T16:55:40"&gt;80&lt;/Measurement_BP_DIA&gt;&lt;Measurement_Weight qualifierName="body weight" qualifierID="27113001" conceptID="554:1000111/1002031" name="measurement.weight" dateTaken="2026-07-27T16:55:40"&gt;68.00&lt;/Measurement_Weight&gt;&lt;Measurement_Height qualifierName="body height" qualifierID="50373000" conceptID="554:1000111/1002031" name="measurement.height" dateTaken="2026-07-27T16:55:40"&gt;170.00&lt;/Measurement_Height&gt;&lt;Measurement_BMI qualifierName="body mass index" qualifierID="60621009" conceptID="554:1000111/1002031" name="measurement.bmi" dateTaken="2026-07-27T16:55:53"&gt;3.11&lt;/Measurement_BMI&gt;&lt;/Patient_Measurement&gt;</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">ListReads_RespondSuccessfully(path: "/erms/GetDischargeSummaryReportList")</span>
+          <span class="duration">00:00:02.2267328</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /erms/GetDischargeSummaryReportList?pmsPatientId=2459731&amp;pmsEncounterId=2147488418__901__-__local</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>&lt;?xml version="1.0" encoding="utf-16"?&gt;&lt;DischargeReports xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" name="clinical.DischargeReports" conceptType="List" /&gt;</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">GetPatientData_ReturnsRealPatientRecord</span>
+          <span class="duration">00:00:02.5594838</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /erms/GetPatientData?pmsPatientId=2459731&amp;pmsEncounterId=2147488418__901__-__local</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>&lt;?xml version="1.0" encoding="utf-16"?&gt;&lt;PatientData xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema"&gt;&lt;Patient_Surname conceptID="554:1000111/1000310/2"&gt;WMKCU&lt;/Patient_Surname&gt;&lt;Patient_FirstName conceptID="554:1000111/1000310/1"&gt;LnB&lt;/Patient_FirstName&gt;&lt;Patient_MiddleName conceptID="554:1000111/1000310/3" /&gt;&lt;Patient_NHI conceptID="554:1000111/1000360"&gt;ZZZ0121&lt;/Patient_NHI&gt;&lt;Patient_DateOfBirth conceptID="554:1000111/1000320"&gt;2019-01-12T00:00:00&lt;/Patient_DateOfBirth&gt;&lt;Patient_Gender conceptID="554:1000111/1000350"&gt;F&lt;/Patient_Gender&gt;&lt;Patient_ResidentialAddress_StreetNumber conceptID="554:1000111/1000340/2" /&gt;&lt;Patient_ResidentialAddress_StreetName conceptID="554:1000111/1000340/3"&gt;11a+pinestead+reach,r+d+3, Silverdale+0993,0993,572%40wdhb&lt;/Patient_ResidentialAddress_StreetName&gt;&lt;Patient_ResidentialAddress_Suburb conceptID="554:1000111/1000340/5" /&gt;&lt;Patient_ResidentialAddress_City conceptID="554:1000111/1000340/7"&gt;Akaroa&lt;/Patient_ResidentialAddress_City&gt;&lt;Patient_ResidentialAddress_Postcode conceptID="554:1000111/1000400/6" /&gt;&lt;Patient_ResidentialAddress_AdditionalLine conceptID="554:1000111/1000340/4" /&gt;&lt;Patient_PostalAddress_StreetNumber conceptID="554:1000111/1000400/2" /&gt;&lt;Patient_PostalAddress_StreetName conceptID="554:1000111/1000400/3" /&gt;&lt;Patient_PostalAddress_Suburb conceptID="554:1000111/1000400/5" /&gt;&lt;Patient_PostalAddress_City conceptID="554:1000111/1000400/7" /&gt;&lt;Patient_PostalAddress_Postcode /&gt;&lt;Patient_PostalAddress_AdditionalLine conceptID="554:1000111/1000400/4" /&gt;&lt;Patient_Ethnicity1CodeLevel2 conceptID="554:1000111/1000370/1"&gt;21&lt;/Patient_Ethnicity1CodeLevel2&gt;&lt;Patient_Ethnicity2CodeLevel2 conceptID="554:1000111/1000370/2" /&gt;&lt;Patient_Ethnicity3CodeLevel2 conceptID="554:1000111/1000370/3" /&gt;&lt;Patient_Email conceptID="554:1000111/1000390"&gt;yvgy@indicitest.com&lt;/Patient_Email&gt;&lt;Patient_Mobile conceptID="554:1000111/1000331"&gt;+64211234567&lt;/Patient_Mobile&gt;&lt;Patient_ResidentialPhone conceptID="554:1000111/1000330"&gt;+64211234567&lt;/Patient_ResidentialPhone&gt;&lt;Patient_WorkPhone conceptID="554:1000111/1000332"&gt;+64211234567&lt;/Patient_WorkPhone&gt;&lt;Patient_IsEligiblePublicFunds conceptID="554:1000111/1000382"&gt;T&lt;/Patient_IsEligiblePublicFunds&gt;&lt;Patient_HUC conceptID="554:1000111/1000391" /&gt;&lt;Patient_HUC_StartDate conceptID="554:1000111/1000392" /&gt;&lt;Patient_HUC_EndDate conceptID="554:1000111/1000393" /&gt;&lt;Patient_CSC conceptID="554:1000111/1000395" /&gt;&lt;Patient_CSC_StartDate conceptID="554:1000111/1000396" /&gt;&lt;Patient_CSC_EndDate conceptID="554:1000111/1000397" /&gt;&lt;Patient_InternalPMSID conceptID="554:1000111/1000399"&gt;B27AEEE1-156C-4C99-915C-97FF96B26D21&lt;/Patient_InternalPMSID&gt;&lt;/PatientData&gt;</pre></div>
+          
+          
+        </div>
+      </details></div></section><section class="group">
+    <h2>ColCompatTests <span class="group-count">6/6</span></h2>
+    <div class="cards">
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">GetProviderData_RespondsSuccessfully</span>
+          <span class="duration">00:00:02.5593882</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /erms/col/GetProviderData?pmsPatientId=2459731&amp;pmsEncounterId=2147488418__901__-__local</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>[{"providername":"UXYXLX Qaaaa aappPpap","providercode":"NZNC","registrationnumber":"111","providerinternalname":"","providerrolecode":"N","providerhpicpn":""},{"providername":"Vrlywyyw xuxgy","providercode":"NZNC","registrationnumber":"190756","providerinternalname":"","providerrolecode":"N","providerhpicpn":"25CAYH"},{"providername":"Oszysy vzmuiuv","providercode":"NZMC","registrationnumber":"25905","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"11ARDX"},{"providername":"pract NURSE","providercode":"NZNC","registrationnumber":"165930","providerinternalname":"","providerrolecode":"NP","providerhpicpn":"10FBWB"},{"providername":"Vrlywyyw yqyyq","providercode":"NZNC","registrationnumber":"115663","providerinternalname":"","providerrolecode":"N","providerhpicpn":"19FQJX"},{"providername":"Tyxyk rtykrwyxr","providercode":"NZNC","registrationnumber":"1111","providerinternalname":"","providerrolecode":"N","providerhpicpn":""},{"providername":"yuhyy Mtyvvvovvv","providercode":"NZNC","registrationnumber":"106802","providerinternalname":"","providerrolecode":"N","providerhpicpn":"18FHRD"},{"providername":"wwwwyyw swswtxzxtss","providercode":"NZNC","registrationnumber":"111621","providerinternalname":"","providerrolecode":"N","providerhpicpn":"11FMHS"},{"providername":"Vvvvymrvv Othuy","providercode":"NZMC","registrationnumber":"111","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"GU UYUUUU","providercode":"NZMC","registrationnumber":"12345","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Ygxxz YIUYY","providercode":"NZNC","registrationnumber":"184684","providerinternalname":"","providerrolecode":"N","providerhpicpn":""},{"providername":"mynurse NURSE","providercode":"NZNC","registrationnumber":"127885","providerinternalname":"","providerrolecode":"N","providerhpicpn":"15KDEJ"},{"providername":"Xavier Edwards","providercode":"NZMC","registrationnumber":"73859","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"98ZZVG"},{"providername":"Pre YQMDOG","providercode":"NZMC","registrationnumber":"123456","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"xvxfvE thtgpt","providercode":"NZMC","registrationnumber":"16797","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"10AKCV"},{"providername":"rzrf LXXXVX","providercode":"NZNC","registrationnumber":"070947","providerinternalname":"","providerrolecode":"N","providerhpicpn":"12DRQP"},{"providername":"pcT TrjypcT","providercode":"NZMC","registrationnumber":"111111","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"YvgY YvgY","providercode":"NZMC","registrationnumber":"12345","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"test AQIB","providercode":"NZMC","registrationnumber":"312312312","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"uqfxeqx ZGZGZ","providercode":"NZMC","registrationnumber":"11124441","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"112233"},{"providername":"sxwwwwwfww vvvvvylvyll","providercode":"NZMC","registrationnumber":"12312","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"thzzhi yvgn","providercode":"NZMC","registrationnumber":"444","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"smswq zwiini","providercode":"NZMC","registrationnumber":"5945","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"ulmsluvv ulmsluvv","providercode":"NZMC","registrationnumber":"423432432","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"llyylkwy roepuo","providercode":"NZMC","registrationnumber":"dfd","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"mmymym mymmmy","providercode":"NZMC","registrationnumber":"23123123","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"hyr hyr","providercode":"NZMC","registrationnumber":"312323312","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"ggygT rdjL","providercode":"NZMC","registrationnumber":"hg654","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"jrrvv nn","providercode":"NZMC","registrationnumber":"1232121321312","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"WMKCU HEUE","providercode":"NZMC","registrationnumber":"65478","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"ZZZZ zgO","providercode":"NZMC","registrationnumber":"123123123","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"ZS  uhky SSS","providercode":"NZNC","registrationnumber":"1234","providerinternalname":"","providerrolecode":"N","providerhpicpn":""},{"providername":"xlcX qE","providercode":"NZNC","registrationnumber":"12345","providerinternalname":"","providerrolecode":"N","providerhpicpn":""},{"providername":"hNgpN xvxfvE","providercode":"NZMC","registrationnumber":"65116","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"29ALWR"},{"providername":"vhoP xvxfve","providercode":"NZMC","registrationnumber":"1111","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Asad Doctor 2nd User PREPROD 2ND","providercode":"NZMC","registrationnumber":"12345","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"seuoj ndnt","providercode":"NZMC","registrationnumber":"12345","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"xvxfvE wnkkcT","providercode":"NZNC","registrationnumber":"4411111","providerinternalname":"","providerrolecode":"N","providerhpicpn":""},{"providername":"Special CharacterProviders","providercode":"NZMC","registrationnumber":"12345","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"fzz990-F"},{"providername":"Special CharacterProviders","providercode":"NZMC","registrationnumber":"12345","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"fzz990-F"},{"providername":"seuoj illct","providercode":"NZMC","registrationnumber":"8888","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"fzz990-F"},{"providername":" kel gc","providercode":"NZMC","registrationnumber":"12346","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"fzz990-F"},{"providername":"Special CharacterProviders","providercode":"NZMC","registrationnumber":"123456","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"FZZ990-F"},{"providername":"KKtsmTThTgpT GGtljnzrtQ","providercode":"NZMC","registrationnumber":"123454","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"FZZ990-F"},{"providername":"Special CharacterProviders","providercode":"NZMC","registrationnumber":"12345","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"FZZ990-F"},{"providername":"thluhG illcT","providercode":"NZMC","registrationnumber":"66666","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"FZZ990-F"},{"providername":"RRRT 975FDD","providercode":"NZMC","registrationnumber":"14785","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"fzz990-F"},{"providername":"HEUE WMKCU","providercode":"NZMC","registrationnumber":"99999","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"fzz990-F"},{"providername":"HHtsmTThTgpT tljnzrtQ","providercode":"NZMC","registrationnumber":"12345","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"FZZ990-F"},{"providername":"Special CharacterProviders","providercode":"NZMC","registrationnumber":"12345","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"FZZ990-F"},{"providername":"qFpqF gmtcT","providercode":"NZMC","registrationnumber":"33333","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"FZZ990-F"},{"providername":"ORU tljnzrtQ","providercode":"NZMC","registrationnumber":"12345","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"FZZ990-F"},{"providername":"ttwK uqxtx","providercode":"NZMC","registrationnumber":"12345","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"FZZ990-F"},{"providername":"VYVGY VYVGY","providercode":"NZMC","registrationnumber":"12345","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"FZZ990-F"},{"providername":"ttyytuoj ghh","providercode":"NZMC","registrationnumber":"12345","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"fzz990-F"},{"providername":"oooo tljnzrtQ","providercode":"NZNC","registrationnumber":"12345","providerinternalname":"","providerrolecode":"N","providerhpicpn":"fzz990-F"},{"providername":"zzz tljnzrtQ","providercode":"NZNC","registrationnumber":"12345","providerinternalname":"","providerrolecode":"N","providerhpicpn":"fzz990-F"},{"providername":"yyyy tljnzrtQ","providercode":"NZMC","registrationnumber":"12345","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"fzz990-F"},{"providername":"yjpkuB rdjL","providercode":"NZMC","registrationnumber":"3344","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"qluB wmqwq","providercode":"NZMC","registrationnumber":"12345","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"FZZ999-B"},{"providername":"tsnTViVhssV tljnzrtQ","providercode":"NZNC","registrationnumber":"12345","providerinternalname":"","providerrolecode":"N","providerhpicpn":"FZZ990-F"},{"providername":"yvhyv tljnzrtQ","providercode":"NZMC","registrationnumber":"12345","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"fzz999-B"},{"providername":"culc hlul xvxfvE","providercode":"NZMC","registrationnumber":"aaa1333","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"hlqN qyggg","providercode":"NZMC","registrationnumber":"12","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"RRRR ZvgZ","providercode":"NZMC","registrationnumber":"123123123123","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"zs  jwuwo","providercode":"NZNC","registrationnumber":"0147","providerinternalname":"","providerrolecode":"N","providerhpicpn":""},{"providername":"UOFZZWO XGTGX","providercode":"NZMC","registrationnumber":"CSF23423","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"irrwig irrwig","providercode":"NZMC","registrationnumber":"111","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"mxlox mxlox","providercode":"NZMC","registrationnumber":"111","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"rdjl rdjl","providercode":"NZMC","registrationnumber":"111","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"mwltL mwltL","providercode":"NZMC","registrationnumber":"111","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"ofos ofos","providercode":"NZMC","registrationnumber":"111","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"zain JWUWO","providercode":"NZMC","registrationnumber":"sss1111","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"flsf flsf","providercode":"NZMC","registrationnumber":"111","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"flsf flsf","providercode":"NZMC","registrationnumber":"111","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Paul Doctor","providercode":"NZMC","registrationnumber":"53568","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"uofzzwo wFkzF","providercode":"NZMC","registrationnumber":"14785236","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Special CharacterProviders","providercode":"NZMC","registrationnumber":"12345","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"FZZ999-B"},{"providername":"nttYvnY fqE","providercode":"NZMC","registrationnumber":"98765","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"sam SAM","providercode":"NZMC","registrationnumber":"3123123","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Asad Nurse PREPROD NURSE","providercode":"NZNC","registrationnumber":"ZAA1234","providerinternalname":"","providerrolecode":"N","providerhpicpn":""},{"providername":"Doc WOC","providercode":"NZMC","registrationnumber":"11111","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"NUrse NURSE","providercode":"NZNC","registrationnumber":"22","providerinternalname":"","providerrolecode":"N","providerhpicpn":""},{"providername":"Michael SOLIS","providercode":"NZMC","registrationnumber":"55465","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"688558"},{"providername":"Tyler CURTIS","providercode":"NZNC","registrationnumber":"352845","providerinternalname":"","providerrolecode":"N","providerhpicpn":""},{"providername":"Doc EH","providercode":"NZMC","registrationnumber":"784578","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Nurse EH","providercode":"NZNC","registrationnumber":"12457852","providerinternalname":"","providerrolecode":"N","providerhpicpn":""},{"providername":"Taha DOC","providercode":"NZMC","registrationnumber":"556521","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"TAH312"},{"providername":"Taha NURSE","providercode":"NZNC","registrationnumber":"320221","providerinternalname":"","providerrolecode":"N","providerhpicpn":""},{"providername":"Shahzad DOC","providercode":"NZMC","registrationnumber":"123456","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Shahzad NURSE","providercode":"NZNC","registrationnumber":"123","providerinternalname":"","providerrolecode":"N","providerhpicpn":""},{"providername":"Sayab RAFIQUE","providercode":"NZMC","registrationnumber":"444H3","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Wasim DOCTOR","providercode":"NZMC","registrationnumber":"11101","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Wasim NURSE","providercode":"NZNC","registrationnumber":"110","providerinternalname":"","providerrolecode":"N","providerhpicpn":""},{"providername":"Doctor FINANCE","providercode":"NZMC","registrationnumber":"3333","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Doctor FAMILY","providercode":"NZMC","registrationnumber":"34234234","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"muhammad HASHIR","providercode":"NZMC","registrationnumber":"147852369","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Hussain Ali Khan","providercode":"NZMC","registrationnumber":"111","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"User  NURSE","providercode":"NZNC","registrationnumber":"456789","providerinternalname":"","providerrolecode":"N","providerhpicpn":""},{"providername":"Muhammad IRFAN","providercode":"NZMC","registrationnumber":"2587414","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"nmnere FAMILY","providercode":"NZMC","registrationnumber":"234234234","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"User PRO","providercode":"NZMC","registrationnumber":"123","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Doctor QA","providercode":"NZMC","registrationnumber":"444444444","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"siam RAJA","providercode":"NZMC","registrationnumber":"1","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"man FAMILY","providercode":"NZMC","registrationnumber":"231123123","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Grey ED","providercode":"NZMC","registrationnumber":"12","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Multiple practice USER1","providercode":"NZNC","registrationnumber":"1234","providerinternalname":"","providerrolecode":"N","providerhpicpn":""},{"providername":"Nurse TEST","providercode":"NZNC","registrationnumber":"1111","providerinternalname":"","providerrolecode":"N","providerhpicpn":""},{"providername":"faa FAMILY","providercode":"NZMC","registrationnumber":"24234234","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"newuser FAMILY","providercode":"NZMC","registrationnumber":"3123123","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"TM PROVIDER","providercode":"NZMC","registrationnumber":"11111","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Usman DOC","providercode":"NZMC","registrationnumber":"111","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Nurse URGENT CARE","providercode":"NZNC","registrationnumber":"1234","providerinternalname":"","providerrolecode":"N","providerhpicpn":""},{"providername":"Multiple Practices USER 1","providercode":"NZMC","registrationnumber":"ZAA1234","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"nurse SIAM","providercode":"NZNC","registrationnumber":"1","providerinternalname":"","providerrolecode":"N","providerhpicpn":""},{"providername":"thzzhI IFPJF","providercode":"NZNC","registrationnumber":"555555","providerinternalname":"","providerrolecode":"N","providerhpicpn":""},{"providername":"Nurson NURSE","providercode":"NZNC","registrationnumber":"90812","providerinternalname":"","providerrolecode":"N","providerhpicpn":""},{"providername":"User PREPROD","providercode":"NZMC","registrationnumber":"324324","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Muhammad HASHIR","providercode":"NZMC","registrationnumber":"14785236","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"New USER","providercode":"NZMC","registrationnumber":"123","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"DOC AI","providercode":"NZMC","registrationnumber":"1122","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"azam WASEEM","providercode":"NZMC","registrationnumber":"123123123","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Asad Doctor PREPROD","providercode":"NZMC","registrationnumber":" AAA11234  ","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Pre USER","providercode":"NZMC","registrationnumber":"123213","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Pass USER","providercode":"NZMC","registrationnumber":"213456456","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Carson DOCTOR","providercode":"NZMC","registrationnumber":"090122","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Doctor SHAMS","providercode":"NZMC","registrationnumber":"345675843642","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"ilya ANJ","providercode":"NZMC","registrationnumber":"012012012","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"chadmin-  MARAENUI","providercode":"NZMC","registrationnumber":"42603","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"98ZZVT"},{"providername":"LocationDoctor HEADER","providercode":"NZMC","registrationnumber":"1231231","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Jackie Hansen","providercode":"NZMC","registrationnumber":"1679611","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Victoria PRACTICE","providercode":"NZMC","registrationnumber":"322021","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"khan CHECKLIST","providercode":"NZMC","registrationnumber":"456","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Arya STARK","providercode":"NZMC","registrationnumber":"PPP101","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"98ZZZA"},{"providername":"user3 MERCY","providercode":"NZMC","registrationnumber":"444rrrrr","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Zeeshan SIKANDER","providercode":"NZMC","registrationnumber":"225","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"tes TEST","providercode":"NZNC","registrationnumber":"adf","providerinternalname":"","providerrolecode":"N","providerhpicpn":""},{"providername":"Michael DONALD","providercode":"NZMC","registrationnumber":"25479258","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Muhammad UMAR","providercode":"NZMC","registrationnumber":"344","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Ali AYYAN","providercode":"NZMC","registrationnumber":"234","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Qazi MORGAN","providercode":"NZMC","registrationnumber":"11","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Zayan ALI","providercode":"NZMC","registrationnumber":"2222","providerinternalname":"","providerrolecode":"GP","providerhpicpn":"222CPN"},{"providername":"Shahzad AHMAD","providercode":"NZMC","registrationnumber":"d","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""},{"providername":"Mohsin ALI","providercode":"NZMC","registrationnumber":"234","providerinternalname":"","providerrolecode":"GP","providerhpicpn":""}]</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">SaveInvoice_Write_FailsWithKnownInvalidValuesRejection</span>
+          <span class="duration">00:00:02.5975997</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>POST /erms/col/SaveInvoice</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>Invalid values passed!</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">GetSurgeryData_WithLocationId_RespondsSuccessfully</span>
+          <span class="duration">00:00:02.6139073</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /erms/col/GetSurgeryData?pmsPatientId=2459731&amp;pmsEncounterId=2147488418__901__-__local&amp;LocationId=901</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>{"locationcode":null,"surgeryname":null,"locationstreet":null,"locationsuburb":null,"locationcity":null,"locationpostcode":null,"postalstreet":null,"postalsuburb":null,"postalcity":null,"postalpostcode":null,"dayphone":null,"afterhoursphone":null,"faxphone":null,"hpifacilitynumber":null}</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">GetCurrentPatientData_ReturnsRealPatientRecord</span>
+          <span class="duration">00:00:02.6273803</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /erms/col/GetCurrentPatientData?pmsPatientId=2459731&amp;pmsEncounterId=2147488418__901__-__local</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>[{"id":2459731,"lastname":"WMKCU","firstname":"LnB","title":"Miss","homestreet":"11a\u002Bpinestead\u002Breach,r\u002Bd\u002B3, Silverdale\u002B0993,0993,572%40wdhb","homesuburb":"","homecity":"Akaroa","homepostcode":"","postalstreet":"","postalsuburb":"","postalcity":"","postalpostcode":"","dayphone":"\u002B64211234567","ahphone":"","cellphone":"\u002B64211234567","dob":"2019-01-12T00:00:00","nhinumber":"ZZZ0121","gmscode":"","csccardnnumber":"","cscstartdate":"0","cscexpiredate":"0","iscscholder":0,"huccode":"","huccardnnumber":"","hucstartdate":"0","hucexpiresdate":"0","ishucholder":0,"gendercode":"F","ethnicitycode1":"21","ethnicitycodedesc1":"Maori - NZ","ethnicitycode2":"0","ethnicitycode2desc":"","ethnicitycode3":"0","ethnicitycode3desc":"","ethnicitycode4":"0","ethnicitycode4desc":"","ethnicitycode5":"0","ethnicitycode5desc":"","ethnicitycode6":"","ethnicitycode6desc":"","quintile":"0","genderdesc":"female","email":"yvgy@indicitest.com","enrolmentcode":"Confirmed Enrolment (C)","nokname":"","nokresidence":"","nokstreet":"","noksuburb":"","nokcity":"","nokphone":"","nokahphone":"","nokrelationship":"","isenrolled":"1","iscapitated":"1"}]</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">GetDiagnosisData_RespondsSuccessfully</span>
+          <span class="duration">00:00:02.6012594</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /erms/col/GetDiagnosisData?pmsPatientId=2459731&amp;pmsEncounterId=2147488418__901__-__local</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>[{"diagnosisnote":"Jake paralysis","diagnosisclassstatus":"Long Term","diagnosisdateonsetdatetime":"0001-01-01T00:00:00","diagnosiswhenclassdatetime":"2026-07-27T00:00:00","diagnosiscode":"7287001","diagnosiscodingsystem":"SNOMED-NZ"},{"diagnosisnote":"Type 2 diabetes mellitus","diagnosisclassstatus":"","diagnosisdateonsetdatetime":"2026-07-27T00:00:00","diagnosiswhenclassdatetime":"2026-07-27T00:00:00","diagnosiscode":"44054006","diagnosiscodingsystem":"SNOMED-NZ"},{"diagnosisnote":"[D]Chills with fever (situation)","diagnosisclassstatus":"","diagnosisdateonsetdatetime":"0001-01-01T00:00:00","diagnosiswhenclassdatetime":"2026-03-26T00:00:00","diagnosiscode":"206760004","diagnosiscodingsystem":"SNOMED-NZ"}]</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">GetSessionData_RunsAndRecordsActualResult</span>
+          <span class="duration">00:00:02.6122176</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /erms/col/GetSessionData?pmsPatientId=2459731&amp;pmsEncounterId=2147488418__901__-__local</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>BeginExecuteReader: CommandText property has not been initialized</pre></div>
+          
+          
+        </div>
+      </details></div></section><section class="group">
+    <h2>KaroCompatTests <span class="group-count">15/15</span></h2>
+    <div class="cards">
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">ListReads_RespondSuccessfully(path: "/karo/conditions")</span>
+          <span class="duration">00:00:02.6282106</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /karo/conditions?patientId=2459731&amp;encounterId=2147488418__901__-__local</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>{"patientId":"2459731","resourceType":"Conditions","system":"hss","entry":[{"diagnosisDate":"2026-03-26","conceptId":"206760004","name":"[D]Chills with fever (situation)","fsn":"[D]Chills with fever (situation)","type":"Situation","onSetDate":null,"summary":null,"isLongTerm":"false"},{"diagnosisDate":"2026-07-27","conceptId":"7287001","name":"Jake paralysis","fsn":"Poisoning caused by triorthocresyl phosphate (disorder)","type":"disorder","onSetDate":null,"summary":"erer","isLongTerm":"true"},{"diagnosisDate":"2026-07-27","conceptId":"44054006","name":"Type 2 diabetes mellitus","fsn":"Diabetes mellitus type 2 (disorder)","type":"disorder","onSetDate":"2026-07-27","summary":"QA test condition entry from HEK dashboard","isLongTerm":"false"}]}</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">Observations_Write_SavesSuccessfully</span>
+          <span class="duration">00:00:06.0410996</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>POST /karo/observations</code></div>
+          <div class="block"><div class="block-label">Request</div><pre>{"patientId":"2459731","encounterId":"2147488418__901__-__local","userId":"1","temperature":"36.8","waistCircumference":"85","height":"170","weight":"68","bpSys":"120","bpDia":"80","heartRate":"72","notes":"Integration test vitals entry"}</pre></div>
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>{"status":"success","message":""}</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">ListReads_RespondSuccessfully(path: "/karo/screeningcodes")</span>
+          <span class="duration">00:00:02.5975779</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /karo/screeningcodes?patientId=2459731&amp;encounterId=2147488418__901__-__local</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>{"patientId":"2459731","resourceType":"ScreeningCodes","system":"hss","entry":[]}</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">Demographics_ReturnsRealPatientRecord</span>
+          <span class="duration">00:00:02.6431437</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /karo/demographics?patientId=2459731&amp;encounterId=2147488418__901__-__local</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>{"patientId":"2459731","resourceType":"Patient","system":"hss","entry":[{"listDemographicInfo":[{"nhi":"ZZZ0121","birthDate":"2019-01-12T00:00:00","type":"Patient","titleCode":"Miss","given":"LnB","family":"WMKCU","gender":"female","ethnicity1":21,"ethnicity2":0,"ethnicity3":0,"quintile":"","meshblock":"","cellNumber":"+64211234567","dayPhone":"+64211234567","email":"yvgy@indicitest.com","fullAddress":"11a+pinestead+reach,r+d+3, Silverdale+0993,0993,572%40wdhb, Akaroa","enrolmentStatus":"Enrolled","smokingStatus":null,"street":"  11a+pinestead+reach,r+d+3, Silverdale+0993,0993,572%40wdhb","suburb":"","city":"Akaroa","postCode":"","isNZResident":"T","dateOfEnrolment":null}],"listcardtype":[]}]}</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">ListReads_RespondSuccessfully(path: "/karo/clinicalnotes")</span>
+          <span class="duration">00:00:02.6210721</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /karo/clinicalnotes?patientId=2459731&amp;encounterId=2147488418__901__-__local</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>{"patientId":"2459731","resourceType":"Notes","system":"hss","entry":[{"subjectiveNotes":"Automated integration test - subjective note","objectiveNotes":"BP 120/80, HR 72, afebrile","assessment":"Stable, no acute concerns (integration test)","plans":"Follow up in 2 weeks (integration test)","appointmentAdvice":null,"date":"2026-07-27T18:28:09"},{"subjectiveNotes":"Automated integration test - subjective note","objectiveNotes":"BP 120/80, HR 72, afebrile","assessment":"Stable, no acute concerns (integration test)","plans":"Follow up in 2 weeks (integration test)","appointmentAdvice":null,"date":"2026-07-27T18:23:34"},{"subjectiveNotes":"Automated integration test - subjective note","objectiveNotes":"BP 120/80, HR 72, afebrile","assessment":"Stable, no acute concerns (integration test)","plans":"Follow up in 2 weeks (integration test)","appointmentAdvice":null,"date":"2026-07-27T18:20:35"},{"subjectiveNotes":"Automated QA test - subjective note from HEK dashboard","objectiveNotes":"BP 120/80, HR 72, afebrile","assessment":"Stable, no acute concerns (QA test)","plans":"Follow up in 2 weeks (QA test)","appointmentAdvice":null,"date":"2026-07-27T16:51:38"},{"subjectiveNotes":"11","objectiveNotes":"11","assessment":"11","plans":"11","appointmentAdvice":null,"date":"2026-07-27T15:56:55"},{"subjectiveNotes":null,"objectiveNotes":null,"assessment":null,"plans":null,"appointmentAdvice":"sdad","date":"2026-06-23T08:16:03"},{"subjectiveNotes":"testing\r\rtesting \rtesting testing \rtesting \rtesting testing testing testing testing \rtesting testing testing testing testing testing testing testing testing \rtesting ","objectiveNotes":null,"assessment":null,"plans":null,"appointmentAdvice":null,"date":"2026-06-09T10:34:01"},{"subjectiveNotes":"\\bp 154/99.","objectiveNotes":null,"assessment":null,"plans":null,"appointmentAdvice":null,"date":"2026-04-06T08:48:52"},{"subjectiveNotes":"\\bgl 6.4","objectiveNotes":null,"assessment":null,"plans":null,"appointmentAdvice":null,"date":"2026-03-24T09:26:03"},{"subjectiveNotes":"\\bgl 6.4","objectiveNotes":null,"assessment":null,"plans":null,"appointmentAdvice":null,"date":"2026-03-24T09:26:03"},{"subjectiveNotes":"ism2\r\r\r\r ","objectiveNotes":null,"assessment":null,"plans":null,"appointmentAdvice":null,"date":"2026-02-13T12:14:36"},{"subjectiveNotes":"&lt;p&gt;ttttttt&lt;/p&gt;","objectiveNotes":null,"assessment":null,"plans":null,"appointmentAdvice":null,"date":"2025-10-03T12:29:25"}]}</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">Conditions_Write_SavesSuccessfully</span>
+          <span class="duration">00:00:02.4354752</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>POST /karo/conditions</code></div>
+          <div class="block"><div class="block-label">Request</div><pre>{"patientId":"2459731","encounterId":"2147488418__901__-__local","userId":"1","type":"disorder","onSetDate":"2026-07-27","summary":"Integration test condition entry","isLongTerm":"false","conceptId":"44054006","name":"Type 2 diabetes mellitus","fsn":"Type 2 diabetes mellitus (disorder)"}</pre></div>
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>{"status":"success","message":"Diagnosis already exits against current Appointment."}</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">ListReads_RespondSuccessfully(path: "/karo/labresults")</span>
+          <span class="duration">00:00:02.6013944</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /karo/labresults?patientId=2459731&amp;encounterId=2147488418__901__-__local</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>{"patientId":"2459731","resourceType":"Labs","system":"hss","entry":[{"messageSubject":"ORTHOPAEDIC.","title":"HbA1c","code":"||106234","effectiveDateTime":"2026-04-03T00:00:00","value":"&lt;4 &amp; &gt;5 data added by user test 123\nTest data added by user"},{"messageSubject":"security test","title":"Bone Scintigraphy","code":"||106378","effectiveDateTime":"2026-04-03T00:00:00","value":"BPNB"},{"messageSubject":"security test","title":"CBC","code":"||106172","effectiveDateTime":"2026-04-03T00:00:00","value":"&gt;=8.9 value"},{"messageSubject":"security test","title":"CCDHB-RAD-XA IVC Filter Retri","code":"||109112","effectiveDateTime":"2026-04-03T00:00:00","value":"new value &lt;89"},{"messageSubject":"security test","title":"Cholesterol (total)","code":"||106183","effectiveDateTime":"2026-04-03T00:00:00","value":"data 56 &lt; 8"},{"messageSubject":"security test","title":"Lipids - Fasting","code":"||106267","effectiveDateTime":"2026-04-03T00:00:00","value":"comment added new"},{"messageSubject":"lab doc","title":"CBC","code":"||106172","effectiveDateTime":"2026-04-01T00:00:00","value":"TEST CBC Count : 100\nNew TEST added"},{"messageSubject":"Lab new Value","title":"Bone Density","code":"||106377","effectiveDateTime":"2026-04-01T00:00:00","value":"596"},{"messageSubject":"Lab new Value","title":"CBC","code":"||106172","effectiveDateTime":"2026-04-01T00:00:00","value":"value : 100"},{"messageSubject":"Lab new Value","title":"CCDHB-RAD-MR Prostate","code":"||109058","effectiveDateTime":"2026-04-01T00:00:00","value":"562"}]}</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">Documents_WithNoIdentifierFilter_ReturnsRealDocumentList</span>
+          <span class="duration">00:00:02.8024394</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /karo/documents?patientId=2459731&amp;encounterId=2147488418__901__-__local</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>{"patientId":"2459731","resourceType":"Documents","system":"hss","entry":[{"createdDateTime":"2025-09-30T07:51:34","messageSubject":"Specialist Referral","identifier":"c2455cbb-fdd8-4394-bffe-11ba7d1ce977","messageTitle":null,"messageData":null,"contentType":"application/pdf"},{"createdDateTime":"2025-11-17T18:45:05","messageSubject":"Specialist Referral","identifier":"c538222e-19a0-4674-ada2-f567b785b6fe","messageTitle":null,"messageData":null,"contentType":"application/pdf"},{"createdDateTime":"2025-11-17T18:47:07","messageSubject":"Specialist Referral","identifier":"eb574030-952c-4404-a7bb-b37f5b57b2a7","messageTitle":null,"messageData":null,"contentType":"application/pdf"},{"createdDateTime":"2025-11-17T18:55:15","messageSubject":"Specialist Referral","identifier":"0074adf3-2b19-4f85-bdce-d5d239d126e3","messageTitle":null,"messageData":null,"contentType":"application/pdf"},{"createdDateTime":"2025-11-17T18:58:59","messageSubject":"Specialist Referral","identifier":"80095740-bd0d-4e67-93ad-7a19d07c7927","messageTitle":null,"messageData":null,"contentType":"application/pdf"},{"createdDateTime":"2025-11-17T19:02:47","messageSubject":"Specialist Referral","identifier":"fbc81dd3-6018-49c9-8142-47fd910536ab","messageTitle":null,"messageData":null,"contentType":"application/pdf"},{"createdDateTime":"2025-11-18T05:38:05","messageSubject":"Specialist Referral","identifier":"b9ae3d85-9791-49dd-9d68-4b38dd5dad45","messageTitle":null,"messageData":null,"contentType":"application/pdf"},{"createdDateTime":"2025-11-18T05:39:12","messageSubject":"Specialist Referral","identifier":"5aef2727-47ff-41ba-b69d-2069f1ebf625","messageTitle":null,"messageData":null,"contentType":"application/pdf"},{"createdDateTime":"2025-12-08T14:00:06","messageSubject":"test","identifier":"a031f909-9698-42ff-a57d-3601876581ed","messageTitle":null,"messageData":null,"contentType":"application/pdf"},{"createdDateTime":"2025-12-08T14:01:57","messageSubject":"test 1","identifier":"8e015150-b691-4959-b1fe-25b2732edd03","messageTitle":null,"messageData":null,"contentType":"application/pdf"},{"createdDateTime":"2025-12-12T11:32:42","messageSubject":"Prescription Print","identifier":"324ff93e-746c-420b-9bf7-1c1bfda966cd","messageTitle":null,"messageData":null,"contentType":"application/pdf"},{"createdDateTime":"2025-12-12T11:36:16","messageSubject":"Prescription Print","identifier":"d41c4e40-1701-4a83-a3d7-e383eab19766","messageTitle":null,"messageData":null,"contentType":"application/pdf"},{"createdDateTime":"2025-12-12T12:13:44","messageSubject":"Prescription Print","identifier":"29eb6d89-cfa7-480a-bced-134fe04603c1","messageTitle":null,"messageData":null,"contentType":"application/pdf"},{"createdDateTime":"2025-12-12T12:22:38","messageSubject":"Prescription Print","identifier":"b637bf77-56be-4882-a49a-78ef8e842399","messageTitle":null,"messageData":null,"contentType":"application/pdf"},{"createdDateTime":"2025-12-15T06:31:29","messageSubject":"Prescription Print","identifier":"7613b925-72cc-4972-8aa3-c49195ca46c2","messageTitle":null,"messageData":null,"contentType":"text/html"},{"createdDateTime":"2025-12-15T07:30:09","messageSubject":"Prescription Print","identifier":"4781c263-681e-4836-80d5-890f00b717d5","messageTitle":null,"messageData":null,"contentType":"text/html"},{"createdDateTime":"2025-12-15T07:31:17","messageSubject":"Prescription Print","identifier":"163ff8b3-bdfc-472e-bdde-7610c8ba9f8d","messageTitle":null,"messageData":null,"contentType":"text/html"},{"createdDateTime":"2025-12-15T11:30:29","messageSubject":"Prescription Print","identifier":"6a79500c-943d-48ed-997f-6047ff4908a7","messageTitle":null,"messageData":null,"contentType":"application/pdf"},{"createdDateTime":"2025-12-15T13:54:53","messageSubject":"Prescription Print","identifier":"6a0e6329-9432-46b6-ab46-6b40461b27f3","messageTitle":null,"messageData":null,"contentType":"application/pdf"},{"createdDateTime":"2025-12-16T06:25:34","messageSubject":"Prescription Print","identifier":"657a4e3f-e050-40f2-a53b-f8b5d816770d","messageTitle":null,"messageData":null,"contentType":"text/html"},{"createdDateTime":"2025-12-16T06:30:31","messageSubject":"Prescription Print","identifier":"cec93ab1-17a6-40bc-9550-61f47a96d13c","messageTitle":null,"messageData":null,"contentType":"text/html"},{"createdDateTime":"2025-12-16T06:37:01","messageSubject":"Prescription Print","identifier":"c49f05bf-df60-486d-8037-578703256f29","messageTitle":null,"messageData":null,"contentType":"text/html"},{"createdDateTime":"2025-12-16T06:41:10","messageSubject":"Prescription Print","identifier":"45bcecf6-4978-4c56-a13d-24e2916edbeb","messageTitle":null,"messageData":null,"contentType":"text/html"},{"createdDateTime":"2025-12-16T06:45:20","messageSubject":"Prescription Print","identifier":"0f65df6a-8636-468d-92a4-0e84854f11a7","messageTitle":null,"messageData":null,"contentType":"text/html"},{"createdDateTime":"2025-12-16T06:46:33","messageSubject":"Prescription Print","identifier":"098b15e1-5238-4f87-8459-f178fc0cdd71","messageTitle":null,"messageData":null,"contentType":"text/html"},{"createdDateTime":"2025-12-16T10:52:54","messageSubject":"Prescription Print","identifier":"abc3f133-118e-4996-9cee-fa53cf321960","messageTitle":null,"messageData":null,"contentType":"text/html"},{"createdDateTime":"2025-12-16T10:54:27","messageSubject":"Prescription Print","identifier":"11a4f1ef-7d22-415c-9c3a-70ffda90fcd5","messageTitle":null,"messageData":null,"contentType":"application/pdf"},{"createdDateTime":"2025-12-22T13:08:40","messageSubject":"Immunisation Print","identifier":"47b92243-1074-462c-be27-076d38fd5a0c","messageTitle":null,"messageData":null,"contentType":"application/pdf"},{"createdDateTime":"2025-12-22T13:10:00","messageSubject":"Immunisation Print","identifier":"6ef10698-a46c-4a80-9f7d-819cb85ffc19","messageTitle":null,"messageData":null,"contentType":"application/pdf"},{"createdDateTime":"2026-04-13T08:10:12","messageSubject":"Immunisation Print","identifier":"14b94007-9536-4437-968b-743160c3fc30","messageTitle":null,"messageData":null,"contentType":"application/pdf"},{"createdDateTime":"2026-04-13T08:10:36","messageSubject":"Immunisation Print","identifier":"5ef0ab65-df08-4823-b145-dbe6e8491d29","messageTitle":null,"messageData":null,"contentType":"application/pdf"},{"createdDateTime":"2026-04-13T08:13:59","messageSubject":"Immunisation Print","identifier":"f06ad502-638a-4e83-9774-24c459984408","messageTitle":null,"messageData":null,"contentType":"application/pdf"},{"createdDateTime":"2026-04-13T10:09:33","messageSubject":"Immunisation Print","identifier":"0fc25ab5-b1b1-4c83-a9e8-027520122a60","messageTitle":null,"messageData":null,"contentType":"application/pdf"},{"createdDateTime":"2026-04-13T11:31:29","messageSubject":"Immunisation Print","identifier":"fca337d3-4ef1-405e-8026-09f19c02d887","messageTitle":null,"messageData":null,"contentType":"application/pdf"},{"createdDateTime":"2026-05-11T12:32:14","messageSubject":"Patient Medical History","identifier":"4310fc75-340f-4053-b0ab-4af4e043bab1","messageTitle":null,"messageData":null,"contentType":"application/pdf"},{"createdDateTime":"2026-05-11T12:33:14","messageSubject":"Patient Medical History","identifier":"5e11e966-0a6b-43e4-a44e-d3314796ad7b","messageTitle":null,"messageData":null,"contentType":"application/pdf"},{"createdDateTime":"2025-10-01T00:00:00","messageSubject":"Enrolment trans in ","identifier":"23fd6760-80d5-490c-bf9e-d5eadbc93e96","messageTitle":null,"messageData":null,"contentType":"application/pdf"}]}</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">Invoice_Write_FailsWithKnownStoredProcedureArgumentMismatch</span>
+          <span class="duration">00:00:02.5184304</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>POST /karo/invoice</code></div>
+          <div class="block"><div class="block-label">Request</div><pre>{"patientId":"2459731","encounterId":"2147488418__901__-__local","userId":"1","name":"GP Standard Consultation","code":"GP-20260727133110056","fee":"55.50","payee":"Patient"}</pre></div>
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>{"status":"fail","message":"Procedure or function uspInsertUpdateService has too many arguments specified."}</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">Recalls_Write_FailsWithKnownMissingCategorySeedData</span>
+          <span class="duration">00:00:02.6119968</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>POST /karo/recalls</code></div>
+          <div class="block"><div class="block-label">Request</div><pre>{"patientId":"2459731","encounterId":"2147488418__901__-__local","userId":"1","priority":"Normal","group":"Immunisation","dueDate":"2026-09-01","notes":"Integration test recall entry","categoryId":"1"}</pre></div>
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>{"status":"fail","message":"Unable to Save Recall.Please try again or contact INDICI support."}</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">Provider_WithUserId1_ReturnsRealProviderRecord</span>
+          <span class="duration">00:00:00.0250464</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /karo/provider?patientId=2459731&amp;encounterId=2147488418__901__-__local&amp;userId=1</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>{"patientId":"2459731","resourceType":"Provider","system":"hss","entry":[{"type":"Super Admin","nzmc":"","birthDate":"1987-01-02","titleCode":"Other","given":"Super Admin","family":"User","gender":"female","dayPhone":"33333331111+","email":"mailto:abc12@abc.com@abc.com"}]}</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">ListReads_RespondSuccessfully(path: "/karo/recalls")</span>
+          <span class="duration">00:00:02.1849759</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /karo/recalls?patientId=2459731&amp;encounterId=2147488418__901__-__local</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>{"patientId":"2459731","resourceType":"Recalls","system":"hss","entry":[{"group":"Vaccine Schedule","categoryId":null,"priority":"Medium","dueDate":"2027-03-30","notes":"","reason":null},{"group":"Vaccine Schedule","categoryId":null,"priority":"Medium","dueDate":"2030-01-12","notes":null,"reason":null},{"group":"Vaccine Schedule","categoryId":null,"priority":"Medium","dueDate":"2031-01-12","notes":null,"reason":null},{"group":"Vaccine Schedule","categoryId":null,"priority":"Medium","dueDate":"2064-01-12","notes":null,"reason":null}]}</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">Document_Write_FailsWithKnownStoredProcedureRollbackBug</span>
+          <span class="duration">00:00:02.6168445</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>POST /karo/document</code></div>
+          <div class="block"><div class="block-label">Request</div><pre>{"patientId":"2459731","encounterId":"2147488418__901__-__local","messageData":"SW50ZWdyYXRpb24gdGVzdCBkb2N1bWVudCBjb250ZW50","contentType":"text/plain","messageSubject":"Integration Test Document","itemType":"Letter"}</pre></div>
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>{"status":"fail","message":"The ROLLBACK TRANSACTION request has no corresponding BEGIN TRANSACTION.\n\r\nDECLARE @vIsSynchronized\tINT\r\nSELECT  @vIsSynchronized = PD.IsSynchronized \r\n\t  FROM [dbo].[TblPracticeDMSInfo](NOLOCK) PD\r\n\t WHERE PD.IsActive = 1 AND PD.IsDeleted = 0 AND PD.PracticeID = @pPracticeID \r\n\r\n IF @vIsSynchronized = 1\r\n\t\t  begin \r\n\t\t  \r\n\texec  @pDocumentIDOut = DMS_PMS.dbo.fetch_seq_id\r\n\r\n\t\t  end\r\n\t\t  else \r\n\t\t  begin \r\n\t\t set   @pDocumentIDOut = NEXT VALUE FOR DMS_PMS.[dbo].[Seq_tblDocument]\r\n\r\n\t\t  end \r\n\r\n\r\n\t\r\n\tSELECT @pDocumentID=DocumentID FROM DMS_PMS.dbo.tblDocument WHERE DocumentKey=@pDocumentKey and PracticeID = @pPracticeID\r\n\tSELECT TOP 1 @pClientID = ClientID FROM tblClient WHERE ClientName = @pClientName\r\n\t\t\r\n\tif @pDocumentStagingKey != ''\r\n\tBegin\r\n\t\t\tselect @pDocumentData  = SF.documentData,@pDocumentSize = SF.DocumentSize--,-- @pDocumentTypeID = CASE WHEN @pDocumentTypeID &lt;&gt; 6 THEN SF.DocumentTypeID ELSE @pDocumentTypeID END\r\n\t\tfrom DMS_PMS.GP2GP.tblStagingImportfiles SF\r\n\t\twhere DocumentName = @pDocumentStagingKey\r\n\tEND\r\n\r\n\t\r\n\t\tIF @pDocumentID is null or @pDocumentID=0\r\n\t\t\tBEGIN\r\n\t\t\tprint '1'\t\r\n\t\t\t\r\n\t\t\t\t\t--SET @pDocumentIDOut =NEXT VALUE FOR DMS_PMS.[dbo].[Seq_tblDocument]\r\n\t\t\t\t\t\t\r\n\tINSERT INTO DMS_PMS.dbo.tblDocument\r\n([DocumentID],[ClientID],[CategoryID],[DocumentName],[DocumentTypeID],[Description],[DocumentKey],[DocumentSize],[ProfileID]\r\n,[CreatedAt],[IsDeleted],[PracticeID],[FilePath],[IssaveonCloud])\r\n\tVALUES\r\n(@pDocumentIDOut,@pClientID,@pCategoryID,@pDocumentName,@pDocumentTypeID,@pDescription,@pDocumentKey,@pDocumentSize,\r\n@pProfileID,GETDATE(),0,@pPracticeID,@pFilePath, @pIsSaveOnCloud)\r\n\t\t\t\t\r\n\t\t\t\tINSERT INTO DMS_PMS.dbo.tblDocumentDetail\r\n\t\t\t\t\t(DocumentID,DocumentData)\t\r\n\t\t\t\tVALUES\r\n\t\t\t\t\t(@pDocumentIDOut, @pDocumentData)\r\n\t\t\t\t\r\n\t\t\tEND\r\n\t\tELSE\r\n\t\t\tBEGIN\r\n\t\t\tprint '2'\r\n\t\t\t\tUPDATE DMS_PMS.dbo.tblDocument\r\n\t\t\t\tSET ClientID = @pClientID,\r\n\t\t\t\t\tCategoryID = @pCategoryID,\r\n\t\t\t\t\tDocumentName = @pDocumentName,\r\n\t\t\t\t\tDocumentTypeID = @pDocumentTypeID,\r\n\t\t\t\t\t[Description] = @pDescription,\r\n\t\t\t\t\t[ProfileID] = @pProfileID,\r\n\t\t\t\t\tFilePath=@pFilePath,\r\n\r\n\t\t\t\t\tUpdatedAt = GETDATE()\r\n\t\t\t\tWHERE DocumentID = @pDocumentID\r\n\r\n\t\t\t\tIF (@pDocumentData IS NOT NULL)\r\n\t\t\t\tBEGIN\r\n\t\t\t\t\tUPDATE DMS_PMS.dbo.tblDocumentDetail SET DocumentData = @pDocumentData WHERE DocumentID = @pDocumentID\r\n\t\t\t\t\tUPDATE DMS_PMS.dbo.tblDocument SET DocumentSize = @pDocumentSize,DocumentTypeID = @pDocumentTypeID WHERE DocumentID = @pDocumentID\r\n\t\t\t\tEND\r\n\t\t\t\tSET @pDocumentIDOut = @pDocumentID\r\n\t\t\t\t\r\n\t\t\tEND\r\n\t\t\n1\nexception"}</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">ClinicalNotes_Write_SavesSuccessfully</span>
+          <span class="duration">00:00:02.6978057</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>POST /karo/clinicalnotes</code></div>
+          <div class="block"><div class="block-label">Request</div><pre>{"patientId":"2459731","encounterId":"2147488418__901__-__local","userId":"1","subjectiveNotes":"Automated integration test - subjective note","objectiveNotes":"BP 120/80, HR 72, afebrile","assessment":"Stable, no acute concerns (integration test)","plans":"Follow up in 2 weeks (integration test)"}</pre></div>
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>{"status":"success","message":""}</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">ListReads_RespondSuccessfully(path: "/karo/medications")</span>
+          <span class="duration">00:00:03.0138422</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>GET /karo/medications?patientId=2459731&amp;encounterId=2147488418__901__-__local</code></div>
+          
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>{"patientId":"2459731","resourceType":"Medications","system":"hss","entry":[{"sctid":"10471661000116109","medicineName":"morphine sulfate 5 mg/mL injection, ampoule","dosage":"1","route":"Intramuscular","expectedDuration":"5","startDate":"2026-04-03","isLongterm":"true","directions":"Inject One Unit once daily"},{"sctid":"10039571000116108","medicineName":"aminophylline 250 mg/10 mL injection, ampoule","dosage":"3","route":"Intravenous","expectedDuration":"3","startDate":"2026-04-03","isLongterm":"true","directions":"Take: Three "},{"sctid":"20063021000116106","medicineName":"Panadol - paracetamol 120 mg/5 mL oral liquid","dosage":"3","route":null,"expectedDuration":"1","startDate":"2026-04-03","isLongterm":"true","directions":"Take Three mL twice daily"}]}</pre></div>
+          
+          
+        </div>
+      </details></div></section><section class="group">
+    <h2>HisoCompatTests <span class="group-count">5/5</span></h2>
+    <div class="cards">
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">GetDeliveryOptions_ReturnsRealDeliveryTarget</span>
+          <span class="duration">00:00:02.5898685</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>POST /hiso/getDeliveryOptions</code></div>
+          <div class="block"><div class="block-label">Request</div><pre>{"sessionKey":"0f456781-fbe5-41d8-a27b-8cac561ccaec"}</pre></div>
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>{"getDeliveryOptionsResponseReturn":{"url":null,"messageID":null,"recipientAccount":null,"senderAccount":null,"senderPassword":null}}</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">GetVersion_ReturnsRealApplicationVersion</span>
+          <span class="duration">00:00:02.5416615</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>POST /hiso/getVersion</code></div>
+          <div class="block"><div class="block-label">Request</div><pre>{"sessionKey":"0f456781-fbe5-41d8-a27b-8cac561ccaec"}</pre></div>
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>{"getVersionResponseReturn":{"application":"PMS","applicationVersion":"1.0","hisoversion":1}}</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">GetFormView_RespondsSuccessfully</span>
+          <span class="duration">00:00:02.6813541</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>POST /hiso/getFormView</code></div>
+          <div class="block"><div class="block-label">Request</div><pre>{"sessionKey":"0f456781-fbe5-41d8-a27b-8cac561ccaec"}</pre></div>
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>{"getFormViewResponseReturn":{"resumePath":null,"viewType":null,"view":null,"dataContainer":null}}</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">GetData_WithMinimalContainer_ReturnsPatientSection</span>
+          <span class="duration">00:00:02.6847068</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>POST /hiso/getData</code></div>
+          <div class="block"><div class="block-label">Request</div><pre>{"sessionKey":"0f456781-fbe5-41d8-a27b-8cac561ccaec","dataContainer":{"formMetaData":{"formInstanceOperationMode":"N"},"submittedDataXml":"\u003CdataContainer\u003E\u003Csection name=\u0022patient.details\u0022\u003E\u003Cfield name=\u0022nhi\u0022 /\u003E\u003C/section\u003E\u003C/dataContainer\u003E"}}</pre></div>
+          <div class="block"><div class="block-label">Response (HTTP 200)</div><pre>{"getDataResponseReturn":{"dataContainer":{"formMetaData":{"formInstanceId":null,"formInstanceVersion":null,"formEngineId":null,"formInstanceOperationMode":"N","formDefinitionId":null,"formDefinitionVersion":null,"formDefinitionTitle":null},"submittedDataXml":"&lt;dataContainer&gt;&lt;section name=\"patient.details\"&gt;&lt;field name=\"nhi\"&gt;&lt;/field&gt;&lt;/section&gt;&lt;/dataContainer&gt;"}}}</pre></div>
+          
+          
+        </div>
+      </details>
+      <details class="card pass">
+        <summary>
+          <span class="badge badge-pass">PASS</span>
+          <span class="method">SaveContainer_WithMinimalNonAcc45Body_FailsWithKnownUnhandledServerError</span>
+          <span class="duration">00:00:02.6526879</span>
+        </summary>
+        <div class="card-body">
+          <div class="call"><code>POST /hiso/saveContainer</code></div>
+          <div class="block"><div class="block-label">Request</div><pre>{"sessionKey":"0f456781-fbe5-41d8-a27b-8cac561ccaec","formMetaData":{"formInstanceOperationMode":"N"},"resumePath":"","view":"","viewType":"","completed":false,"submittedDataXml":"\u003CdataContainer\u003E\u003C/dataContainer\u003E"}</pre></div>
+          <div class="block"><div class="block-label">Response (HTTP 500)</div><pre>{"title":"Internal Server Error","status":500,"type":"https://api.hek.example/errors/internal-server-error","detail":"An unexpected error occurred.","traceId":"a5f1d994984e484d9d6eb2b6f7fe7950","errors":null}</pre></div>
+          
+          
+        </div>
+      </details></div></section>
+  </div>
+</body>
+</html>

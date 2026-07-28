@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using System.Xml;
 using HekCoreApi.Application.Common.Interfaces;
 using HekCoreApi.Application.Common.Models;
@@ -35,7 +35,7 @@ public sealed class CanonicalPractitionersRepository : ICanonicalPractitionersRe
 
     public async Task<IReadOnlyList<PractitionerCanonical>> GetErmsAsync(RoutingContext routing, string? patientId, CancellationToken ct = default)
     {
-        var table = await _ermsRepository.GetRegisteredPractitionersAsync(routing.PracticeId, patientId, locationId: null, ct);
+        var table = await _ermsRepository.GetRegisteredPractitionersAsync(routing.PracticeId, routing, patientId, locationId: null, ct);
         var results = new List<PractitionerCanonical>();
 
         foreach (DataRow row in table.Rows)

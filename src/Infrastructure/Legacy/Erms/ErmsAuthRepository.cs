@@ -1,5 +1,6 @@
 using System.Data;
 using HekCoreApi.Application.Common.Interfaces;
+using HekCoreApi.Application.Common.Models;
 using Microsoft.Data.SqlClient;
 
 namespace HekCoreApi.Infrastructure.Legacy.Erms;
@@ -14,9 +15,9 @@ public sealed class ErmsAuthRepository : IErmsAuthRepository
         _connectionResolver = connectionResolver;
     }
 
-    public async Task<KaroAuthResult?> InsertAndValidateTokenAsync(string practiceSuffix, string? username, string? password, string? patientId, string? encounterId, string? token = null, double expiryInDays = 0, string? pho = null, CancellationToken ct = default)
+    public async Task<KaroAuthResult?> InsertAndValidateTokenAsync(string practiceSuffix, RoutingContext routingContext, string? username, string? password, string? patientId, string? encounterId, string? token = null, double expiryInDays = 0, string? pho = null, CancellationToken ct = default)
     {
-        var connectionString = await _connectionResolver.ResolveAsync(practiceSuffix, ct);
+        var connectionString = await _connectionResolver.ResolveAsync(routingContext, ct);
 
         var parameters = new List<SqlParameter>();
         if (!string.IsNullOrWhiteSpace(username))

@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using System.Xml;
 using HekCoreApi.Application.Common.Interfaces;
 using HekCoreApi.Application.Common.Models;
@@ -51,7 +51,7 @@ public sealed class CanonicalConditionsRepository : ICanonicalConditionsReposito
     /// </summary>
     public async Task<IReadOnlyList<ConditionCanonical>> GetColAsync(RoutingContext routing, string? patientId, CancellationToken ct = default)
     {
-        var table = await _colRepository.GetDiagnosisDataAsync(routing.PracticeId, patientId, sortOrder: null, DateTime.MinValue, DateTime.MinValue, ct);
+        var table = await _colRepository.GetDiagnosisDataAsync(routing.PracticeId, routing, patientId, sortOrder: null, DateTime.MinValue, DateTime.MinValue, ct);
         var results = new List<ConditionCanonical>();
 
         foreach (DataRow row in table.Rows)
@@ -70,7 +70,7 @@ public sealed class CanonicalConditionsRepository : ICanonicalConditionsReposito
 
     public async Task<IReadOnlyList<ConditionCanonical>> GetKaroAsync(RoutingContext routing, string? patientId, CancellationToken ct = default)
     {
-        var diagnoses = await _karoRepository.GetConditionsAsync(routing.PracticeId, patientId, ct);
+        var diagnoses = await _karoRepository.GetConditionsAsync(routing.PracticeId, routing, patientId, ct);
         return diagnoses.Select(d => new ConditionCanonical(
             d.ConceptId,
             d.Name ?? string.Empty,
@@ -82,7 +82,7 @@ public sealed class CanonicalConditionsRepository : ICanonicalConditionsReposito
 
     public async Task<IReadOnlyList<ConditionCanonical>> GetErmsAsync(RoutingContext routing, string? patientId, CancellationToken ct = default)
     {
-        var table = await _ermsRepository.GetConditionsAsync(routing.PracticeId, patientId, sortOrder: null, DateTime.MinValue, DateTime.MinValue, ct);
+        var table = await _ermsRepository.GetConditionsAsync(routing.PracticeId, routing, patientId, sortOrder: null, DateTime.MinValue, DateTime.MinValue, ct);
         var results = new List<ConditionCanonical>();
 
         foreach (DataRow row in table.Rows)

@@ -1,5 +1,6 @@
 using System.Data;
 using HekCoreApi.Application.Common.Interfaces;
+using HekCoreApi.Application.Common.Models;
 using Microsoft.Data.SqlClient;
 
 namespace HekCoreApi.Infrastructure.Legacy.Erms;
@@ -21,12 +22,12 @@ public sealed class ErmsWriteRepository : IErmsWriteRepository
     }
 
     /// <summary>Legacy (`HSSDA.cs:38-64`): `CheckAWSIsEnabled(practiceSuffixNumeric, connectionString)` picks `[HSS].[uspUpdateExistingDoc_AWS]` vs `[HSS].[uspUpdateExistingDoc]` - both take the same two params.</summary>
-    public async Task UpdateExistingDocumentAsync(string practiceSuffix, string? referralId, string? practiceSuffixNumeric, CancellationToken ct = default)
+    public async Task UpdateExistingDocumentAsync(string practiceSuffix, RoutingContext routingContext, string? referralId, string? practiceSuffixNumeric, CancellationToken ct = default)
     {
         // Legacy swallows every error here (its own try/catch fills an out param the controller only logs).
         try
         {
-            var connectionString = await _connectionResolver.ResolveAsync(practiceSuffix, ct);
+            var connectionString = await _connectionResolver.ResolveAsync(routingContext, ct);
             var parameters = new List<SqlParameter>
             {
                 new("@pReferralId", (object?)referralId ?? DBNull.Value),
@@ -51,11 +52,11 @@ public sealed class ErmsWriteRepository : IErmsWriteRepository
         }
     }
 
-    public async Task<string> SaveToDmsAsync(string practiceSuffix, string? practiceSuffixNumeric, byte[] contentData, string? contentType, string? messageSubject, int categoryId, string? referralId, CancellationToken ct = default)
+    public async Task<string> SaveToDmsAsync(RoutingContext routingContext, string? practiceSuffixNumeric, byte[] contentData, string? contentType, string? messageSubject, int categoryId, string? referralId, CancellationToken ct = default)
     {
         var documentTypeId = await ResolveDocumentTypeAsync(contentType, ct);
         var documentKey = Guid.NewGuid().ToString();
-        var dmsConnectionString = await _dmsConnectionResolver.ResolveAsync(practiceSuffix, ct);
+        var dmsConnectionString = await _dmsConnectionResolver.ResolveAsync(routingContext, ct);
 
         var parameters = new List<SqlParameter>
         {
@@ -79,9 +80,9 @@ public sealed class ErmsWriteRepository : IErmsWriteRepository
         return dmsId > 0 ? documentKey : string.Empty;
     }
 
-    public async Task InsertDocumentAsync(string practiceSuffix, string? patientId, string? encounterId, string? messageSubject, string dmsKey, int itemTypeId, DateTime resultDate, string? referralId, string? userId, CancellationToken ct = default)
+    public async Task InsertDocumentAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? encounterId, string? messageSubject, string dmsKey, int itemTypeId, DateTime resultDate, string? referralId, string? userId, CancellationToken ct = default)
     {
-        var connectionString = await _connectionResolver.ResolveAsync(practiceSuffix, ct);
+        var connectionString = await _connectionResolver.ResolveAsync(routingContext, ct);
         var parameters = new List<SqlParameter>
         {
             new("@pPatientID", Convert.ToInt32(patientId)),

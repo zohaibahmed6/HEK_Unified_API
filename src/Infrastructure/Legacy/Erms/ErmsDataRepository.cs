@@ -1,6 +1,7 @@
 using System.Data;
 using System.Text.Json;
 using HekCoreApi.Application.Common.Interfaces;
+using HekCoreApi.Application.Common.Models;
 using Microsoft.Data.SqlClient;
 
 namespace HekCoreApi.Infrastructure.Legacy.Erms;
@@ -41,13 +42,13 @@ public sealed class ErmsDataRepository : IErmsDataRepository
         _awsDocumentService = awsDocumentService;
     }
 
-    public Task<DataTable> GetMeasurementAsync(string practiceSuffix, string? patientId, CancellationToken ct = default) =>
-        ExecuteAsync(practiceSuffix, "[HSS].[uspGetMeasurement]", PatientOnly(patientId), ct);
+    public Task<DataTable> GetMeasurementAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, CancellationToken ct = default) =>
+        ExecuteAsync(routingContext, "[HSS].[uspGetMeasurement]", PatientOnly(patientId), ct);
 
-    public Task<DataTable> GetSmokingStatusAsync(string practiceSuffix, string? patientId, CancellationToken ct = default) =>
-        ExecuteAsync(practiceSuffix, "[HSS].[uspGetSmokingStatus]", PatientOnly(patientId), ct);
+    public Task<DataTable> GetSmokingStatusAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, CancellationToken ct = default) =>
+        ExecuteAsync(routingContext, "[HSS].[uspGetSmokingStatus]", PatientOnly(patientId), ct);
 
-    public Task<DataTable> GetProviderAsync(string practiceSuffix, string? patientId, string? userId, string? locationId, string? encounterId, CancellationToken ct = default)
+    public Task<DataTable> GetProviderAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? userId, string? locationId, string? encounterId, CancellationToken ct = default)
     {
         var parameters = PatientOnly(patientId);
         if (!string.IsNullOrWhiteSpace(locationId))
@@ -65,13 +66,13 @@ public sealed class ErmsDataRepository : IErmsDataRepository
             parameters.Add(new SqlParameter("@pEncounterid", encounterId));
         }
 
-        return ExecuteAsync(practiceSuffix, "[HSS].[uspGetProvider]", parameters, ct);
+        return ExecuteAsync(routingContext, "[HSS].[uspGetProvider]", parameters, ct);
     }
 
-    public Task<DataTable> GetNextOfKinAsync(string practiceSuffix, string? patientId, CancellationToken ct = default) =>
-        ExecuteAsync(practiceSuffix, "[HSS].[uspGetNextOfKin]", PatientOnly(patientId), ct);
+    public Task<DataTable> GetNextOfKinAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, CancellationToken ct = default) =>
+        ExecuteAsync(routingContext, "[HSS].[uspGetNextOfKin]", PatientOnly(patientId), ct);
 
-    public Task<DataTable> GetRegisteredPractitionersAsync(string practiceSuffix, string? patientId, string? locationId, CancellationToken ct = default)
+    public Task<DataTable> GetRegisteredPractitionersAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? locationId, CancellationToken ct = default)
     {
         var parameters = PatientOnly(patientId);
         if (!string.IsNullOrWhiteSpace(locationId))
@@ -79,42 +80,42 @@ public sealed class ErmsDataRepository : IErmsDataRepository
             parameters.Add(new SqlParameter("@pLocationId", locationId));
         }
 
-        return ExecuteAsync(practiceSuffix, "[HSS].[uspGetRegisteredPractitioners]", parameters, ct);
+        return ExecuteAsync(routingContext, "[HSS].[uspGetRegisteredPractitioners]", parameters, ct);
     }
 
-    public Task<DataTable> GetAcc45Async(string practiceSuffix, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, CancellationToken ct = default) =>
-        ExecuteAsync(practiceSuffix, "[HSS].[uspGetACC45]", Dated(patientId, sortOrder, minDate, maxDate), ct);
+    public Task<DataTable> GetAcc45Async(string practiceSuffix, RoutingContext routingContext, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, CancellationToken ct = default) =>
+        ExecuteAsync(routingContext, "[HSS].[uspGetACC45]", Dated(patientId, sortOrder, minDate, maxDate), ct);
 
-    public Task<DataTable> GetConditionsAsync(string practiceSuffix, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, CancellationToken ct = default) =>
-        ExecuteAsync(practiceSuffix, "[HSS].[uspGetConditions]", Dated(patientId, sortOrder, minDate, maxDate), ct);
+    public Task<DataTable> GetConditionsAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, CancellationToken ct = default) =>
+        ExecuteAsync(routingContext, "[HSS].[uspGetConditions]", Dated(patientId, sortOrder, minDate, maxDate), ct);
 
-    public Task<DataTable> GetConsultNotesAsync(string practiceSuffix, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, CancellationToken ct = default) =>
-        ExecuteAsync(practiceSuffix, "[HSS].[uspGetConsultNotes]", Dated(patientId, sortOrder, minDate, maxDate), ct);
+    public Task<DataTable> GetConsultNotesAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, CancellationToken ct = default) =>
+        ExecuteAsync(routingContext, "[HSS].[uspGetConsultNotes]", Dated(patientId, sortOrder, minDate, maxDate), ct);
 
-    public Task<DataTable> GetMedicalAllergiesAsync(string practiceSuffix, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, CancellationToken ct = default) =>
-        ExecuteAsync(practiceSuffix, "[HSS].[uspGetAllergies]", Dated(patientId, sortOrder, minDate, maxDate), ct);
+    public Task<DataTable> GetMedicalAllergiesAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, CancellationToken ct = default) =>
+        ExecuteAsync(routingContext, "[HSS].[uspGetAllergies]", Dated(patientId, sortOrder, minDate, maxDate), ct);
 
-    public Task<DataTable> GetMedicationsAsync(string practiceSuffix, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, bool isLongTerm, CancellationToken ct = default)
+    public Task<DataTable> GetMedicationsAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, bool isLongTerm, CancellationToken ct = default)
     {
         var parameters = Dated(patientId, sortOrder, minDate, maxDate);
         parameters.Add(new SqlParameter("@pIsLongTerm", isLongTerm));
         parameters.Add(new SqlParameter("@pShowStop", false));
-        return ExecuteAsync(practiceSuffix, "[HSS].[uspGetMedications]", parameters, ct);
+        return ExecuteAsync(routingContext, "[HSS].[uspGetMedications]", parameters, ct);
     }
 
-    public Task<DataTable> GetLabsAsync(string practiceSuffix, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, CancellationToken ct = default) =>
-        ExecuteAsync(practiceSuffix, "[HSS].[uspGetLabs]", Dated(patientId, sortOrder, minDate, maxDate), ct);
+    public Task<DataTable> GetLabsAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, CancellationToken ct = default) =>
+        ExecuteAsync(routingContext, "[HSS].[uspGetLabs]", Dated(patientId, sortOrder, minDate, maxDate), ct);
 
-    public Task<DataTable> GetLabResultsAsync(string practiceSuffix, string? patientId, string? referenceId, CancellationToken ct = default) =>
-        ExecuteAsync(practiceSuffix, "[HSS].[uspGetLabResults]", Detail(patientId, referenceId), ct);
+    public Task<DataTable> GetLabResultsAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? referenceId, CancellationToken ct = default) =>
+        ExecuteAsync(routingContext, "[HSS].[uspGetLabResults]", Detail(patientId, referenceId), ct);
 
-    public Task<DataTable> GetRadsAsync(string practiceSuffix, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, CancellationToken ct = default) =>
-        ExecuteAsync(practiceSuffix, "[HSS].[uspGetRads]", Dated(patientId, sortOrder, minDate, maxDate), ct);
+    public Task<DataTable> GetRadsAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, CancellationToken ct = default) =>
+        ExecuteAsync(routingContext, "[HSS].[uspGetRads]", Dated(patientId, sortOrder, minDate, maxDate), ct);
 
-    public Task<DataTable> GetRadResultsAsync(string practiceSuffix, string? patientId, string? referenceId, CancellationToken ct = default) =>
-        ExecuteAsync(practiceSuffix, "[HSS].[uspGetRadResults]", Detail(patientId, referenceId), ct);
+    public Task<DataTable> GetRadResultsAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? referenceId, CancellationToken ct = default) =>
+        ExecuteAsync(routingContext, "[HSS].[uspGetRadResults]", Detail(patientId, referenceId), ct);
 
-    public async Task<DataTable> GetOtherDocsAsync(string practiceSuffix, string practiceSuffixNumeric, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, bool isReferral, CancellationToken ct = default)
+    public async Task<DataTable> GetOtherDocsAsync(string practiceSuffix, string practiceSuffixNumeric, RoutingContext routingContext, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, bool isReferral, CancellationToken ct = default)
     {
         var parameters = Dated(patientId, sortOrder, minDate, maxDate);
         if (isReferral)
@@ -122,7 +123,7 @@ public sealed class ErmsDataRepository : IErmsDataRepository
             parameters.Add(new SqlParameter("@pType", "Discharge Summary"));
         }
 
-        var connectionString = await _connectionResolver.ResolveAsync(practiceSuffix, ct);
+        var connectionString = await _connectionResolver.ResolveAsync(routingContext, ct);
         if (!int.TryParse(practiceSuffixNumeric, out var practiceIdInt))
         {
             return await LegacyDbExecutor.ExecuteDataTableAsync(connectionString, CommandType.StoredProcedure, "[HSS].[uspGetOtherDocs]", parameters, ct);
@@ -158,7 +159,7 @@ public sealed class ErmsDataRepository : IErmsDataRepository
         return table;
     }
 
-    public async Task<DataTable> GetDocResultsAsync(string practiceSuffix, string practiceSuffixNumeric, string? referenceId, bool isDischarge, CancellationToken ct = default)
+    public async Task<DataTable> GetDocResultsAsync(string practiceSuffix, string practiceSuffixNumeric, RoutingContext routingContext, string? referenceId, bool isDischarge, CancellationToken ct = default)
     {
         var parameters = new List<SqlParameter> { new("@pIsDischarge", isDischarge) };
         if (!string.IsNullOrWhiteSpace(referenceId))
@@ -166,7 +167,7 @@ public sealed class ErmsDataRepository : IErmsDataRepository
             parameters.Add(new SqlParameter("@pReferenceId", referenceId));
         }
 
-        var connectionString = await _connectionResolver.ResolveAsync(practiceSuffix, ct);
+        var connectionString = await _connectionResolver.ResolveAsync(routingContext, ct);
         if (!int.TryParse(practiceSuffixNumeric, out var practiceIdInt))
         {
             return await LegacyDbExecutor.ExecuteDataTableAsync(connectionString, CommandType.StoredProcedure, "[HSS].[uspGetDocResults]", parameters, ct);
@@ -184,7 +185,7 @@ public sealed class ErmsDataRepository : IErmsDataRepository
             return table;
         }
 
-        var dmsConnectionString = await _dmsConnectionResolver.ResolveAsync(practiceSuffix, ct);
+        var dmsConnectionString = await _dmsConnectionResolver.ResolveAsync(routingContext, ct);
         var singleDocJson = await _awsDocumentService.DocumentGetByDocumentKeyJsonResultAsync(referenceId.ToUpperInvariant(), practiceIdInt, dmsConnectionString, connectionString, ct);
         if (string.IsNullOrEmpty(singleDocJson))
         {
@@ -262,9 +263,9 @@ public sealed class ErmsDataRepository : IErmsDataRepository
         return parameters;
     }
 
-    private async Task<DataTable> ExecuteAsync(string practiceSuffix, string procName, List<SqlParameter> parameters, CancellationToken ct)
+    private async Task<DataTable> ExecuteAsync(RoutingContext routingContext, string procName, List<SqlParameter> parameters, CancellationToken ct)
     {
-        var connectionString = await _connectionResolver.ResolveAsync(practiceSuffix, ct);
+        var connectionString = await _connectionResolver.ResolveAsync(routingContext, ct);
         return await LegacyDbExecutor.ExecuteDataTableAsync(connectionString, CommandType.StoredProcedure, procName, parameters, ct);
     }
 }

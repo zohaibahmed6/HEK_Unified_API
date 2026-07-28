@@ -1,5 +1,6 @@
 using System.Data;
 using HekCoreApi.Application.Common.Interfaces;
+using HekCoreApi.Application.Common.Models;
 using Microsoft.Data.SqlClient;
 
 namespace HekCoreApi.Infrastructure.Legacy.Erms;
@@ -14,9 +15,9 @@ public sealed class ErmsDemographicsRepository : IErmsDemographicsRepository
         _connectionResolver = connectionResolver;
     }
 
-    public async Task<DataTable> GetDemographicsAsync(string practiceSuffix, string? patientId, CancellationToken ct = default)
+    public async Task<DataTable> GetDemographicsAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, CancellationToken ct = default)
     {
-        var connectionString = await _connectionResolver.ResolveAsync(practiceSuffix, ct);
+        var connectionString = await _connectionResolver.ResolveAsync(routingContext, ct);
         var parameters = new List<SqlParameter> { new("@pPatientId", (object?)patientId ?? DBNull.Value) };
 
         return await LegacyDbExecutor.ExecuteDataTableAsync(connectionString, CommandType.StoredProcedure, "[HSS].[uspGetDemographics]", parameters, ct);

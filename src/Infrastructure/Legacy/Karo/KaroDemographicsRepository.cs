@@ -1,5 +1,6 @@
 using System.Data;
 using HekCoreApi.Application.Common.Interfaces;
+using HekCoreApi.Application.Common.Models;
 
 namespace HekCoreApi.Infrastructure.Legacy.Karo;
 
@@ -13,9 +14,9 @@ public sealed class KaroDemographicsRepository : IKaroDemographicsRepository
         _connectionResolver = connectionResolver;
     }
 
-    public async Task<KaroDemographicsResult> GetAsync(string practiceSuffix, string? patientId, CancellationToken ct = default)
+    public async Task<KaroDemographicsResult> GetAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, CancellationToken ct = default)
     {
-        var connectionString = await _connectionResolver.ResolveAsync(practiceSuffix, ct);
+        var connectionString = await _connectionResolver.ResolveAsync(routingContext, ct);
         var parameters = new List<Microsoft.Data.SqlClient.SqlParameter> { new("@pPatientId", (object?)patientId ?? DBNull.Value) };
 
         var dataSet = await LegacyDbExecutor.ExecuteDataSetAsync(connectionString, CommandType.StoredProcedure, "[HSS].[uspGetDemographics]", parameters, ct);

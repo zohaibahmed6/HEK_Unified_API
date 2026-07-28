@@ -1,5 +1,6 @@
 using System.Data;
 using HekCoreApi.Application.Common.Interfaces;
+using HekCoreApi.Application.Common.Models;
 using Microsoft.Data.SqlClient;
 
 namespace HekCoreApi.Infrastructure.Legacy.Erms;
@@ -14,18 +15,18 @@ public sealed class ColDataRepository : IColDataRepository
         _connectionResolver = connectionResolver;
     }
 
-    public Task<DataTable> GetCurrentPatientDataAsync(string practiceSuffix, string? patientId, CancellationToken ct = default) =>
-        ExecuteAsync(practiceSuffix, "[OnlineClaim].[uspGetPatientData]", PatientOnly(patientId), ct);
+    public Task<DataTable> GetCurrentPatientDataAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, CancellationToken ct = default) =>
+        ExecuteAsync(routingContext, "[OnlineClaim].[uspGetPatientData]", PatientOnly(patientId), ct);
 
-    public Task<DataTable> GetProviderDataAsync(string practiceSuffix, string? patientId, CancellationToken ct = default) =>
-        ExecuteAsync(practiceSuffix, "[OnlineClaim].[uspGetProvider]", PatientOnly(patientId), ct);
+    public Task<DataTable> GetProviderDataAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, CancellationToken ct = default) =>
+        ExecuteAsync(routingContext, "[OnlineClaim].[uspGetProvider]", PatientOnly(patientId), ct);
 
-    public Task<DataTable> GetSessionDataAsync(string practiceSuffix, string? patientId, CancellationToken ct = default) =>
+    public Task<DataTable> GetSessionDataAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, CancellationToken ct = default) =>
         // Legacy BUG reproduced on purpose: PHCO.GetSessionData executes an EMPTY proc name, which
         // always fails - the SQL error message becomes the legacy response body.
-        ExecuteAsync(practiceSuffix, "", PatientOnly(patientId), ct);
+        ExecuteAsync(routingContext, "", PatientOnly(patientId), ct);
 
-    public Task<DataTable> GetDiagnosisDataAsync(string practiceSuffix, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, CancellationToken ct = default)
+    public Task<DataTable> GetDiagnosisDataAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, CancellationToken ct = default)
     {
         var parameters = PatientOnly(patientId);
         if (!string.IsNullOrWhiteSpace(sortOrder))
@@ -43,10 +44,10 @@ public sealed class ColDataRepository : IColDataRepository
             parameters.Add(new SqlParameter("@pMaxDate", maxDate));
         }
 
-        return ExecuteAsync(practiceSuffix, "[OnlineClaim].[uspGetConditions]", parameters, ct);
+        return ExecuteAsync(routingContext, "[OnlineClaim].[uspGetConditions]", parameters, ct);
     }
 
-    public Task<DataTable> GetSurgeryDataAsync(string practiceSuffix, string? patientId, string? locationId, string? encounterId, CancellationToken ct = default)
+    public Task<DataTable> GetSurgeryDataAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? locationId, string? encounterId, CancellationToken ct = default)
     {
         var parameters = PatientOnly(patientId);
         parameters.Add(new SqlParameter("@pEncounterId", (object?)encounterId ?? DBNull.Value));
@@ -55,13 +56,13 @@ public sealed class ColDataRepository : IColDataRepository
             parameters.Add(new SqlParameter("@pLocationId", locationId));
         }
 
-        return ExecuteAsync(practiceSuffix, "[OnlineClaim].[uspGetSurgeryData]", parameters, ct);
+        return ExecuteAsync(routingContext, "[OnlineClaim].[uspGetSurgeryData]", parameters, ct);
     }
 
-    public async Task<long> SaveInvoiceAsync(string practiceSuffix, string? patientId, string? accountHolderId, string? encounterId, string? serviceName, string? serviceCode,
+    public async Task<long> SaveInvoiceAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? accountHolderId, string? encounterId, string? serviceName, string? serviceCode,
         string? fee, string? description, string? payee, string? serviceProvider, string? serviceProviderType, string? serviceDate, string? pegasusReference, string? claimShortCode, CancellationToken ct = default)
     {
-        var connectionString = await _connectionResolver.ResolveAsync(practiceSuffix, ct);
+        var connectionString = await _connectionResolver.ResolveAsync(routingContext, ct);
 
         var parameters = new List<SqlParameter>
         {
@@ -107,9 +108,9 @@ public sealed class ColDataRepository : IColDataRepository
     private static List<SqlParameter> PatientOnly(string? patientId) =>
         new() { new SqlParameter("@pPatientId", (object?)patientId ?? DBNull.Value) };
 
-    private async Task<DataTable> ExecuteAsync(string practiceSuffix, string procName, List<SqlParameter> parameters, CancellationToken ct)
+    private async Task<DataTable> ExecuteAsync(RoutingContext routingContext, string procName, List<SqlParameter> parameters, CancellationToken ct)
     {
-        var connectionString = await _connectionResolver.ResolveAsync(practiceSuffix, ct);
+        var connectionString = await _connectionResolver.ResolveAsync(routingContext, ct);
         return await LegacyDbExecutor.ExecuteDataTableAsync(connectionString, CommandType.StoredProcedure, procName, parameters, ct);
     }
 }

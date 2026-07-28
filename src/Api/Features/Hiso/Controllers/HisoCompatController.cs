@@ -13,18 +13,19 @@ using Microsoft.AspNetCore.Mvc;
 namespace HekCoreApi.Api.Features.Hiso.Controllers;
 
 /// <summary>
-/// HISO's real `getData` SOAP operation (`FormSessionService.getData`, `HISO_doc.md` Section 3),
-/// exposed here with the same field names/request-response shape - no separate bearer token
-/// required, since the legacy operation authenticates via the session GUID alone ("Session GUID
-/// only", `EndpointInventory.md`). Path is `/hiso/getData` (not namespaced/renamed further),
-/// matching the legacy SOAP action `.../getData` as closely as an HTTP/JSON binding allows.
-/// PROJECT_STATUS.md open item 34 (new, 2026-07-20): built after Zohaib flagged that renaming
-/// data-retrieval operations away from their legacy names/shapes broke the ability to test against
-/// an existing getData-configured consumer - this is the first of the three legacy systems' data
-/// operations given real wire-compatible treatment, not just auth.
+/// Internal-only JSON mirror of HISO's real SOAP operations (<see cref="Soap.FormSessionService"/>
+/// at `/FormSessionService.svc`, which is the actual legacy-compatible door real external HISO
+/// clients must use). This controller exists solely so the project's own frontend dashboard
+/// (`frontend/src/hisoView.tsx`/`catalog.ts`) has a plain JSON transport to call - it is not a
+/// public legacy-compat surface and should not be advertised to real external HISO clients.
+/// `getFormView` has no SOAP equivalent (dashboard-only convenience, not a real legacy operation).
+/// v1.1 plan Step 4 follow-up (2026-07-27): originally flagged as a not-yet-retired duplicate
+/// JSON door; scoped down to "internal dashboard API only" instead of deletion, since the
+/// frontend calls these JSON routes directly and has no SOAP client of its own.
 /// </summary>
 [ApiController]
 [Route("hiso")]
+[ApiExplorerSettings(IgnoreApi = true)]
 public sealed class HisoCompatController : ControllerBase
 {
     private readonly IMediator _mediator;

@@ -1,4 +1,4 @@
-using HekCoreApi.Application.Common.Interfaces;
+﻿using HekCoreApi.Application.Common.Interfaces;
 using MediatR;
 
 namespace HekCoreApi.Application.Features.Karo.Queries;
@@ -17,12 +17,14 @@ public sealed class KaroDemographicsQueryHandler : IRequestHandler<KaroDemograph
 {
     private readonly IKaroRequestParser _parser;
     private readonly IKaroTokenValidator _tokenValidator;
+    private readonly IKaroRoutingResolver _routingResolver;
     private readonly IKaroDemographicsRepository _repository;
 
-    public KaroDemographicsQueryHandler(IKaroRequestParser parser, IKaroTokenValidator tokenValidator, IKaroDemographicsRepository repository)
+    public KaroDemographicsQueryHandler(IKaroRequestParser parser, IKaroTokenValidator tokenValidator, IKaroRoutingResolver routingResolver, IKaroDemographicsRepository repository)
     {
         _parser = parser;
         _tokenValidator = tokenValidator;
+        _routingResolver = routingResolver;
         _repository = repository;
     }
 
@@ -32,14 +34,15 @@ public sealed class KaroDemographicsQueryHandler : IRequestHandler<KaroDemograph
         {
             var (encounterId, practiceSuffix, _) = _parser.ParseEncounterId(request.EncounterId);
             var patientId = _parser.Decrypt(request.PatientId);
+            var routingContext = _routingResolver.Resolve(request.EncounterId ?? string.Empty);
 
-            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, patientId, encounterId, request.BearerToken, request.Pho, cancellationToken);
+            var validation = await _tokenValidator.ValidateAsync(practiceSuffix, routingContext, patientId, encounterId, request.BearerToken, request.Pho, cancellationToken);
             if (!validation.Valid)
             {
                 return new KaroDemographicsQueryResult(false, null, null, null, "Invalid token value!");
             }
 
-            var result = await _repository.GetAsync(practiceSuffix, patientId, cancellationToken);
+            var result = await _repository.GetAsync(practiceSuffix, routingContext, patientId, cancellationToken);
             return new KaroDemographicsQueryResult(true, patientId, result.Demographic, result.Cards, null);
         }
         catch (Exception ex)
