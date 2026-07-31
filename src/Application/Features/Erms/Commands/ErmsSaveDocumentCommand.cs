@@ -1,4 +1,5 @@
 ﻿using HekCoreApi.Application.Common.Interfaces;
+using HekCoreApi.Application.Common.Models;
 using MediatR;
 
 namespace HekCoreApi.Application.Features.Erms.Commands;
@@ -17,7 +18,7 @@ public sealed record ErmsSaveDocumentCommand(
     string? BearerToken) : IRequest<ErmsSaveDocumentResult>;
 
 /// <summary>Empty `Error` = success (legacy signals failure purely via the non-blank error string that drives the 400 response).</summary>
-public sealed record ErmsSaveDocumentResult(string Error);
+public sealed record ErmsSaveDocumentResult(string Error, CallRoutingInfo? Routing = null);
 
 /// <summary>
 /// Ported from ERMS's `SaveDocument` (`APIController.cs:1535`): base64+decrypt on PatiendID/EncounterID/
@@ -32,18 +33,21 @@ public sealed class ErmsSaveDocumentCommandHandler : IRequestHandler<ErmsSaveDoc
     private readonly IErmsTokenValidator _tokenValidator;
     private readonly IErmsRoutingResolver _routingResolver;
     private readonly IErmsWriteRepository _writeRepository;
+    private readonly ITenantRegistryService _tenantRegistryService;
 
-    public ErmsSaveDocumentCommandHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsWriteRepository writeRepository)
+    public ErmsSaveDocumentCommandHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsWriteRepository writeRepository, ITenantRegistryService tenantRegistryService)
     {
         _parser = parser;
         _tokenValidator = tokenValidator;
         _routingResolver = routingResolver;
         _writeRepository = writeRepository;
+        _tenantRegistryService = tenantRegistryService;
     }
 
     public async Task<ErmsSaveDocumentResult> Handle(ErmsSaveDocumentCommand request, CancellationToken ct)
     {
         var error = string.Empty;
+        CallRoutingInfo? routing = null;
         try
         {
             // Legacy: GetBase64Value on PatiendID/EncounterID/ProviderID, then the shared split
@@ -53,10 +57,13 @@ public sealed class ErmsSaveDocumentCommandHandler : IRequestHandler<ErmsSaveDoc
             var providerId = _parser.Decrypt(_parser.DecodeBase64(request.ProviderId));
             var routingContext = _routingResolver.Resolve(request.EncounterId ?? string.Empty);
 
+            var route = await _tenantRegistryService.ResolveRouteAsync(routingContext, ct);
+            routing = route is not null ? CallRoutingInfo.FromPracticeRoute(route, routingContext.Environment) : null;
+
             var validation = await _tokenValidator.ValidateAsync(practiceSuffix, routingContext, patientId, encounterId, request.BearerToken, ct);
             if (!validation.Valid)
             {
-                return new ErmsSaveDocumentResult(validation.ErrorMessage ?? "Invalid token value!");
+                return new ErmsSaveDocumentResult(validation.ErrorMessage ?? "Invalid token value!", routing);
             }
 
             var dmsGuidKey = string.Empty;
@@ -91,6 +98,6 @@ public sealed class ErmsSaveDocumentCommandHandler : IRequestHandler<ErmsSaveDoc
             error = ex.Message;
         }
 
-        return new ErmsSaveDocumentResult(error);
+        return new ErmsSaveDocumentResult(error, routing);
     }
 }

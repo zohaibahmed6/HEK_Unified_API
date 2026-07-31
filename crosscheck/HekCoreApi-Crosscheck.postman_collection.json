@@ -1,0 +1,406 @@
+{
+  "info": {
+    "name": "HekCoreApi Crosscheck - Legacy vs New (2026-07-30)",
+    "description": "New-API calls used in the 2026-07-30 legacy-vs-new crosscheck. Auth requests store their token into a collection variable; downstream requests reference it. Run top-to-bottom per folder.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "newBase", "value": "http://localhost:8080" },
+    { "key": "erms_token", "value": "" },
+    { "key": "karo_token", "value": "" },
+    { "key": "col_token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "HISO (SOAP, no Host header needed)",
+      "item": [
+        {
+          "name": "getVersion",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "text/xml; charset=utf-8" },
+              { "key": "SOAPAction", "value": "\"http://www.hiso.govt.nz/10014.2/1.0/formsession/getVersion\"" }
+            ],
+            "url": "{{newBase}}/FormSessionService.svc",
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\"><soapenv:Body><getVersion xmlns=\"http://www.hiso.govt.nz/10014.2/1.0/formsession\"><sessionKey>D2C9E798-1BF9-4610-AC16-B2C09744A40E</sessionKey></getVersion></soapenv:Body></soapenv:Envelope>"
+            }
+          }
+        },
+        {
+          "name": "getDeliveryOptions",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "text/xml; charset=utf-8" },
+              { "key": "SOAPAction", "value": "\"http://www.hiso.govt.nz/10014.2/1.0/formsession/getDeliveryOptions\"" }
+            ],
+            "url": "{{newBase}}/FormSessionService.svc",
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\"><soapenv:Body><getDeliveryOptions xmlns=\"http://www.hiso.govt.nz/10014.2/1.0/formsession\"><sessionKey>D2C9E798-1BF9-4610-AC16-B2C09744A40E</sessionKey></getDeliveryOptions></soapenv:Body></soapenv:Envelope>"
+            }
+          }
+        },
+        {
+          "name": "getData (dynamic mode, minimal - needs real form payload)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "text/xml; charset=utf-8" },
+              { "key": "SOAPAction", "value": "\"http://www.hiso.govt.nz/10014.2/1.0/formsession/getData\"" }
+            ],
+            "url": "{{newBase}}/FormSessionService.svc",
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\"><soapenv:Body><getData xmlns=\"http://www.hiso.govt.nz/10014.2/1.0/formsession\"><sessionKey>D2C9E798-1BF9-4610-AC16-B2C09744A40E</sessionKey><dataContainer><formMetaData xmlns=\"http://www.hiso.govt.nz/10014.2/1.0/formInstanceMeta\"><formInstanceOperationMode>N</formInstanceOperationMode></formMetaData><submittedData xmlns=\"\"><dummy/></submittedData></dataContainer></getData></soapenv:Body></soapenv:Envelope>"
+            }
+          }
+        },
+        {
+          "name": "saveContainer (minimal - needs real view/dataContainer payload)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "text/xml; charset=utf-8" },
+              { "key": "SOAPAction", "value": "\"http://www.hiso.govt.nz/10014.2/1.0/formsession/saveContainer\"" }
+            ],
+            "url": "{{newBase}}/FormSessionService.svc",
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\"><soapenv:Body><saveContainer xmlns=\"http://www.hiso.govt.nz/10014.2/1.0/formsession\"><sessionKey>D2C9E798-1BF9-4610-AC16-B2C09744A40E</sessionKey><resumePath></resumePath><dataContainer xmlns=\"\"><dummy/></dataContainer><view></view><viewType></viewType><viewSignature></viewSignature><completed>false</completed><continueSession>false</continueSession></saveContainer></soapenv:Body></soapenv:Envelope>"
+            }
+          }
+        },
+        {
+          "name": "getFormView (CONFIRMED MISSING - expect 'No operation found' fault)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "text/xml; charset=utf-8" },
+              { "key": "SOAPAction", "value": "\"http://www.hiso.govt.nz/10014.2/1.0/formsession/getFormView\"" }
+            ],
+            "url": "{{newBase}}/FormSessionService.svc",
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\"><soapenv:Body><getFormView xmlns=\"http://www.hiso.govt.nz/10014.2/1.0/formsession\"><sessionKey>D2C9E798-1BF9-4610-AC16-B2C09744A40E</sessionKey><formInstanceId>a30f8f2e-519d-449b-a194-03a1c3157fa9</formInstanceId></getFormView></soapenv:Body></soapenv:Envelope>"
+            }
+          }
+        },
+        {
+          "name": "processAction (launchForm)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "text/xml; charset=utf-8" },
+              { "key": "SOAPAction", "value": "\"http://www.hiso.govt.nz/10014.2/1.0/formsession/processAction\"" }
+            ],
+            "url": "{{newBase}}/FormSessionService.svc",
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\"><soapenv:Body><processAction xmlns=\"http://www.hiso.govt.nz/10014.2/1.0/formsession\"><sessionKey>D2C9E798-1BF9-4610-AC16-B2C09744A40E</sessionKey><actionId>launchForm</actionId><actionContainer xmlns=\"\"><dummy/></actionContainer></processAction></soapenv:Body></soapenv:Envelope>"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "ERMS (Host: southerms.indici.nz)",
+      "item": [
+        {
+          "name": "Ping",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Host", "value": "southerms.indici.nz" } ],
+            "url": "{{newBase}}/api/ping"
+          }
+        },
+        {
+          "name": "Authenticate",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "var body = pm.response.text();",
+              "var m = body.match(/<Token>([^<]+)<\\/Token>/);",
+              "if (m) pm.collectionVariables.set('erms_token', m[1]);"
+            ]}
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Host", "value": "southerms.indici.nz" },
+              { "key": "Content-Type", "value": "application/xml" }
+            ],
+            "url": "{{newBase}}/API/Authenticate",
+            "body": {
+              "mode": "raw",
+              "raw": "<Credential><Username>ermsdev</Username><Password>eRMsd3V</Password><PatientId>2450776</PatientId><EncounterId>19592581__901__FZZ999-B</EncounterId></Credential>"
+            }
+          }
+        },
+        {
+          "name": "GetPatientData",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Host", "value": "southerms.indici.nz" },
+              { "key": "Authorization", "value": "Bearer {{erms_token}}" }
+            ],
+            "url": "{{newBase}}/API/GetPatientData?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B"
+          }
+        },
+        {
+          "name": "GetRegisteredPractitioners (MISMATCH - fewer rows than legacy)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Host", "value": "southerms.indici.nz" },
+              { "key": "Authorization", "value": "Bearer {{erms_token}}" }
+            ],
+            "url": "{{newBase}}/API/GetRegisteredPractitioners?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B"
+          }
+        },
+        {
+          "name": "GetPrescribedMedications (MISMATCH - fewer rows than legacy)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Host", "value": "southerms.indici.nz" },
+              { "key": "Authorization", "value": "Bearer {{erms_token}}" }
+            ],
+            "url": "{{newBase}}/API/GetPrescribedMedications?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B"
+          }
+        },
+        {
+          "name": "GetRegularMedications (MISMATCH - fewer rows than legacy)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Host", "value": "southerms.indici.nz" },
+              { "key": "Authorization", "value": "Bearer {{erms_token}}" }
+            ],
+            "url": "{{newBase}}/API/GetRegularMedications?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B"
+          }
+        },
+        {
+          "name": "GetConsultNotes (MISMATCH - different note content)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Host", "value": "southerms.indici.nz" },
+              { "key": "Authorization", "value": "Bearer {{erms_token}}" }
+            ],
+            "url": "{{newBase}}/API/GetConsultNotes?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B"
+          }
+        },
+        {
+          "name": "GetLaboratoryReportList",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Host", "value": "southerms.indici.nz" },
+              { "key": "Authorization", "value": "Bearer {{erms_token}}" }
+            ],
+            "url": "{{newBase}}/API/GetLaboratoryReportList?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B"
+          }
+        },
+        {
+          "name": "GetLaboratoryReportDetails (MISMATCH - CRLF vs LF)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Host", "value": "southerms.indici.nz" },
+              { "key": "Authorization", "value": "Bearer {{erms_token}}" }
+            ],
+            "url": "{{newBase}}/API/GetLaboratoryReportDetails?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsReferenceId=B3A928B7-3FE9-42D7-AFAE-802C71607AE8"
+          }
+        },
+        {
+          "name": "GetScannedDetails (MISMATCH - legacy errors, new succeeds)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Host", "value": "southerms.indici.nz" },
+              { "key": "Authorization", "value": "Bearer {{erms_token}}" }
+            ],
+            "url": "{{newBase}}/API/GetScannedDetails?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsReferenceId=4171A2EC-586D-45DE-84FA-A080AA2266A8"
+          }
+        },
+        {
+          "name": "GetDischargeSummaryDetails (empty ref - legacy HANGS, new OK)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Host", "value": "southerms.indici.nz" },
+              { "key": "Authorization", "value": "Bearer {{erms_token}}" }
+            ],
+            "url": "{{newBase}}/API/GetDischargeSummaryDetails?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsReferenceId="
+          }
+        },
+        {
+          "name": "SaveDocument (write, test payload)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Host", "value": "southerms.indici.nz" },
+              { "key": "Authorization", "value": "Bearer {{erms_token}}" },
+              { "key": "Content-Type", "value": "application/xml" }
+            ],
+            "url": "{{newBase}}/API/SaveDocument",
+            "body": {
+              "mode": "raw",
+              "raw": "<?xml version=\"1.0\" encoding=\"utf-8\"?><ReferralDocument><ReferralDocument_Referral_ID></ReferralDocument_Referral_ID><ReferralDocument_Document_ID></ReferralDocument_Document_ID><ReferralDocument_Patient_PMS_ID>2450776</ReferralDocument_Patient_PMS_ID><ReferralDocument_Encounter_ID>19592581__901__FZZ999-B</ReferralDocument_Encounter_ID><ReferralDocument_Referral_Type>Referral</ReferralDocument_Referral_Type><ReferralDocument_Item_Type>Document</ReferralDocument_Item_Type><ReferralDocument_Referral_Status>New</ReferralDocument_Referral_Status><ReferralDocument_Created_Date>2026-07-30</ReferralDocument_Created_Date><ReferralDocument_Referrer_Fullname>Test Crosscheck</ReferralDocument_Referrer_Fullname><ReferralDocument_Referrer_PMS_ID>1</ReferralDocument_Referrer_PMS_ID><ReferralDocument_Document_Source>CrosscheckTest</ReferralDocument_Document_Source><ReferralDocument_Content_Type>text/plain</ReferralDocument_Content_Type><ReferralDocument_Description_Type>Test</ReferralDocument_Description_Type><ReferralDocument_Description>Crosscheck test document</ReferralDocument_Description><ReferralDocument_Encoding>base64</ReferralDocument_Encoding><ReferralDocument_Content>SGVsbG8gV29ybGQ=</ReferralDocument_Content><ReferralDocument_Error_Text></ReferralDocument_Error_Text></ReferralDocument>"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "KARO/HSS (Host: hss.itsmyhealth.nz - NOTE: real /api/Get* routes 404, see errors.md)",
+      "item": [
+        {
+          "name": "Ping",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Host", "value": "hss.itsmyhealth.nz" } ],
+            "url": "{{newBase}}/api/ping"
+          }
+        },
+        {
+          "name": "Authenticate",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "var json = pm.response.json();",
+              "if (json.token) pm.collectionVariables.set('karo_token', json.token);"
+            ]}
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Host", "value": "hss.itsmyhealth.nz" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{newBase}}/api/Authenticate",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"Username\":\"hsslive\",\"Password\":\"H$$L1v3005\",\"patientId\":\"2450776\",\"encounterId\":\"19592581__901__FZZ999-B\",\"system\":\"hss\",\"pho\":\"HBPHO\"}"
+            }
+          }
+        },
+        {
+          "name": "GetDemographics (via WORKING internal route - real /api/GetDemographics 404s, see errors.md)",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{karo_token}}" } ],
+            "url": "{{newBase}}/karo/demographics?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B"
+          }
+        },
+        {
+          "name": "GetRecallCategories (MISMATCH - new API wrongly requires 'group' param)",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{karo_token}}" } ],
+            "url": "{{newBase}}/karo/recallcategories?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B&group="
+          }
+        },
+        {
+          "name": "SaveScreeningCode (MATCHED - stub confirmed identical)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{karo_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{newBase}}/karo/screeningcodes",
+            "body": { "mode": "raw", "raw": "{\"test\":\"crosscheck\"}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "COL (Host: southerms.indici.nz)",
+      "item": [
+        {
+          "name": "Authenticate (new API succeeds, has Expiry '+0' bug - see errors.md)",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "var json = pm.response.json();",
+              "if (json.Token) pm.collectionVariables.set('col_token', json.Token);"
+            ]}
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Host", "value": "southerms.indici.nz" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{newBase}}/COL/Authenticate",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"Username\":\"ermsdev\",\"Password\":\"eRMsd3V\",\"PatientId\":\"2450776\",\"EncounterId\":\"19592581__901__FZZ999-B\"}"
+            }
+          }
+        },
+        {
+          "name": "GetCurrentPatientData",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Host", "value": "southerms.indici.nz" },
+              { "key": "Authorization", "value": "Bearer {{col_token}}" }
+            ],
+            "url": "{{newBase}}/COL/GetCurrentPatientData?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B"
+          }
+        },
+        {
+          "name": "GetSessionData (CRITICAL BUG - CommandText not initialized)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Host", "value": "southerms.indici.nz" },
+              { "key": "Authorization", "value": "Bearer {{col_token}}" }
+            ],
+            "url": "{{newBase}}/COL/GetSessionData?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B"
+          }
+        },
+        {
+          "name": "GetProviderData",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Host", "value": "southerms.indici.nz" },
+              { "key": "Authorization", "value": "Bearer {{col_token}}" }
+            ],
+            "url": "{{newBase}}/COL/GetProviderData?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B"
+          }
+        },
+        {
+          "name": "GetSurgeryData",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Host", "value": "southerms.indici.nz" },
+              { "key": "Authorization", "value": "Bearer {{col_token}}" }
+            ],
+            "url": "{{newBase}}/COL/GetSurgeryData?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B"
+          }
+        },
+        {
+          "name": "GetDiagnosisData",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Host", "value": "southerms.indici.nz" },
+              { "key": "Authorization", "value": "Bearer {{col_token}}" }
+            ],
+            "url": "{{newBase}}/COL/GetDiagnosisData?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B"
+          }
+        }
+      ]
+    }
+  ]
+}

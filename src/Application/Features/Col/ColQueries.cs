@@ -7,10 +7,10 @@ namespace HekCoreApi.Application.Features.Col;
 
 public sealed record ColAuthenticateQuery(string? Username, string? Password, string? PatientId, string? EncounterId) : IRequest<ColAuthenticateResult>;
 
-public sealed record ColAuthenticateResult(string? Token, string? Expiry, string? PracticeId, string Error);
+public sealed record ColAuthenticateResult(string? Token, string? Expiry, string? PracticeId, string Error, CallRoutingInfo? Routing = null);
 
 /// <summary>Shared result for the COL read/write pipelines - raw DataTable plus the error text that (non-blank) becomes the whole response body.</summary>
-public sealed record ColReadResult(bool Succeeded, DataTable? Table, string Error);
+public sealed record ColReadResult(bool Succeeded, DataTable? Table, string Error, CallRoutingInfo? Routing = null);
 
 public sealed record ColGetCurrentPatientDataQuery(string? PatientId, string? EncounterId, string? BearerToken) : IRequest<ColReadResult>;
 public sealed record ColGetSessionDataQuery(string? PatientId, string? EncounterId, string? BearerToken) : IRequest<ColReadResult>;
@@ -22,7 +22,7 @@ public sealed record ColSaveInvoiceCommand(string? PatientId, string? AccountHol
     string? AmountInclGst, string? Description, string? Payee, string? ServiceProvider, string? ServiceProviderType, string? ServiceDate,
     string? PegasusReference, string? ClaimShortCode, string? BearerToken) : IRequest<ColSaveInvoiceResult>;
 
-public sealed record ColSaveInvoiceResult(long ServiceMappingId, string Error);
+public sealed record ColSaveInvoiceResult(long ServiceMappingId, string Error, CallRoutingInfo? Routing = null);
 
 /// <summary>
 /// Ported from `COLController.Authenticate` (`COLController.cs:24`): NO base64 step (unlike ERMS),
@@ -38,13 +38,15 @@ public sealed class ColAuthenticateQueryHandler : IRequestHandler<ColAuthenticat
     private readonly IErmsAuthRepository _authRepository;
     private readonly ISecretProvider _secretProvider;
     private readonly IErmsRoutingResolver _routingResolver;
+    private readonly ITenantRegistryService _tenantRegistryService;
 
-    public ColAuthenticateQueryHandler(IColRequestParser parser, IErmsAuthRepository authRepository, ISecretProvider secretProvider, IErmsRoutingResolver routingResolver)
+    public ColAuthenticateQueryHandler(IColRequestParser parser, IErmsAuthRepository authRepository, ISecretProvider secretProvider, IErmsRoutingResolver routingResolver, ITenantRegistryService tenantRegistryService)
     {
         _parser = parser;
         _authRepository = authRepository;
         _secretProvider = secretProvider;
         _routingResolver = routingResolver;
+        _tenantRegistryService = tenantRegistryService;
     }
 
     public async Task<ColAuthenticateResult> Handle(ColAuthenticateQuery request, CancellationToken ct)
@@ -55,6 +57,9 @@ public sealed class ColAuthenticateQueryHandler : IRequestHandler<ColAuthenticat
             var patientId = _parser.Decrypt(request.PatientId);
             var routingContext = _routingResolver.Resolve(request.EncounterId ?? string.Empty);
 
+            var route = await _tenantRegistryService.ResolveRouteAsync(routingContext, ct);
+            var routing = route is not null ? CallRoutingInfo.FromPracticeRoute(route, routingContext.Environment) : null;
+
             var expiryRaw = await _secretProvider.GetSecretAsync("Erms:ExpiryInDays", ct);
             var expiryInDays = double.TryParse(expiryRaw, out var parsed) ? parsed : 0;
 
@@ -64,18 +69,32 @@ public sealed class ColAuthenticateQueryHandler : IRequestHandler<ColAuthenticat
             {
                 if (dbResult.Expiry is { } expiry && expiry != DateTime.MinValue)
                 {
-                    return new ColAuthenticateResult(dbResult.Token, expiry.ToString("yyyy-MM-ddTHH:mm:ssz"), dbResult.PracticeId, string.Empty);
+                    return new ColAuthenticateResult(dbResult.Token, FormatExpiryLikeLegacy(expiry), dbResult.PracticeId, string.Empty, routing);
                 }
 
-                return new ColAuthenticateResult(null, null, null, "Invalid credentials!");
+                return new ColAuthenticateResult(null, null, null, "Invalid credentials!", routing);
             }
 
-            return new ColAuthenticateResult(null, null, null, "Authentication failed!");
+            return new ColAuthenticateResult(null, null, null, "Authentication failed!", routing);
         }
         catch (Exception ex)
         {
             return new ColAuthenticateResult(null, null, null, ex.Message);
         }
+    }
+
+    // Same fix as ERMS's `FormatExpiryLikeLegacy` (`ErmsCompatController.cs`, 2026-07-30) - legacy's
+    // real server always ran with its local system clock set to NZ time, so its "z" format specifier
+    // picked up NZ's UTC offset (+12/+13) implicitly. Relying on the container's own ambient timezone
+    // for this is fragile (works today only because `docker-compose.yml`'s `TZ: Pacific/Auckland` was
+    // added for an unrelated reason - Azure/other hosts aren't guaranteed to have that set), so this
+    // computes the real NZ offset explicitly instead. This exact bug was found live 2026-07-31 in
+    // COL's own `Authenticate` (separate handler from ERMS's, never got the same fix at the time).
+    private static string FormatExpiryLikeLegacy(DateTime expiry)
+    {
+        var nzZone = TimeZoneInfo.FindSystemTimeZoneById(OperatingSystem.IsWindows() ? "New Zealand Standard Time" : "Pacific/Auckland");
+        var offsetHours = nzZone.GetUtcOffset(DateTime.SpecifyKind(expiry, DateTimeKind.Unspecified)).Hours;
+        return expiry.ToString("yyyy-MM-ddTHH:mm:ss") + (offsetHours >= 0 ? "+" : "-") + Math.Abs(offsetHours);
     }
 }
 
@@ -89,35 +108,43 @@ internal sealed class ColReadPipeline
     private readonly IColRequestParser _parser;
     private readonly IErmsTokenValidator _tokenValidator;
     private readonly IErmsRoutingResolver _routingResolver;
+    private readonly ITenantRegistryService _tenantRegistryService;
 
-    public ColReadPipeline(IColRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver)
+    public ColReadPipeline(IColRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, ITenantRegistryService tenantRegistryService)
     {
         _parser = parser;
         _tokenValidator = tokenValidator;
         _routingResolver = routingResolver;
+        _tenantRegistryService = tenantRegistryService;
     }
 
     public async Task<ColReadResult> RunAsync(string? patientId, string? encounterId, string? bearerToken,
         Func<string, RoutingContext, string?, string?, Task<DataTable>> fetch, CancellationToken ct = default)
     {
+        CallRoutingInfo? routing = null;
         try
         {
             var (parsedEncounterId, practiceSuffix) = _parser.ParseEncounterId(encounterId);
             var parsedPatientId = _parser.Decrypt(patientId);
             var routingContext = _routingResolver.Resolve(encounterId ?? string.Empty);
 
+            var route = await _tenantRegistryService.ResolveRouteAsync(routingContext, ct);
+            routing = route is not null ? CallRoutingInfo.FromPracticeRoute(route, routingContext.Environment) : null;
+
             var validation = await _tokenValidator.ValidateAsync(practiceSuffix, routingContext, parsedPatientId, parsedEncounterId, bearerToken, ct);
             if (!validation.Valid)
             {
-                return new ColReadResult(false, null, validation.ErrorMessage ?? "Invalid token value!");
+                return new ColReadResult(false, null, validation.ErrorMessage ?? "Invalid token value!", routing);
             }
 
             var table = await fetch(practiceSuffix, routingContext, parsedPatientId, parsedEncounterId);
-            return new ColReadResult(true, table, string.Empty);
+            return new ColReadResult(true, table, string.Empty, routing);
         }
         catch (Exception ex)
         {
-            return new ColReadResult(false, null, ex.Message);
+            // routing may already be resolved by the time fetch() throws (e.g. the real legacy
+            // GetSessionData bug - an empty stored-procedure name) - still surface it if so.
+            return new ColReadResult(false, null, ex.Message, routing);
         }
     }
 }
@@ -127,9 +154,9 @@ public sealed class ColGetCurrentPatientDataQueryHandler : IRequestHandler<ColGe
     private readonly ColReadPipeline _pipeline;
     private readonly IColDataRepository _repository;
 
-    public ColGetCurrentPatientDataQueryHandler(IColRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IColDataRepository repository)
+    public ColGetCurrentPatientDataQueryHandler(IColRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IColDataRepository repository, ITenantRegistryService tenantRegistryService)
     {
-        _pipeline = new ColReadPipeline(parser, tokenValidator, routingResolver);
+        _pipeline = new ColReadPipeline(parser, tokenValidator, routingResolver, tenantRegistryService);
         _repository = repository;
     }
 
@@ -143,9 +170,9 @@ public sealed class ColGetSessionDataQueryHandler : IRequestHandler<ColGetSessio
     private readonly ColReadPipeline _pipeline;
     private readonly IColDataRepository _repository;
 
-    public ColGetSessionDataQueryHandler(IColRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IColDataRepository repository)
+    public ColGetSessionDataQueryHandler(IColRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IColDataRepository repository, ITenantRegistryService tenantRegistryService)
     {
-        _pipeline = new ColReadPipeline(parser, tokenValidator, routingResolver);
+        _pipeline = new ColReadPipeline(parser, tokenValidator, routingResolver, tenantRegistryService);
         _repository = repository;
     }
 
@@ -159,9 +186,9 @@ public sealed class ColGetProviderDataQueryHandler : IRequestHandler<ColGetProvi
     private readonly ColReadPipeline _pipeline;
     private readonly IColDataRepository _repository;
 
-    public ColGetProviderDataQueryHandler(IColRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IColDataRepository repository)
+    public ColGetProviderDataQueryHandler(IColRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IColDataRepository repository, ITenantRegistryService tenantRegistryService)
     {
-        _pipeline = new ColReadPipeline(parser, tokenValidator, routingResolver);
+        _pipeline = new ColReadPipeline(parser, tokenValidator, routingResolver, tenantRegistryService);
         _repository = repository;
     }
 
@@ -175,9 +202,9 @@ public sealed class ColGetSurgeryDataQueryHandler : IRequestHandler<ColGetSurger
     private readonly ColReadPipeline _pipeline;
     private readonly IColDataRepository _repository;
 
-    public ColGetSurgeryDataQueryHandler(IColRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IColDataRepository repository)
+    public ColGetSurgeryDataQueryHandler(IColRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IColDataRepository repository, ITenantRegistryService tenantRegistryService)
     {
-        _pipeline = new ColReadPipeline(parser, tokenValidator, routingResolver);
+        _pipeline = new ColReadPipeline(parser, tokenValidator, routingResolver, tenantRegistryService);
         _repository = repository;
     }
 
@@ -192,9 +219,9 @@ public sealed class ColGetDiagnosisDataQueryHandler : IRequestHandler<ColGetDiag
     private readonly ColReadPipeline _pipeline;
     private readonly IColDataRepository _repository;
 
-    public ColGetDiagnosisDataQueryHandler(IColRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IColDataRepository repository)
+    public ColGetDiagnosisDataQueryHandler(IColRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IColDataRepository repository, ITenantRegistryService tenantRegistryService)
     {
-        _pipeline = new ColReadPipeline(parser, tokenValidator, routingResolver);
+        _pipeline = new ColReadPipeline(parser, tokenValidator, routingResolver, tenantRegistryService);
         _repository = repository;
     }
 
@@ -216,13 +243,15 @@ public sealed class ColSaveInvoiceCommandHandler : IRequestHandler<ColSaveInvoic
     private readonly IErmsTokenValidator _tokenValidator;
     private readonly IErmsRoutingResolver _routingResolver;
     private readonly IColDataRepository _repository;
+    private readonly ITenantRegistryService _tenantRegistryService;
 
-    public ColSaveInvoiceCommandHandler(IColRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IColDataRepository repository)
+    public ColSaveInvoiceCommandHandler(IColRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IColDataRepository repository, ITenantRegistryService tenantRegistryService)
     {
         _parser = parser;
         _tokenValidator = tokenValidator;
         _routingResolver = routingResolver;
         _repository = repository;
+        _tenantRegistryService = tenantRegistryService;
     }
 
     public async Task<ColSaveInvoiceResult> Handle(ColSaveInvoiceCommand request, CancellationToken ct)
@@ -233,10 +262,13 @@ public sealed class ColSaveInvoiceCommandHandler : IRequestHandler<ColSaveInvoic
             var patientId = _parser.Decrypt(request.PatientId);
             var routingContext = _routingResolver.Resolve(request.EncounterId ?? string.Empty);
 
+            var route = await _tenantRegistryService.ResolveRouteAsync(routingContext, ct);
+            var routing = route is not null ? CallRoutingInfo.FromPracticeRoute(route, routingContext.Environment) : null;
+
             var validation = await _tokenValidator.ValidateAsync(practiceSuffix, routingContext, patientId, encounterId, request.BearerToken, ct);
             if (!validation.Valid)
             {
-                return new ColSaveInvoiceResult(-1, validation.ErrorMessage ?? "Invalid token value!");
+                return new ColSaveInvoiceResult(-1, validation.ErrorMessage ?? "Invalid token value!", routing);
             }
 
             var serviceMappingId = await _repository.SaveInvoiceAsync(practiceSuffix, routingContext, patientId, request.AccountHolderId, encounterId,
@@ -245,10 +277,10 @@ public sealed class ColSaveInvoiceCommandHandler : IRequestHandler<ColSaveInvoic
 
             if (serviceMappingId is not (-3) && serviceMappingId <= 0)
             {
-                return new ColSaveInvoiceResult(serviceMappingId, "Invalid values passed!");
+                return new ColSaveInvoiceResult(serviceMappingId, "Invalid values passed!", routing);
             }
 
-            return new ColSaveInvoiceResult(serviceMappingId, string.Empty);
+            return new ColSaveInvoiceResult(serviceMappingId, string.Empty, routing);
         }
         catch (Exception ex)
         {

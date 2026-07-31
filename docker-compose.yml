@@ -21,6 +21,13 @@ services:
       dockerfile: src/Api/Dockerfile
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      # Container defaults to UTC (confirmed 2026-07-31 - `docker exec ... date` showed UTC while the
+      # dev machine's own clock is NZ +12) - every timestamp this app writes (DateTime.UtcNow in
+      # InsertedAt/UpdatedAt columns, log timestamps) is correct but looked "wrong" at a glance next to
+      # NZ wall-clock time. Setting TZ here doesn't change what UtcNow returns, but makes `date`/log
+      # display and any future `DateTime.Now` usage match NZ time as expected. tzdata is already present
+      # in the `mcr.microsoft.com/dotnet/aspnet:8.0` base image (confirmed - no package install needed).
+      TZ: Pacific/Auckland
       ConnectionStrings__TenantRegistry: "Server=host.docker.internal,1433;Database=HekTenantRegistry;User Id=hek_dev;Password=${HOST_DB_PASSWORD};TrustServerCertificate=True;"
       Auth__Enabled: ${AUTH_ENABLED:-false}
       Auth__JwtSigningKey: ${AUTH_JWT_SIGNING_KEY:?AUTH_JWT_SIGNING_KEY must be set - see .env.example}
@@ -49,11 +56,27 @@ services:
       # this is the .NET Core replacement for the old AWSDoc.dll's App.config <appSettings> values.
       Hiso__DmsAwsBaseUrl: ${HISO_DMS_AWS_BASE_URL}
       Hiso__DmsAwsSecretKey: ${HISO_DMS_AWS_SECRET_KEY}
+      # getDeliveryOptions (GetDeliveryOptionsQuery.cs) real HealthLink delivery-account credentials -
+      # deliberately NOT mapped here as `${HISO_DELIVERY_USERID}` etc: confirmed live 2026-07-31 that
+      # an unset host env var still sets the container's env var to an EMPTY string, and ASP.NET
+      # Core's config providers treat any set env var (even empty) as a real override, taking priority
+      # over appsettings.json - so the CHANGE_ME placeholders there would be silently blanked out
+      # again, exactly the "looks resolved but is actually empty" bug this was meant to fix. Until
+      # real credentials exist, appsettings.json's CHANGE_ME_HISO_DELIVERY_* placeholders are left to
+      # surface as-is (a visible, obvious signal in a live test) - add the 3 lines back here (mirroring
+      # HISO_DMS_* above) once real values are in .env, not before.
     extra_hosts:
       - "host.docker.internal:host-gateway"
       - "dbserver-local:192.168.5.9"
     ports:
       - "8080:8080"
+    volumes:
+      # Serilog writes per-system log folders (logs/{hiso,karo,erms,col}/*.log, see Program.cs's
+      # UseSerilog callback) to a relative "logs/" path under /app - without a mount, every container
+      # recreate (rebuild, `docker compose up` after a code change) wipes them, since the container
+      # filesystem itself is thrown away. Bind-mounted to a real host folder (not a named volume) so
+      # the files are directly browsable/attachable in Windows Explorer, no `docker exec` needed.
+      - ./logs:/app/logs
     depends_on:
       aspire-dashboard:
         condition: service_started

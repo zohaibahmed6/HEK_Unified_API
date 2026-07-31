@@ -1,6 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <!-- Static Log.Logger, used by LegacyDbExecutor to log every SP call centrally regardless of
+         caller (no ILogger<T> DI available in that static class) - configured/set once in Api's
+         Program.cs via UseSerilog, so this just needs the core abstraction, not Serilog.AspNetCore. -->
+    <PackageReference Include="Serilog" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
     <!-- Explicit override forcing a newer patch than EF Core 8.0.10 pulls transitively (5.2.0) - see
          Directory.Packages.props for why. -->

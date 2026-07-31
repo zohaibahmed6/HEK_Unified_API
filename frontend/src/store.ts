@@ -6,6 +6,8 @@ export interface SystemAuthState {
   token?: string;
   sessionKey?: string;
   practiceId?: string;
+  username?: string;
+  password?: string;
   values: Record<string, string>;
 }
 
@@ -65,7 +67,7 @@ export function useDashboardStore() {
   );
 
   const setAuth = useCallback(
-    (system: SystemId, patch: Partial<Pick<SystemAuthState, "token" | "sessionKey" | "practiceId">>) => {
+    (system: SystemId, patch: Partial<Pick<SystemAuthState, "token" | "sessionKey" | "practiceId" | "username" | "password">>) => {
       setState((prev) => {
         const next = { ...prev, [system]: { ...prev[system], ...patch } };
         try {

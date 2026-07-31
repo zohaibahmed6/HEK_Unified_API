@@ -13,12 +13,17 @@ public sealed class PracticeRegistryEntry
 {
     public int Id { get; set; }
 
-    public required string PracticeId { get; set; }
+    /// <summary>Null when this row only routes by PracticeCode/Environment (no flat practiceId applies).</summary>
+    public string? PracticeId { get; set; }
 
-    public required string PracticeCode { get; set; }
+    /// <summary>Null when this row only routes by PracticeId alone, or by Environment alone (KARO/ERMS 4-segment quirk).</summary>
+    public string? PracticeCode { get; set; }
 
-    /// <summary>Server/cluster selector (e.g. "SOUTH") - decides which physical DB a practice routes to.</summary>
-    public required string Environment { get; set; }
+    /// <summary>
+    /// Server/cluster selector (e.g. "SOUTH") - decides which physical DB a practice routes to.
+    /// Null when this row routes by PracticeId (alone or with PracticeCode) instead.
+    /// </summary>
+    public string? Environment { get; set; }
 
     public required string PracticeName { get; set; }
 

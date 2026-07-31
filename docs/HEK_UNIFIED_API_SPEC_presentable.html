@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HEK Unified Healthcare API Hub — Specification</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --paper: #faf9f6; --panel: #ffffff; --ink: #1c1e1a; --muted: #5c5c54;
+    --line: #dedad0; --rule: #c9c4b6;
+    --accent: #3a5a78; --accent-strong: #24374a; --accent-soft: #e7edf2;
+    --tag-new: #6a7a3a; --tag-new-soft: #eef2e1;
+    --code-bg: #f0ede3;
+    --shadow: 0 1px 2px rgba(28,30,26,0.05), 0 6px 20px rgba(28,30,26,0.04);
+  }
+  :root[data-theme="dark"] {
+    --paper: #15160f; --panel: #1d1f17; --ink: #ece9dd; --muted: #a9a495;
+    --line: #33342a; --rule: #454634;
+    --accent: #8fb2d4; --accent-strong: #b7d1ea; --accent-soft: #223140;
+    --tag-new: #a9c15c; --tag-new-soft: #2a331a;
+    --code-bg: #262619;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 6px 20px rgba(0,0,0,0.28);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #15160f; --panel: #1d1f17; --ink: #ece9dd; --muted: #a9a495;
+      --line: #33342a; --rule: #454634;
+      --accent: #8fb2d4; --accent-strong: #b7d1ea; --accent-soft: #223140;
+      --tag-new: #a9c15c; --tag-new-soft: #2a331a;
+      --code-bg: #262619;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 6px 20px rgba(0,0,0,0.28);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body {
+    font-family: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+    font-size: 16px; line-height: 1.65;
+  }
+  .layout { display: grid; grid-template-columns: 240px minmax(0, 760px); gap: 56px; max-width: 1100px; margin: 0 auto; padding: 56px 24px 120px; justify-content: center; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } .toc { display: none; } }
+
+  /* ---------- TOC ---------- */
+  .toc { position: sticky; top: 40px; align-self: start; font-family: -apple-system, "Segoe UI", sans-serif; }
+  .toc-label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
+  .toc a {
+    display: block; font-size: 13.5px; color: var(--muted); text-decoration: none; padding: 5px 0;
+    border-left: 2px solid transparent; padding-left: 10px; margin-left: -1px;
+  }
+  .toc a:hover { color: var(--accent-strong); border-left-color: var(--line); }
+  .toc a.sub { font-size: 12.5px; padding-left: 22px; }
+
+  /* ---------- cover block ---------- */
+  .cover {
+    border: 1px solid var(--line); border-radius: 4px; padding: 32px 36px; margin-bottom: 48px;
+    background: var(--panel); box-shadow: var(--shadow);
+  }
+  .cover .eyebrow {
+    font-family: -apple-system, "Segoe UI", sans-serif; font-size: 11.5px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--accent-strong); margin: 0 0 14px; font-weight: 600;
+  }
+  .cover h1 {
+    font-size: clamp(26px, 4vw, 34px); line-height: 1.18; margin: 0 0 20px; font-weight: 700;
+    letter-spacing: -0.01em; text-wrap: balance;
+  }
+  .meta-grid {
+    display: grid; grid-template-columns: auto 1fr; gap: 6px 18px;
+    font-family: -apple-system, "Segoe UI", sans-serif; font-size: 13.5px;
+  }
+  .meta-grid dt { color: var(--muted); font-weight: 600; }
+  .meta-grid dd { margin: 0; }
+  .status-badge {
+    display: inline-block; font-family: -apple-system, "Segoe UI", sans-serif; font-size: 11px;
+    font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 3px 10px;
+    border-radius: 999px; background: var(--accent-soft); color: var(--accent-strong);
+  }
+
+  /* ---------- prose ---------- */
+  h2 {
+    font-size: 22px; font-weight: 700; letter-spacing: -0.005em; margin: 56px 0 6px;
+    padding-bottom: 10px; border-bottom: 1px solid var(--rule); scroll-margin-top: 24px;
+  }
+  h2 .num {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    color: var(--accent); font-weight: 700; margin-right: 10px; font-size: 0.85em;
+  }
+  h3 {
+    font-size: 17px; font-weight: 700; margin: 32px 0 10px; scroll-margin-top: 24px;
+  }
+  p { margin: 0 0 16px; }
+  ul, ol { margin: 0 0 16px; padding-left: 24px; }
+  li { margin-bottom: 6px; }
+  strong { font-weight: 700; }
+  em { font-style: italic; }
+  a { color: var(--accent-strong); }
+  code {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 0.86em; background: var(--code-bg); padding: 0.1em 0.4em; border-radius: 4px;
+  }
+  blockquote {
+    margin: 0 0 16px; padding: 4px 0 4px 18px; border-left: 3px solid var(--line);
+    color: var(--muted); font-style: italic;
+  }
+  .section-intro { color: var(--muted); font-size: 15px; margin-bottom: 20px; }
+
+  /* ---------- requirement tables ---------- */
+  .table-wrap { overflow-x: auto; margin: 0 0 20px; border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow); }
+  table {
+    width: 100%; border-collapse: collapse; font-family: -apple-system, "Segoe UI", sans-serif;
+    font-size: 13.8px; background: var(--panel);
+  }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  thead th {
+    font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
+    font-weight: 700; border-bottom: 1px solid var(--rule);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.id, th.id-col {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12.5px; font-weight: 700; color: var(--accent-strong); white-space: nowrap; width: 1%;
+  }
+
+  /* ---------- v1.1 "new" tagging ---------- */
+  .new-tag {
+    display: inline-block; font-family: -apple-system, "Segoe UI", sans-serif; font-size: 9.5px;
+    font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; padding: 1px 6px;
+    border-radius: 4px; background: var(--tag-new-soft); color: var(--tag-new); margin-left: 8px;
+    vertical-align: middle;
+  }
+  .addendum-banner {
+    background: var(--tag-new-soft); border: 1px solid var(--tag-new); border-left-width: 4px;
+    border-radius: 6px; padding: 14px 18px; margin: 0 0 24px; font-size: 14px;
+  }
+  .addendum-banner .label {
+    font-family: -apple-system, "Segoe UI", sans-serif; font-size: 10.5px; font-weight: 800;
+    letter-spacing: 0.06em; text-transform: uppercase; color: var(--tag-new); margin-bottom: 6px; display: block;
+  }
+
+  /* ---------- transcript quotes ---------- */
+  .transcript { list-style: none; padding: 0; margin: 0 0 20px; counter-reset: item; }
+  .transcript li {
+    counter-increment: item; padding: 10px 0 10px 40px; position: relative; font-size: 14.5px;
+    color: var(--ink); border-bottom: 1px solid var(--line);
+  }
+  .transcript li:last-child { border-bottom: none; }
+  .transcript li::before {
+    content: counter(item); position: absolute; left: 0; top: 10px;
+    font-family: ui-monospace, monospace; font-size: 12px; font-weight: 700; color: var(--muted);
+    width: 26px; text-align: right;
+  }
+
+  /* ---------- open items ---------- */
+  .open-item {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+    padding: 12px 16px; margin-bottom: 10px; font-size: 14px; box-shadow: var(--shadow);
+  }
+  .open-item .q-tag {
+    font-family: -apple-system, "Segoe UI", sans-serif; font-size: 10px; font-weight: 800;
+    letter-spacing: 0.05em; text-transform: uppercase; color: var(--accent); margin-right: 6px;
+  }
+
+  /* ---------- changelog ---------- */
+  .changelog { list-style: none; padding: 0; margin: 0; }
+  .changelog li { padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .changelog li:last-child { border-bottom: none; }
+  .changelog .v {
+    font-family: ui-monospace, monospace; font-weight: 700; color: var(--accent-strong); margin-right: 8px;
+  }
+  .changelog .d { color: var(--muted); font-size: 12.5px; }
+
+  footer {
+    margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--rule);
+    font-family: -apple-system, "Segoe UI", sans-serif; font-size: 12px; color: var(--muted);
+  }
+
+  @media print {
+    .toc { display: none; }
+    .layout { grid-template-columns: 1fr; max-width: 100%; }
+    body { font-size: 12pt; }
+    .cover, .table-wrap, .open-item { box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <nav class="toc">
+    <p class="toc-label">Contents</p>
+    <a href="#purpose">1. Purpose &amp; Vision</a>
+    <a href="#scope">2. Scope</a>
+    <a href="#functional">3. Functional Requirements</a>
+    <a href="#nonfunctional">4. Non-Functional Requirements</a>
+    <a href="#process">5. Process Requirements</a>
+    <a href="#architecture">6. Proposed Architecture</a>
+    <a href="#acceptance">7. Acceptance Criteria</a>
+    <a href="#open">8. Open Items</a>
+    <a href="#transcript">9. Source Transcript (v1.1)</a>
+    <a href="#net-effect">10. Net Effect on v1.0</a>
+    <a href="#changelog">Change Log</a>
+  </nav>
+
+  <main>
+    <div class="cover">
+      <p class="eyebrow">HEK · Specification Document</p>
+      <h1>HEK Unified Healthcare API Hub</h1>
+      <dl class="meta-grid">
+        <dt>Project</dt><dd>HEK Unified Healthcare API (API Hub / Integration Gateway)</dd>
+        <dt>Author</dt><dd>Zohaib Ahmed</dd>
+        <dt>Source</dt><dd>Requirements stated by Dr. Ahmed Javad — "AI Transition Platform" meetings (recorded, transcripts on file)</dd>
+        <dt>Status</dt><dd><span class="status-badge">Draft v1.1</span> &nbsp; base spec 2026-07-22, addendum 2026-07-23</dd>
+      </dl>
+    </div>
+
+    <p class="section-intro">
+      This document combines the original specification (v1.0) with the v1.1 addendum into one
+      reading copy. Items added or sharpened by the v1.1 addendum are marked
+      <span class="new-tag">v1.1</span> inline so the two revisions can be read as a single,
+      current spec rather than two separate files.
+    </p>
+
+    <h2 id="purpose"><span class="num">1</span>Purpose and Vision</h2>
+    <p>
+      Today, three separate integrations exist against HEK systems: <strong>HISO</strong>,
+      <strong>Karo</strong>, and <strong>ERMS</strong>. Each external system calls its own API and
+      requests its own data fields (e.g., HISO uses ~100 fields, Karo ~50, ERMS ~100; combined
+      roughly 300 fields with overlap).
+    </p>
+    <p>
+      Dr. Javad's directive: replace these with <strong>one single, unified REST API — an API Hub /
+      Gateway</strong> — that any consuming system talks to. Existing per-system APIs will be
+      deprecated once the hub is live ("we'll tell the Karo team: the old API is being shut down,
+      use this now"). Long-term, every HEK integration — current and future — routes through this
+      hub, and the hub becomes the single managed integration point.
+    </p>
+    <p>
+      This is explicitly described as one of the major projects HEK will undertake going forward,
+      and the first deliverable is a working, presentable R&amp;D demo.
+    </p>
+    <div class="addendum-banner">
+      <span class="label">Sharpened in v1.1</span>
+      The single most important constraint added in the follow-up meeting: <strong>zero change for
+      existing consumers.</strong> HISO, Karo, and ERMS must keep calling exactly as they do today —
+      same request shape, same response format. All unification happens strictly behind the gateway.
+      See <a href="#functional">FR-10</a>.
+    </div>
+
+    <h2 id="scope"><span class="num">2</span>Scope</h2>
+    <h3>In scope (Phase 1)</h3>
+    <ol>
+      <li>Analyze the three existing integrations (HISO, Karo, ERMS) and extract each system's <strong>data set</strong> separately.</li>
+      <li>Derive the <strong>common data elements</strong> across the three to form one unified/canonical data set.</li>
+      <li>Design and build a <strong>single unified REST API</strong> exposing that data set.</li>
+      <li>Field-level authorization, audit logging, telemetry, error handling, containerized deployment.</li>
+      <li>Simulation/demo: simulate each consumer (e.g., "the HISO caller") hitting the hub and receiving exactly what its old API gave it.</li>
+    </ol>
+    <h3>Out of scope (Phase 1)</h3>
+    <ul>
+      <li>Migrating consumers in production (deprecation of old APIs is a later phase).</li>
+      <li>Integrations beyond the initial three (the design must <em>support</em> them, not implement them) — <span class="new-tag">v1.1</span> though FR-11 now requires the design to actively account for additional already-running integrations, not just remain theoretically extensible.</li>
+    </ul>
+
+    <h2 id="functional"><span class="num">3</span>Functional Requirements</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th class="id-col">ID</th><th>Requirement</th></tr></thead>
+        <tbody>
+          <tr><td class="id">FR-1</td><td>Extract and document the data set of each of the three integrations (HISO, Karo, ERMS) individually.</td></tr>
+          <tr><td class="id">FR-2</td><td>Identify common elements across the three data sets and define one unified/canonical data model.</td></tr>
+          <tr><td class="id">FR-3</td><td>Expose a single REST API set; any consuming system calls the same API and states what it needs.</td></tr>
+          <tr><td class="id">FR-4</td><td>The API must return <strong>only the data requested</strong> — no "return everything" endpoints. It must be an intelligent system that serves precisely what a consumer asks for, not a single stored procedure that dumps all data.</td></tr>
+          <tr><td class="id">FR-5</td><td>Per-consumer field scoping: each consumer may access <strong>only the fields defined in its own standard</strong> (HISO consumers get HISO's fields, Karo consumers Karo's, etc.). A consumer must never receive fields outside its scope. "No extra data goes to anyone."</td></tr>
+          <tr><td class="id">FR-6</td><td>Full request auditing: record <strong>which consumer called, when, and exactly which data/fields were taken</strong>, so a complete access history exists.</td></tr>
+          <tr><td class="id">FR-7</td><td>Extensibility: new systems/integrations can be added to the hub over time without redesign — the API is extended with additional integrations.</td></tr>
+          <tr><td class="id">FR-8</td><td>The hub becomes the gateway for all HEK integrations; design must anticipate onboarding the remaining integrations after the first three.</td></tr>
+          <tr><td class="id">FR-9</td><td>Simulation capability for the demo: emulate each existing consumer's calls against the hub to prove parity with the current per-system APIs.</td></tr>
+          <tr><td class="id">FR-10<span class="new-tag">v1.1</span></td><td><strong>Zero change for existing consumers.</strong> HISO, Karo, ERMS, and any other current caller must keep calling exactly as they do today — same request shape, same response format. All unification happens strictly behind the gateway; consumers must not be asked to change anything.</td></tr>
+          <tr><td class="id">FR-11<span class="new-tag">v1.1</span></td><td><strong>Bring all running integrations into one place</strong>, not just the original three. The source transcript references additional systems already running in parallel (one referred to as "Florence" — name to be confirmed) that must also be routed through the same hub.</td></tr>
+          <tr><td class="id">FR-12<span class="new-tag">v1.1</span></td><td><strong>Call-flow traceability.</strong> The system/demo must be able to show, per request, which environment the call originated from and which environment/system it was routed to and fulfilled from.</td></tr>
+          <tr><td class="id">FR-13<span class="new-tag">v1.1</span></td><td><strong>Working demo interface.</strong> The next demo must include an actual interface (UI) built around the API — not a bare token/mock exchange — so the flow can be shown visually end-to-end.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 id="nonfunctional"><span class="num">4</span>Non-Functional Requirements</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th class="id-col">ID</th><th>Requirement</th></tr></thead>
+        <tbody>
+          <tr><td class="id">NFR-1</td><td><strong>Technology:</strong> latest/most modern API technology. Implementation in <strong>.NET Core (ASP.NET Core Web API)</strong>, REST.</td></tr>
+          <tr><td class="id">NFR-2</td><td><strong>Deployment:</strong> containerized (Docker), hosting-agnostic — deployable anywhere, portable.</td></tr>
+          <tr><td class="id">NFR-3</td><td><strong>Scalability:</strong> scales up and down properly (container-based horizontal scaling).</td></tr>
+          <tr><td class="id">NFR-4</td><td><strong>Security:</strong> top-notch. Gateway-level authentication (defined method per consumer), authorization enforcing field-level scopes (FR-5).</td></tr>
+          <tr><td class="id">NFR-5</td><td><strong>Telemetry:</strong> full telemetry of every kind built into the API.</td></tr>
+          <tr><td class="id">NFR-6</td><td><strong>Logging &amp; tracking:</strong> all forms of login/call tracking.</td></tr>
+          <tr><td class="id">NFR-7</td><td><strong>Error handling:</strong> systematic, well-designed error handling throughout.</td></tr>
+          <tr><td class="id">NFR-8</td><td><strong>Code quality:</strong> minimal, clean code — use available skills/patterns that minimize code ("less code, less mess, less cost").</td></tr>
+          <tr><td class="id">NFR-9</td><td><strong>Research-grounded design:</strong> study how major platforms (Azure, Amazon/AWS API gateways) approach this; follow the latest industry patterns.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 id="process"><span class="num">5</span>Process Requirements</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th class="id-col">ID</th><th>Requirement</th></tr></thead>
+        <tbody>
+          <tr><td class="id">PR-1</td><td><strong>Study the three systems first</strong> — their data sets, how their APIs are called, and how consumers authenticate — before building.</td></tr>
+          <tr><td class="id">PR-2</td><td><strong>AI-assisted development with proper guidance:</strong> development is done with Claude, but the developer must direct it with full architectural understanding. Dr. Javad will review the entire Claude conversation/development model.</td></tr>
+          <tr><td class="id">PR-3</td><td><strong>Proper R&amp;D first:</strong> research is expected to take a day or more; a full working model of how the system will be built must exist before/alongside the demo.</td></tr>
+          <tr><td class="id">PR-4</td><td><strong>Presentation quality:</strong> the deliverable must be smart and presentable — no spelling mistakes, no sloppiness.</td></tr>
+          <tr><td class="id">PR-5</td><td><strong>Deadline:</strong> working demo presented Wednesday.</td></tr>
+          <tr><td class="id">PR-6</td><td><strong>Approval gate:</strong> the approach is an experiment Dr. Javad will approve — demonstrate that nothing better could be built.</td></tr>
+          <tr><td class="id">PR-7<span class="new-tag">v1.1</span></td><td>Next checkpoint: <strong>one week out</strong>, with (a) a working demo using actual systems, not mocked/token data, and (b) an architecture/call-flow diagram showing request origin → routing → fulfillment.</td></tr>
+          <tr><td class="id">PR-8<span class="new-tag">v1.1</span></td><td>The developer (not just the AI) must fully understand the requirement before building — Dr. Javad expects the requirement to be understood and repeated back correctly, not delegated blindly to AI.</td></tr>
+          <tr><td class="id">PR-9<span class="new-tag">v1.1</span></td><td>This work will eventually be presented to other company stakeholders once satisfactory — the bar for polish and correctness should account for that downstream audience.</td></tr>
+          <tr><td class="id">PR-10<span class="new-tag">v1.1</span></td><td>Consolidation is industry-driven: running many separate per-integration servers (multiple environments, ad-hoc/patchwork add-ons) is stated as no longer acceptable practice — this justifies the single-hub direction.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 id="architecture"><span class="num">6</span>Proposed Architecture</h2>
+    <p>To satisfy the requirements above:</p>
+    <ul>
+      <li><strong>API Gateway / Hub</strong> (ASP.NET Core, containerized): single entry point, versioned REST endpoints.</li>
+      <li><strong>Canonical data model</strong> built from the common elements of HISO/Karo/ERMS data sets; per-consumer <strong>field-scope profiles</strong> stored as configuration.</li>
+      <li><strong>AuthN/AuthZ:</strong> OAuth 2.0 client-credentials (JWT) per consumer; scopes map to field profiles; middleware strips any field outside the caller's profile before response serialization.</li>
+      <li><strong>Selective retrieval:</strong> consumers specify required fields (field-selection query / sparse fieldsets); server intersects request with the consumer's allowed scope.</li>
+      <li><strong>Audit service:</strong> every request logged with consumer identity, timestamp, endpoint, and exact fields returned.</li>
+      <li><strong>Observability:</strong> OpenTelemetry (traces, metrics, logs), structured logging, health endpoints.</li>
+      <li><strong>Error contract:</strong> RFC 7807 problem+json across all endpoints.</li>
+      <li><strong>Extensibility:</strong> each source system behind an adapter; onboarding a new integration = new adapter + field-scope profile, no core changes.</li>
+    </ul>
+
+    <h2 id="acceptance"><span class="num">7</span>Acceptance Criteria (Wednesday demo)</h2>
+    <ol>
+      <li>Three documented data sets (HISO, Karo, ERMS) and the derived unified data set.</li>
+      <li>Running containerized .NET Core API with at least the unified endpoints needed to reproduce what each of the three consumers gets today.</li>
+      <li>Simulated calls per consumer showing: correct data returned, out-of-scope fields blocked, audit record produced, telemetry visible.</li>
+      <li>Documented authentication method and gateway usage rules for consumers.</li>
+      <li>Clean, minimal codebase; presentation materials free of spelling errors; full Claude development conversation available for review.</li>
+    </ol>
+    <div class="addendum-banner">
+      <span class="label">Updated in v1.1</span>
+      For the <em>next</em> demo (one week out, per PR-7), acceptance additionally requires:
+      real systems/data with no mocks, a working demo UI (FR-13), and a call-flow diagram showing
+      request origin → routing → fulfillment per environment (FR-12).
+    </div>
+
+    <h2 id="open"><span class="num">8</span>Open Items</h2>
+    <p class="section-intro">To confirm with Dr. Javad / source teams.</p>
+    <div class="open-item"><span class="q-tag">v1.0</span>Exact field inventories of HISO, Karo, and ERMS (requires access to their API docs/source).</div>
+    <div class="open-item"><span class="q-tag">v1.0</span>Authentication mechanisms currently used by each consumer.</div>
+    <div class="open-item"><span class="q-tag">v1.0</span>Hosting target for the demo (local Docker vs. cloud).</div>
+    <div class="open-item"><span class="q-tag new-tag">v1.1</span><strong>"Florence"</strong> — name of an additional running integration mentioned in the transcript; transcription is uncertain and needs confirmation with Dr. Javad or the source team.</div>
+    <div class="open-item"><span class="q-tag new-tag">v1.1</span><strong>"~18 environments"</strong> — figure stated in the transcript for how many environments this class of system runs across industry-wide; needs verification, as transcription quality is imperfect throughout this segment.</div>
+    <div class="open-item"><span class="q-tag new-tag">v1.1</span>Full list of "several other" integrations currently running, beyond HISO/Karo/ERMS/Florence, that need to be folded into the hub.</div>
+
+    <h2 id="transcript"><span class="num">9</span>Source Transcript — v1.1 Addendum</h2>
+    <p class="section-intro">
+      Dr. Ahmed Javad's statements only, from the continuation transcript segment (~18:04–22:40,
+      Hindi/Urdu, machine-transcribed, translated to English below in speaking order). Fragments are
+      merged where they clearly continue one thought; asides directed at other call participants
+      (camera, greetings) are omitted as non-requirements. This is the raw source FR-10 through PR-10
+      above were derived from.
+    </p>
+    <ol class="transcript">
+      <li>"The system is running — this is the API, you can't [just change it live]. Anyway, mature this a bit first."</li>
+      <li>"No — mature it."</li>
+      <li>"Mature this further and show me what you've done. Because what you've built now — the real question is: are we not asking them [the existing consumers] to change anything?"</li>
+      <li>"We become unified on the back end."</li>
+      <li>"No, no, that's fine — but the consumers say: we won't change anything on our side. Call us the same way, give us the data the same way. So what do we do about that?"</li>
+      <li>"We need this data delivered in exactly the same format going forward — do whatever you want on the back end, we don't need to know — because that is our agreement with you."</li>
+      <li>"Everyone listen — talk less, hear me out. I want the [existing consumers] to not have to change anything at all."</li>
+      <li>"The ERMS side should also not have to change anything — no changes. Whoever is calling us today keeps calling the same way; the unification work happens behind that, on our side."</li>
+      <li>"So it becomes unified [on our end]."</li>
+      <li>"Okay — go ahead, take this forward, and show me a proper demo. Don't do this token/mock kind of thing. Build an interface as part of the demo — the interface is easy to build."</li>
+      <li>"Inside that interface, show how it's actually happening."</li>
+      <li>"Listen to my requirement again, because listening is very important — you cannot work with AI unless your listening skills are good."</li>
+      <li>"On the back end we've unified everything — our side is fine."</li>
+      <li>"We are basically exposing [a single API] so that consumers come in."</li>
+      <li>"They should all come to one single place and call from there, so we get their data in the calls they already make. HISO comes in, Karo comes in, ERMS comes in. Whoever else — because we also have several other integrations running (e.g. a system referred to as 'Florence' in the transcript — name unclear, needs confirmation) — somehow we need to bring all of them onto a single place. I understand what you've built so far, but take it one step further."</li>
+      <li>"Next time you demo this, I need to see actual systems — not this token/mock business — because I'm going to have you present this to other people [stakeholders]."</li>
+      <li>"Show me/tell me what people say — how does the rest of the company take this forward — because we need to carry this ahead."</li>
+      <li>"The whole industry right now says you cannot have multiple servers [per integration] — that's all been running as patchwork/ad-hoc add-ons. We need to finish [consolidating] this. Next week, show me how you're doing it — and also show me a diagram of where a call comes from and where it goes. The industry reportedly has around 18 different environments (number as stated in transcript, needs verification) of this kind."</li>
+      <li>"So — from which environment was this pulled, and how?"</li>
+      <li>"Explain it clearly — do you understand or not?"</li>
+      <li>"It's necessary — AI won't do the understanding for you. You have to understand what is required. There's no time going forward to bring more people/systems in without that understanding."</li>
+    </ol>
+
+    <h2 id="net-effect"><span class="num">10</span>Net Effect of v1.1 on the v1.0 Spec</h2>
+    <ul>
+      <li><strong>FR-5</strong> (per-consumer field scoping) and the "no extra data to anyone" rule are reinforced and sharpened: not only must consumers get only their own fields, they must get them through their <em>existing, unchanged</em> call pattern — the gateway must accept legacy request shapes and adapt internally rather than requiring consumer-side migration.</li>
+      <li><strong>Section 7</strong> (Acceptance Criteria) is updated for the next demo to require: real systems/data (no mocks), a working demo UI, and a call-flow diagram per environment — in addition to the original criteria.</li>
+      <li><strong>Section 8</strong> (Open Items) gains the three v1.1 items listed above.</li>
+    </ul>
+
+    <h2 id="changelog">Change Log</h2>
+    <ul class="changelog">
+      <li><span class="v">v1.0</span>Initial spec extracted from meeting transcript. <span class="d">— 2026-07-22</span></li>
+      <li><span class="v">v1.1</span>Addendum — Dr. Javad's requirements extracted and translated from continuation transcript segment (18:04–22:40); added FR-10–FR-13, PR-7–PR-10, and three open items. <span class="d">— 2026-07-23</span></li>
+    </ul>
+
+    <footer>
+      Combined presentation copy of <code>HEK_UNIFIED_API_SPEC.md</code> (v1.0) and
+      <code>HEK_UNIFIED_API_SPEC_v1.1.md</code> (addendum) — both source files remain the authoritative
+      markdown record in <code>docs/</code>; this page is a reading/presentation copy only.
+    </footer>
+  </main>
+</div>
+</body>
+</html>

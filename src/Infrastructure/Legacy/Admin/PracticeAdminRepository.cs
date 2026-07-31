@@ -55,7 +55,7 @@ public sealed class PracticeAdminRepository : IPracticeAdminRepository
     public async Task<Practice?> GetAsync(string practiceId, CancellationToken ct = default)
     {
         var entry = await _db.Practices.AsNoTracking().SingleOrDefaultAsync(p => p.PracticeId == practiceId && p.IsActive, ct);
-        return entry is null ? null : new Practice(entry.PracticeId, entry.PracticeName, null, entry.DbServerHost, entry.DbName, Enum.Parse<OriginScope>(entry.SourceSystem));
+        return entry is null ? null : new Practice(practiceId, entry.PracticeName, null, entry.DbServerHost, entry.DbName, Enum.Parse<OriginScope>(entry.SourceSystem));
     }
 
     public async Task<Practice?> UpdateAsync(string practiceId, PracticeInput input, CancellationToken ct = default)

@@ -1,5 +1,6 @@
 ﻿using System.Data;
 using HekCoreApi.Application.Common.Interfaces;
+using HekCoreApi.Application.Common.Models;
 using MediatR;
 
 namespace HekCoreApi.Application.Features.Erms.Queries;
@@ -7,7 +8,7 @@ namespace HekCoreApi.Application.Features.Erms.Queries;
 public sealed record ErmsGetPatientDataQuery(string? PatientId, string? EncounterId, string? BearerToken)
     : IRequest<ErmsGetPatientDataResult>;
 
-public sealed record ErmsGetPatientDataResult(bool Succeeded, DataTable? Table, string? ErrorMessage);
+public sealed record ErmsGetPatientDataResult(bool Succeeded, DataTable? Table, string? ErrorMessage, CallRoutingInfo? Routing = null);
 
 /// <summary>
 /// Ported from ERMS's `GetPatientData` (`APIController.cs:856`) - base64-decode both params, real
@@ -22,13 +23,15 @@ public sealed class ErmsGetPatientDataQueryHandler : IRequestHandler<ErmsGetPati
     private readonly IErmsTokenValidator _tokenValidator;
     private readonly IErmsRoutingResolver _routingResolver;
     private readonly IErmsDemographicsRepository _repository;
+    private readonly ITenantRegistryService _tenantRegistryService;
 
-    public ErmsGetPatientDataQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDemographicsRepository repository)
+    public ErmsGetPatientDataQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDemographicsRepository repository, ITenantRegistryService tenantRegistryService)
     {
         _parser = parser;
         _tokenValidator = tokenValidator;
         _routingResolver = routingResolver;
         _repository = repository;
+        _tenantRegistryService = tenantRegistryService;
     }
 
     public async Task<ErmsGetPatientDataResult> Handle(ErmsGetPatientDataQuery request, CancellationToken cancellationToken)
@@ -39,14 +42,17 @@ public sealed class ErmsGetPatientDataQueryHandler : IRequestHandler<ErmsGetPati
             var patientId = _parser.Decrypt(_parser.DecodeBase64(request.PatientId));
             var routingContext = _routingResolver.Resolve(request.EncounterId ?? string.Empty);
 
+            var route = await _tenantRegistryService.ResolveRouteAsync(routingContext, cancellationToken);
+            var routing = route is not null ? CallRoutingInfo.FromPracticeRoute(route, routingContext.Environment) : null;
+
             var validation = await _tokenValidator.ValidateAsync(practiceSuffix, routingContext, patientId, encounterId, request.BearerToken, cancellationToken);
             if (!validation.Valid)
             {
-                return new ErmsGetPatientDataResult(false, null, validation.ErrorMessage ?? "Invalid token value!");
+                return new ErmsGetPatientDataResult(false, null, validation.ErrorMessage ?? "Invalid token value!", routing);
             }
 
             var table = await _repository.GetDemographicsAsync(practiceSuffix, routingContext, patientId, cancellationToken);
-            return new ErmsGetPatientDataResult(true, table, null);
+            return new ErmsGetPatientDataResult(true, table, null, routing);
         }
         catch (Exception ex)
         {

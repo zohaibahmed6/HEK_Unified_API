@@ -5,10 +5,14 @@
   <ItemGroup>
     <!-- Logging -->
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageVersion Include="Serilog" Version="4.0.2" />
     <PackageVersion Include="Serilog.AspNetCore" Version="8.0.3" />
     <PackageVersion Include="Serilog.Sinks.Console" Version="6.0.0" />
     <PackageVersion Include="Serilog.Sinks.File" Version="6.0.0" />
     <PackageVersion Include="Serilog.Enrichers.Environment" Version="3.0.1" />
+    <!-- Per-system technical/errors log files (logging overhaul, 2026-07-29): JSON-structured output
+         is easier/more precise to hand to Claude for triage than plain text. -->
+    <PackageVersion Include="Serilog.Formatting.Compact" Version="3.0.0" />
     <!-- Validation / CQRS -->
     <PackageVersion Include="FluentValidation" Version="11.10.0" />
     <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="11.10.0" />

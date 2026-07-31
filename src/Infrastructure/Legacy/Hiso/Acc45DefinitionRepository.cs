@@ -74,7 +74,11 @@ public sealed class Acc45DefinitionRepository : IAcc45DefinitionRepository
             parameters.Add(new SqlParameter("@FormComments", input.FormComments));
         }
 
-        parameters.Add(new SqlParameter("@pSessionKey", session.PracticeId));
+        // Legacy: `FormSessionService.svc.cs:472` passes `objSessionKey.GUID.ToString()` here - the
+        // real session GUID, not the PracticeId. Same class of bug as `GetDefinitionAsync`'s
+        // `@pSessionKey` fix above - confirmed live 2026-07-31 when a genuinely new record (session
+        // `D2C9E798-...`) inserted with `SessionKey='901'` (the practice ID) instead of the real GUID.
+        parameters.Add(new SqlParameter("@pSessionKey", session.SessionKey is { } sessionGuid ? sessionGuid.ToString() : string.Empty));
 
         await LegacyDbExecutor.ExecuteNonQueryAsync(connectionString, CommandType.StoredProcedure, "[Appointment].[usptblACC45DefinitionInsert]", parameters, ct);
         return true;
@@ -83,10 +87,16 @@ public sealed class Acc45DefinitionRepository : IAcc45DefinitionRepository
     public async Task<Acc45DefinitionRow?> GetDefinitionAsync(HealthLinkSession session, CancellationToken ct = default)
     {
         var connectionString = await _connectionResolver.ResolveAsync(session.PracticeId, ct);
+        // Legacy: Acc45DefinitionBuilder.cs:142-145 - both parameters always sent, unconditionally.
+        // `@pSessionKey` is the raw session GUID (`objSession.GUID.ToString()`), never the PracticeId -
+        // the previous port here sent PracticeId as a same-named-but-wrong fallback whenever
+        // ReferenceId was null, which never matches [Appointment].[tblACC45Definition]'s SessionKey
+        // column (a real session GUID) - confirmed live 2026-07-30 with a real ACC45 row whose
+        // SessionKey exactly matched the caller's session GUID but was never found until this fix.
         var parameters = new List<SqlParameter>
         {
             new("@ACC45ID", (object?)session.ReferenceId ?? DBNull.Value),
-            new("@pSessionKey", session.ReferenceId is null ? DBNull.Value : session.PracticeId)
+            new("@pSessionKey", session.SessionKey is { } sessionGuid ? sessionGuid.ToString() : DBNull.Value)
         };
 
         var table = await LegacyDbExecutor.ExecuteDataTableAsync(connectionString, CommandType.StoredProcedure, "[Appointment].[usptblACC45Definition_Get]", parameters, ct);

@@ -63,7 +63,7 @@ export function SystemDashboard({
   system: SystemId;
   auth: SystemAuthState;
   onSetValue: (key: string, value: string) => void;
-  onSetAuth: (patch: Partial<Pick<SystemAuthState, "token" | "sessionKey" | "practiceId">>) => void;
+  onSetAuth: (patch: Partial<Pick<SystemAuthState, "token" | "sessionKey" | "practiceId" | "username" | "password">>) => void;
 }) {
   const endpoints = useMemo(() => endpointsForSystem(system), [system]);
   const allReads = endpoints.filter((e) => e.kind === "read");
@@ -73,8 +73,15 @@ export function SystemDashboard({
   const [statuses, setStatuses] = useState<Record<string, RunStatus>>({});
   const [authing, setAuthing] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [username, setUsername] = useState(system === "hiso" ? "" : AUTH_DEFAULTS[system].username);
-  const [password, setPassword] = useState(system === "hiso" ? "" : AUTH_DEFAULTS[system].password);
+  // FR-12 call-flow traceability: the plain-English "what happened, where" sentence from the auth
+  // call's X-Hek-Routing-Summary response header, shown right under the auth status.
+  const [authRoutingSummary, setAuthRoutingSummary] = useState<string | null>(null);
+  // Persisted via the dashboard store (localStorage), same as patientId/encounterId - falls back to
+  // the real known-good default credential only the first time, before the user has ever saved one.
+  const username = system === "hiso" ? "" : (auth.username ?? AUTH_DEFAULTS[system].username);
+  const password = system === "hiso" ? "" : (auth.password ?? AUTH_DEFAULTS[system].password);
+  const setUsername = (value: string) => onSetAuth({ username: value });
+  const setPassword = (value: string) => onSetAuth({ password: value });
   const [runningAll, setRunningAll] = useState(false);
 
   const isHiso = system === "hiso";
@@ -100,6 +107,7 @@ export function SystemDashboard({
   const doAuthenticate = async () => {
     setAuthing(true);
     setAuthError(null);
+    setAuthRoutingSummary(null);
     try {
       if (system === "karo") {
         const patientId = auth.values.patientId ?? "";
@@ -107,18 +115,21 @@ export function SystemDashboard({
         const r = await karoAuthenticate(username, password, patientId, encounterId, auth.values.pho ?? "");
         if (r.ok) onSetAuth({ token: r.token, practiceId: r.practiceId });
         else setAuthError(r.error ?? "Authentication failed");
+        setAuthRoutingSummary(r.routingSummary ?? null);
       } else if (system === "erms") {
         const patientId = auth.values.pmsPatientId ?? "";
         const encounterId = auth.values.pmsEncounterId ?? "";
         const r = await ermsAuthenticate(username, password, patientId, encounterId);
         if (r.ok) onSetAuth({ token: r.token, practiceId: r.practiceId });
         else setAuthError(r.error ?? "Authentication failed");
+        setAuthRoutingSummary(r.routingSummary ?? null);
       } else if (system === "col") {
         const patientId = auth.values.pmsPatientId ?? "";
         const encounterId = auth.values.pmsEncounterId ?? "";
         const r = await colAuthenticate(username, password, patientId, encounterId);
         if (r.ok) onSetAuth({ token: r.token, practiceId: r.practiceId });
         else setAuthError(r.error ?? "Authentication failed");
+        setAuthRoutingSummary(r.routingSummary ?? null);
       }
     } finally {
       setAuthing(false);
@@ -187,6 +198,11 @@ export function SystemDashboard({
               </div>
             )}
             {authError && <div className="dash-auth-status dash-auth-status--error">{authError}</div>}
+            {authRoutingSummary && (
+              <div className="dash-call-flow">
+                <span className="dash-call-flow-label">Call Flow</span> {authRoutingSummary}
+              </div>
+            )}
           </>
         )}
 

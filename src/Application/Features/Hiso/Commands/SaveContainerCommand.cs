@@ -1,4 +1,5 @@
 using HekCoreApi.Application.Common.Interfaces;
+using HekCoreApi.Application.Common.Models;
 using HekCoreApi.Application.Features.Auth.Hiso;
 using MediatR;
 
@@ -13,7 +14,7 @@ public sealed record SaveContainerCommand(
     string? ResumePath, string? View, string? ViewType, string? ViewSignature, bool Completed, string? SubmittedDataXml)
     : IRequest<SaveContainerCommandResult>;
 
-public sealed record SaveContainerCommandResult(bool SessionResolved, bool Response);
+public sealed record SaveContainerCommandResult(bool SessionResolved, bool Response, CallRoutingInfo? Routing = null);
 
 /// <summary>
 /// Ported from `FormSessionService.svc.cs`'s `saveContainer`/`saveDataContainer`. DMS save (only when
@@ -29,17 +30,20 @@ public sealed class SaveContainerCommandHandler : IRequestHandler<SaveContainerC
     private readonly IHisoDocumentHandler _documentHandler;
     private readonly IAcc45DefinitionRepository _definitionRepository;
     private readonly IAcc45DetailRepository _detailRepository;
+    private readonly IHisoSessionRegistryRepository _sessionRegistry;
 
     public SaveContainerCommandHandler(
         IMediator mediator,
         IHisoDocumentHandler documentHandler,
         IAcc45DefinitionRepository definitionRepository,
-        IAcc45DetailRepository detailRepository)
+        IAcc45DetailRepository detailRepository,
+        IHisoSessionRegistryRepository sessionRegistry)
     {
         _mediator = mediator;
         _documentHandler = documentHandler;
         _definitionRepository = definitionRepository;
         _detailRepository = detailRepository;
+        _sessionRegistry = sessionRegistry;
     }
 
     public async Task<SaveContainerCommandResult> Handle(SaveContainerCommand request, CancellationToken cancellationToken)
@@ -50,7 +54,10 @@ public sealed class SaveContainerCommandHandler : IRequestHandler<SaveContainerC
             return new SaveContainerCommandResult(false, false);
         }
 
-        var session = Application.Common.Models.HealthLinkSession.FromSessionContext(lookup.Context);
+        var sessionRoute = await _sessionRegistry.FindAsync(request.SessionKey, cancellationToken);
+        var routing = sessionRoute is not null ? CallRoutingInfo.FromHisoSessionRoute(sessionRoute) : null;
+
+        var session = Application.Common.Models.HealthLinkSession.FromSessionContext(lookup.Context, request.SessionKey);
 
         var dmsGuid = Guid.Empty;
         if (request.Completed)
@@ -72,6 +79,6 @@ public sealed class SaveContainerCommandHandler : IRequestHandler<SaveContainerC
         // Legacy: response.response is hardcoded true on the success path regardless of the actual
         // save outcome (a real legacy bug, reproduced on purpose per Zohaib's "match legacy exactly"
         // instruction, not silently "fixed").
-        return new SaveContainerCommandResult(true, true);
+        return new SaveContainerCommandResult(true, true, routing);
     }
 }

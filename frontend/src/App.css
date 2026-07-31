@@ -250,6 +250,71 @@ nav { display: flex; flex-direction: column; gap: 4px; }
 .dash-auth-status--ok { color: #28a745; }
 .dash-auth-status--error { color: #dc3545; }
 
+/* FR-12 call-flow traceability: plain-English "what happened, where" sentence, aimed at a
+   non-technical reader - deliberately distinct styling from status/error lines above/below it. */
+.dash-call-flow,
+.ep-call-flow {
+  margin-top: 10px;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text, #1c1e1a);
+  background: var(--accent-soft, #eef3f8);
+  border-left: 3px solid var(--accent, #3a5a78);
+  border-radius: 4px;
+}
+.dash-call-flow-label,
+.ep-call-flow-label {
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: var(--accent, #3a5a78);
+  margin-right: 6px;
+}
+
+/* "Logs" tab: plain-English per-call history list. */
+.logs-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.logs-list-item {
+  padding: 10px 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  background: #fff;
+  border: 1px solid var(--line, #dedad0);
+  border-radius: 6px;
+}
+.logs-list-timestamp {
+  display: block;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  color: #5c5c54;
+  margin-bottom: 4px;
+}
+.logs-list-system {
+  font-weight: 800;
+  color: var(--accent, #3a5a78);
+  letter-spacing: 0.03em;
+}
+.logs-list-correlation {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--code-bg, #f0ede3);
+  color: #5c5c54;
+  font-size: 9.5px;
+  cursor: help;
+}
+.logs-list-text {
+  color: #1c1e1a;
+}
+
 .dash-summary {
   display: flex;
   align-items: center;

@@ -58,18 +58,23 @@ public sealed class ErmsWriteRepository : IErmsWriteRepository
         var documentKey = Guid.NewGuid().ToString();
         var dmsConnectionString = await _dmsConnectionResolver.ResolveAsync(routingContext, ct);
 
+        // Explicit SqlDbType on every parameter to exactly match `uspDocumentSave`'s real declared
+        // signature - same root cause found and fixed in HISO's `HisoDocumentHandler` and KARO's
+        // `KaroWriteRepository` on 2026-07-31: `@pDocumentSize` was Int32 for a BIGINT param and
+        // `@pPracticeID` was a bare string for an int param, both silently rejected by SQL Server's
+        // RPC-style parameter binding.
         var parameters = new List<SqlParameter>
         {
-            new("@pClientID", 3),
-            new("@pCategoryID", categoryId),
-            new("@pDocumentName", (object?)messageSubject ?? DBNull.Value),
-            new("@pDocumentTypeID", documentTypeId),
-            new("@pDescription", (object?)referralId ?? DBNull.Value),
-            new("@pDocumentKey", documentKey),
-            new("@pDocumentSize", contentData.Length),
-            new("@pProfileID", "1"),
-            new("@pPracticeID", (object?)practiceSuffixNumeric ?? DBNull.Value),
-            new("@pDocumentData", SqlDbType.VarBinary) { Value = contentData }
+            new("@pClientID", SqlDbType.Int) { Value = 3 },
+            new("@pCategoryID", SqlDbType.Int) { Value = categoryId },
+            new("@pDocumentName", SqlDbType.NVarChar, 200) { Value = (object?)messageSubject ?? DBNull.Value },
+            new("@pDocumentTypeID", SqlDbType.Int) { Value = documentTypeId },
+            new("@pDescription", SqlDbType.NVarChar, -1) { Value = (object?)referralId ?? DBNull.Value },
+            new("@pDocumentKey", SqlDbType.NVarChar, 50) { Value = documentKey },
+            new("@pDocumentSize", SqlDbType.BigInt) { Value = (long)contentData.Length },
+            new("@pProfileID", SqlDbType.NVarChar, 500) { Value = "1" },
+            new("@pPracticeID", SqlDbType.Int) { Value = string.IsNullOrEmpty(practiceSuffixNumeric) ? (object)DBNull.Value : int.Parse(practiceSuffixNumeric) },
+            new("@pDocumentData", SqlDbType.Image) { Value = contentData }
         };
         var outParam = new SqlParameter("@pDocumentIDOut", SqlDbType.Int) { Direction = ParameterDirection.Output, Value = -1 };
         parameters.Add(outParam);

@@ -322,6 +322,8 @@ export const HisoPatientForm = forwardRef<
   const [root, setRoot] = useState<HisoSection | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [durationMs, setDurationMs] = useState<number | undefined>(undefined);
+  // FR-12 call-flow traceability: plain-English routing sentence from X-Hek-Routing-Summary.
+  const [routingSummary, setRoutingSummary] = useState<string | null>(null);
 
   const run = async () => {
     setStatus("loading");
@@ -333,6 +335,7 @@ export const HisoPatientForm = forwardRef<
     setDurationMs(r.durationMs);
     setStatus(r.status);
     onStatus?.(r.status);
+    setRoutingSummary(r.routingSummary ?? null);
 
     if (r.status === "error") {
       setError(r.summary);
@@ -362,6 +365,11 @@ export const HisoPatientForm = forwardRef<
         {durationMs !== undefined && <span className="ep-duration">{durationMs} ms</span>}
       </div>
 
+      {routingSummary && (
+        <div className="ep-call-flow">
+          <span className="ep-call-flow-label">Call Flow</span> {routingSummary}
+        </div>
+      )}
       {error && <div className="hiso-doc-error">{error}</div>}
       {status === "empty" && !root && (
         <div className="hiso-empty">Session was valid, but no form data was returned (static/parked mode).</div>

@@ -7,7 +7,7 @@ public interface IAcc45DefinitionRepository
 {
     Task<bool> SaveDefinitionAsync(Acc45DefinitionInput input, HealthLinkSession session, CancellationToken ct = default);
 
-    /// <summary>DB-only part of legacy's `GetACC45Definition` - `ResumePath`/`ViewType` come from here for real; the actual `View` bytes require the external DMS Proxy (not available - see <see cref="IDmsProxyService"/>).</summary>
+    /// <summary>DB-only part of legacy's `GetACC45Definition` - `ResumePath`/`ViewType` come from here for real; the actual `View` bytes come via <see cref="IDmsProxyService"/> (real direct-DB implementation as of 2026-07-31).</summary>
     Task<Acc45DefinitionRow?> GetDefinitionAsync(HealthLinkSession session, CancellationToken ct = default);
 }
 

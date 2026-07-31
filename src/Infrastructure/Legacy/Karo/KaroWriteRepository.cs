@@ -85,7 +85,12 @@ public sealed class KaroWriteRepository : IKaroWriteRepository
         AddIfPresent(parameters, "@pFee", fee);
         parameters.Add(new SqlParameter("@pLocationId", "167"));
         AddIfPresent(parameters, "@pUserId", userId);
-        AddIfPresent(parameters, "@pPayee", payee);
+        // Legacy: `HSSDA.cs:1221-1224` has `@pCoPayment`/`@pPayee` commented out - the real
+        // `[HSS].[uspInsertUpdateService]` proc doesn't declare either parameter at all, so legacy
+        // silently never sends `payee` even though the request model accepts it. This port was
+        // sending `@pPayee` anyway, which the real proc rejects with "too many arguments specified" -
+        // confirmed live 2026-07-31 (legacy succeeded, this API failed on the identical real payload).
+        // `payee` is intentionally unused here, matching legacy's real (dead) behavior exactly.
 
         var outParam = new SqlParameter("@pOutputParam", SqlDbType.Int) { Direction = ParameterDirection.Output };
         parameters.Add(outParam);
@@ -153,18 +158,24 @@ public sealed class KaroWriteRepository : IKaroWriteRepository
         var postedType = await ResolveDocumentTypeAsync(contentType, ct);
         var dmsConnectionString = await _dmsConnectionResolver.ResolveAsync(routingContext, ct);
 
+        // Explicit SqlDbType on every parameter to exactly match `uspDocumentSave`'s real declared
+        // signature - confirmed 2026-07-31 this matters for real (same root cause as HISO's
+        // `HisoDocumentHandler` fix, same day): `@pDocumentSize` was Int32 for a BIGINT param and
+        // `@pPracticeID` was a bare string for an int param, both silently rejected by SQL Server's
+        // RPC-style parameter binding ("expects parameter 'X', which was not supplied") - reproduced
+        // live via a real client payload (legacy succeeded, this API failed on the same call).
         var dmsParameters = new List<SqlParameter>
         {
-            new("@pClientID", 3),
-            new("@pCategoryID", categoryId),
-            new("@pDocumentName", messageSubject ?? string.Empty),
-            new("@pDocumentTypeID", postedType),
-            new("@pDescription", "HSS"),
-            new("@pDocumentKey", Guid.NewGuid().ToString()),
-            new("@pDocumentSize", messageData?.Length ?? 0),
-            new("@pProfileID", "1"),
-            new("@pPracticeID", practiceSuffixNumeric),
-            new("@pDocumentData", SqlDbType.VarBinary) { Value = (object?)messageData ?? DBNull.Value }
+            new("@pClientID", SqlDbType.Int) { Value = 3 },
+            new("@pCategoryID", SqlDbType.Int) { Value = categoryId },
+            new("@pDocumentName", SqlDbType.NVarChar, 200) { Value = messageSubject ?? string.Empty },
+            new("@pDocumentTypeID", SqlDbType.Int) { Value = postedType },
+            new("@pDescription", SqlDbType.NVarChar, -1) { Value = "HSS" },
+            new("@pDocumentKey", SqlDbType.NVarChar, 50) { Value = Guid.NewGuid().ToString() },
+            new("@pDocumentSize", SqlDbType.BigInt) { Value = (long)(messageData?.Length ?? 0) },
+            new("@pProfileID", SqlDbType.NVarChar, 500) { Value = "1" },
+            new("@pPracticeID", SqlDbType.Int) { Value = int.Parse(practiceSuffixNumeric) },
+            new("@pDocumentData", SqlDbType.Image) { Value = (object?)messageData ?? DBNull.Value }
         };
         var documentKey = (string)dmsParameters[5].Value!;
 

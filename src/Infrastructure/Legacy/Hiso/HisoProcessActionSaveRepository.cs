@@ -71,7 +71,9 @@ public sealed class HisoProcessActionSaveRepository : IHisoProcessActionSaveRepo
 
         var doc = new XmlDocument();
         doc.LoadXml(submittedDataXml);
-        var groups = doc.DocumentElement?.SelectNodes("//group") ?? doc.SelectNodes("//group");
+        // Namespace/prefix-agnostic, matching the `ParseRequest` fix - see the comment further down in
+        // this file (real `submittedData` always carries a namespace/prefix plain `SelectNodes` misses).
+        var groups = doc.DocumentElement?.GetElementsByTagName("group", "*");
         if (groups is not null)
         {
             foreach (XmlNode group in groups)
@@ -141,7 +143,7 @@ public sealed class HisoProcessActionSaveRepository : IHisoProcessActionSaveRepo
 
             var doc = new XmlDocument();
             doc.LoadXml(submittedDataXml);
-            var fields = doc.DocumentElement?.SelectNodes("//field") ?? doc.SelectNodes("//field");
+            var fields = doc.DocumentElement?.GetElementsByTagName("field", "*");
             if (fields is not null)
             {
                 foreach (XmlNode field in fields)
@@ -359,14 +361,21 @@ public sealed class HisoProcessActionSaveRepository : IHisoProcessActionSaveRepo
 
         var doc = new XmlDocument();
         doc.LoadXml(submittedDataXml);
-        var sections = doc.DocumentElement?.SelectNodes("//section") ?? doc.SelectNodes("//section");
+        // Real submittedData's `<form>` payload carries the `urn:net.healthlink.genericform.model`
+        // namespace, and once it round-trips through SoapCore's `[XmlAnyElement]` handling .NET
+        // re-serializes it with an explicit `urn:` prefix (confirmed live 2026-07-30, same root cause as
+        // `HisoRequestEngine.ParseRequest`'s equivalent fix) - plain `SelectNodes("//section")` XPath only
+        // matches no-namespace elements, and `Name != "field"` only matches the exact unprefixed name;
+        // both silently miss every real request. `GetElementsByTagName(name, "*")`/`LocalName` match
+        // regardless of prefix/namespace.
+        var sections = doc.DocumentElement?.GetElementsByTagName("section", "*");
         if (sections is not null)
         {
             foreach (XmlNode section in sections)
             {
                 foreach (XmlNode field in section.ChildNodes)
                 {
-                    if (field.Name != "field")
+                    if (field.LocalName != "field")
                     {
                         continue;
                     }

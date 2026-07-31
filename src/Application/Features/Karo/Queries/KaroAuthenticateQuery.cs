@@ -1,4 +1,5 @@
 using HekCoreApi.Application.Common.Interfaces;
+using HekCoreApi.Application.Common.Models;
 using MediatR;
 
 namespace HekCoreApi.Application.Features.Karo.Queries;
@@ -7,7 +8,7 @@ public sealed record KaroAuthenticateQuery(
     string? Username, string? Password, string? PatientId, string? EncounterId, string? System, string? Pho)
     : IRequest<KaroAuthenticateResult>;
 
-public sealed record KaroAuthenticateResult(bool Succeeded, string? Token, DateTime? Expiry, string? PracticeId, string? ErrorMessage);
+public sealed record KaroAuthenticateResult(bool Succeeded, string? Token, DateTime? Expiry, string? PracticeId, string? ErrorMessage, CallRoutingInfo? Routing = null);
 
 /// <summary>
 /// Ported from legacy-reference/hsswebapi/DevLocal/HSSWebAPI/Controllers/APIController.cs's shared
@@ -22,12 +23,14 @@ public sealed class KaroAuthenticateQueryHandler : IRequestHandler<KaroAuthentic
     private readonly IKaroRequestParser _parser;
     private readonly IKaroAuthRepository _authRepository;
     private readonly IKaroRoutingResolver _routingResolver;
+    private readonly ITenantRegistryService _tenantRegistryService;
 
-    public KaroAuthenticateQueryHandler(IKaroRequestParser parser, IKaroAuthRepository authRepository, IKaroRoutingResolver routingResolver)
+    public KaroAuthenticateQueryHandler(IKaroRequestParser parser, IKaroAuthRepository authRepository, IKaroRoutingResolver routingResolver, ITenantRegistryService tenantRegistryService)
     {
         _parser = parser;
         _authRepository = authRepository;
         _routingResolver = routingResolver;
+        _tenantRegistryService = tenantRegistryService;
     }
 
     public async Task<KaroAuthenticateResult> Handle(KaroAuthenticateQuery request, CancellationToken cancellationToken)
@@ -38,6 +41,12 @@ public sealed class KaroAuthenticateQueryHandler : IRequestHandler<KaroAuthentic
             var patientId = _parser.Decrypt(request.PatientId);
             var routingContext = _routingResolver.Resolve(request.EncounterId ?? string.Empty);
 
+            // FR-12: same lookup the connection resolver performs internally, done here too (cheap,
+            // already-cached-by-DbContext-per-request) purely so the resolved route can be surfaced
+            // on the result - never used to build a connection string here.
+            var route = await _tenantRegistryService.ResolveRouteAsync(routingContext, cancellationToken);
+            var routing = route is not null ? CallRoutingInfo.FromPracticeRoute(route, routingContext.Environment) : null;
+
             var dbResult = await _authRepository.InsertAndValidateTokenAsync(
                 practiceSuffix, routingContext, request.Username, request.Password, patientId, encounterId, token: null, request.Pho, cancellationToken);
 
@@ -45,13 +54,13 @@ public sealed class KaroAuthenticateQueryHandler : IRequestHandler<KaroAuthentic
             {
                 if (dbResult.Expiry is { } expiry && expiry != DateTime.MinValue)
                 {
-                    return new KaroAuthenticateResult(true, dbResult.Token, expiry, dbResult.PracticeId, null);
+                    return new KaroAuthenticateResult(true, dbResult.Token, expiry, dbResult.PracticeId, null, routing);
                 }
 
-                return new KaroAuthenticateResult(false, null, null, null, "Invalid credentials!");
+                return new KaroAuthenticateResult(false, null, null, null, "Invalid credentials!", routing);
             }
 
-            return new KaroAuthenticateResult(false, null, null, null, "Authentication failed!");
+            return new KaroAuthenticateResult(false, null, null, null, "Authentication failed!", routing);
         }
         catch (Exception ex)
         {

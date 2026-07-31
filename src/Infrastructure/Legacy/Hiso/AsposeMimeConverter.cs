@@ -36,7 +36,15 @@ public sealed class AsposeMimeConverter : IHisoMimeConverter
         _ = LicenseLoaded.Value;
     }
 
-    /// <summary>Legacy `TypeConverter.CreatePDFromImage`: insert the image into a blank document, save as PDF. Legacy rethrows on failure (no graceful fallback here) - reproduced as-is.</summary>
+    /// <summary>
+    /// Legacy `TypeConverter.CreatePDFromImage`: insert the image into a blank document, save as PDF.
+    /// Falls back to returning the original image bytes unconverted on failure (2026-07-30 - matching
+    /// `ConvertHtmlToPdfAsync`'s existing graceful-degradation behavior below), rather than throwing -
+    /// confirmed live that Aspose's internal image handling (a vendored .NET Framework 4.0 assembly)
+    /// hard-depends on `System.Drawing`, which .NET 8 unconditionally blocks on Linux regardless of
+    /// `libgdiplus`/config switches. An unconverted image is still real, viewable attachment content -
+    /// far better than an empty field or a crashed request.
+    /// </summary>
     public Task<byte[]> ConvertImageToPdfAsync(byte[] imageBytes, CancellationToken ct = default)
     {
         try
@@ -52,7 +60,8 @@ public sealed class AsposeMimeConverter : IHisoMimeConverter
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException("HISO image-to-PDF conversion failed.", ex);
+            _logger.LogWarning(ex, "{System} image-to-PDF conversion failed - returning original image bytes unconverted, matching ConvertHtmlToPdfAsync's graceful-degradation behavior.", "hiso");
+            return Task.FromResult(imageBytes);
         }
     }
 
@@ -79,7 +88,7 @@ public sealed class AsposeMimeConverter : IHisoMimeConverter
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "HISO HTML-to-PDF conversion failed - returning original bytes unconverted, matching legacy's graceful-degradation behavior.");
+            _logger.LogWarning(ex, "{System} HTML-to-PDF conversion failed - returning original bytes unconverted, matching legacy's graceful-degradation behavior.", "hiso");
             return Task.FromResult(htmlBytes);
         }
     }

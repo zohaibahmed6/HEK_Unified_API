@@ -91,6 +91,11 @@ export const PatientRecordForm = forwardRef<
             })}
           </div>
           <div className="hiso-record-panel">
+            {active?.result?.routingSummary && (
+              <div className="ep-call-flow">
+                <span className="ep-call-flow-label">Call Flow</span> {active.result.routingSummary}
+              </div>
+            )}
             {!active || active.status === "loading" ? (
               <div className="hiso-empty">Loading…</div>
             ) : active.status === "error" ? (

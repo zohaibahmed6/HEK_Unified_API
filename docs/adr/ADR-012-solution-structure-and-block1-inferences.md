@@ -59,15 +59,35 @@ part of the "exact existing response shape" the zero-change principle protects. 
 stakeholder confirmation - the alternative reading (FR-HTTP-01 applies even to compat endpoints)
 would break existing consumers if adopted, so this reading was chosen as the lower-risk default.
 
-## Decision 6: Compat endpoint paths are namespaced (`/karo/authenticate`, `/erms/authenticate`), not literally bare `/authenticate`
+## Decision 6: Compat endpoint paths are namespaced internally (`/karo/authenticate`, `/erms/authenticate`), but external clients never see this - resolved 2026-07-30
 
-Per `KARO_HSS_doc.md` and `ERMS_doc.md`, both legacy systems exposed their Authenticate endpoint at
-the literal bare path `/authenticate` - each on its own dedicated legacy server/host. In this
-unified single-host Block 0/1 deployment, both paths would collide. Namespaced by system prefix as
-an interim measure. **Flagged**: ADR-011 already establishes that ERMS/HSS run on a designated
-active/standby server pair, distinct from the general fleet - host-based routing (distinct hostnames
-resolving to the correct backend) may be the intended real zero-path-change mechanism instead of a
-path prefix. Needs confirmation before this is relied upon as final.
+Per `KARO_HSS_doc.md` and `ERMS_doc.md`, both legacy systems exposed their real endpoints at bare
+paths (`/api/{OperationName}` for both KARO and ERMS, `/COL/{OperationName}` for COL) - each on its
+own dedicated legacy server/host, so the paths never collided. In this unified single-host
+deployment, `/api/...` alone can't tell KARO and ERMS calls apart. This was previously flagged as
+unconfirmed (host-based routing vs. asking clients to add a path prefix); confirmed 2026-07-30 with
+real hostnames, and clients require zero URL/path change - resolved via **host-based routing**, not
+a client-visible path prefix:
+
+- KARO/HSS: `hss.itsmyhealth.nz` (prod), `devhss.itsmyhealth.nz` (dev)
+- ERMS: `southerms.indici.nz` (prod), `deverms.itsmyhealth.nz` (dev)
+- COL: same host as ERMS - `COLController` lives inside the legacy ERMS web project, not its own
+  host, so it's disambiguated from ERMS by path prefix (`/COL` vs `/api`), not by hostname.
+- HISO: `hiso.itsmyhealth.nz` - needs no rewrite rule; its SOAP endpoint (`/FormSessionService.svc`)
+  doesn't share a host with anything else on this hub, so no path collision exists to resolve.
+
+`LegacyHostRoutingMiddleware` (`src/Api/Middleware/LegacyHostRoutingMiddleware.cs`), configured via
+`LegacyHostRouting:Rules` in `appsettings.json`, rewrites the incoming bare external path onto this
+hub's internal namespaced route *before* MVC routing runs, based on which rule's `HostContains`
+substring matches the request's `Host` header - so dev vs prod hostnames (which differ) still match
+the same rule without per-environment config entries. A request whose host matches no rule falls
+through with its path untouched, so the internal `/karo`/`/erms`/`/erms/col` paths keep working
+unchanged for local dev/testing without a Host header override.
+
+Because ERMS and COL share one host, the middleware must try every rule matching that host (not just
+the first) and let each system's own external-path-prefix decide - a single "first host match wins"
+resolution (the original implementation) silently dropped COL's rewrite whenever ERMS's rule matched
+the host first, since both potential rules match the same `HostContains` substring.
 
 ## Decision 7: Tenant registry schema, HISO server-address map, and HISO session-expiry column are inferred, not confirmed
 

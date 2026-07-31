@@ -1,4 +1,7 @@
 using System.Diagnostics;
+using HekCoreApi.Api.Configuration;
+using HekCoreApi.Application.Common.Models;
+using Microsoft.Extensions.Options;
 
 namespace HekCoreApi.Api.Telemetry;
 
@@ -13,10 +16,33 @@ namespace HekCoreApi.Api.Telemetry;
 public sealed class LegacyOperationObserver
 {
     private readonly HekTelemetry _telemetry;
+    private readonly IOptionsMonitor<VerboseDiagnosticLoggingOptions> _verboseOptions;
 
-    public LegacyOperationObserver(HekTelemetry telemetry)
+    public LegacyOperationObserver(HekTelemetry telemetry, IOptionsMonitor<VerboseDiagnosticLoggingOptions> verboseOptions)
     {
         _telemetry = telemetry;
+        _verboseOptions = verboseOptions;
+    }
+
+    /// <summary>
+    /// Verbose diagnostic logging (off by default, see <see cref="VerboseDiagnosticLoggingOptions"/> and
+    /// hek_analysis/LOGGING_OVERHAUL_PLAN.md): when enabled, logs the full request/response payload for
+    /// this call to the technical-*.log file only - the readable-file sub-logger's "[CallLog]" filter
+    /// and the errors sub-logger's Level&gt;=Warning filter both naturally exclude this Information-level,
+    /// non-"[CallLog]"-tagged line, so no extra plumbing is needed to keep it out of those two files.
+    /// No-ops (doesn't even serialize <paramref name="request"/>/<paramref name="response"/>) when the
+    /// toggle is off, so this is safe to call unconditionally from every endpoint.
+    /// </summary>
+    public void LogVerbosePayload(ILogger logger, string system, string endpoint, object? request, object? response)
+    {
+        if (!_verboseOptions.CurrentValue.Enabled)
+        {
+            return;
+        }
+
+        logger.LogInformation(
+            "{System} {Endpoint}: verbose payload. Request: {@Request} Response: {@Response}",
+            system, endpoint, request, response);
     }
 
     /// <summary>
@@ -32,20 +58,28 @@ public sealed class LegacyOperationObserver
         IReadOnlyDictionary<string, object?> context,
         Func<Task<TResult>> action,
         Func<TResult, bool>? isExpectedFailure = null,
-        string? expectedFailureReason = null)
+        string? expectedFailureReason = null,
+        Func<TResult, IReadOnlyDictionary<string, object?>>? enrichContext = null)
     {
         TagActivity(system, endpoint, context);
         try
         {
             var result = await action();
 
+            // Some callers (HISO: routing is only known after the mediator call resolves the
+            // session, not before) need to add context entries (e.g. Routing.*) once the result is
+            // in hand, so the CallLog readable line reflects it too - not just the response headers.
+            var loggedContext = enrichContext is not null
+                ? MergeContext(context, enrichContext(result))
+                : context;
+
             if (isExpectedFailure is not null && isExpectedFailure(result))
             {
-                RecordExpectedFailure(logger, system, endpoint, expectedFailureReason ?? "ExpectedFailure", context);
+                RecordExpectedFailure(logger, system, endpoint, expectedFailureReason ?? "ExpectedFailure", loggedContext, result);
             }
             else
             {
-                LogSuccess(logger, system, endpoint, context);
+                LogSuccess(logger, system, endpoint, loggedContext, result);
             }
 
             return result;
@@ -74,7 +108,7 @@ public sealed class LegacyOperationObserver
         try
         {
             var result = await action();
-            LogSuccess(logger, system, endpoint, context);
+            LogSuccess(logger, system, endpoint, context, result);
             return (result, null);
         }
         catch (Exception ex)
@@ -90,12 +124,14 @@ public sealed class LegacyOperationObserver
     /// span as Error (traces should surface these even though the legacy wire contract keeps 200/401
     /// unchanged), and records the error-rate metric.
     /// </summary>
-    public void RecordExpectedFailure(ILogger logger, string system, string endpoint, string reason, IReadOnlyDictionary<string, object?> context)
+    public void RecordExpectedFailure(ILogger logger, string system, string endpoint, string reason, IReadOnlyDictionary<string, object?> context, object? response = null)
     {
         TagActivity(system, endpoint, context);
         logger.LogWarning(
             "{System} {Endpoint}: expected failure ({Reason}). Context: {@Context}",
             system, endpoint, reason, context);
+        EmitCallLog(logger, system, endpoint, succeeded: false, reason, context);
+        LogVerbosePayload(logger, system, endpoint, context, response);
 
         Activity.Current?.SetStatus(ActivityStatusCode.Error, reason);
 
@@ -110,6 +146,9 @@ public sealed class LegacyOperationObserver
             ex,
             "{System} {Endpoint}: unexpected exception. Context: {@Context}",
             system, endpoint, context);
+        EmitCallLog(logger, system, endpoint, succeeded: false, ex.Message, context);
+        // The exception itself is already fully captured by the structured `ex` param on the LogError
+        // call above (stack trace, message, type) - no separate verbose-payload line needed here.
 
         Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
         Activity.Current?.AddException(ex);
@@ -117,10 +156,58 @@ public sealed class LegacyOperationObserver
         _telemetry.RecordLegacyEndpointError(system, endpoint, ex.GetType().Name);
     }
 
-    private static void LogSuccess(ILogger logger, string system, string endpoint, IReadOnlyDictionary<string, object?> context) =>
+    private static IReadOnlyDictionary<string, object?> MergeContext(IReadOnlyDictionary<string, object?> baseContext, IReadOnlyDictionary<string, object?> extra)
+    {
+        var merged = new Dictionary<string, object?>(baseContext);
+        foreach (var (key, value) in extra)
+        {
+            merged[key] = value;
+        }
+
+        return merged;
+    }
+
+    private void LogSuccess(ILogger logger, string system, string endpoint, IReadOnlyDictionary<string, object?> context, object? response = null)
+    {
         logger.LogInformation(
             "{System} {Endpoint} succeeded. Context: {@Context}",
             system, endpoint, context);
+        EmitCallLog(logger, system, endpoint, succeeded: true, failureReason: null, context);
+        LogVerbosePayload(logger, system, endpoint, context, response);
+    }
+
+    /// <summary>
+    /// FR-12/FR-6 (logging overhaul, 2026-07-29): one plain-English line per call, automatically for
+    /// every legacy-compat endpoint that goes through this observer (not hand-wired per controller).
+    /// Message template deliberately contains both "{System}" (so the per-system file router in
+    /// Program.cs can filter on it) and the literal text "[CallLog]" (so the readable-file sub-logger
+    /// can filter on that, separate from the full technical/errors files). Routing info is only as
+    /// complete as whatever the caller has already put in <paramref name="context"/> under the
+    /// "Routing.*" keys (see <see cref="RoutingHeaderWriter"/>/the FR-12 pilot controllers) - endpoints
+    /// that haven't had routing resolution added yet simply log without a DB server/environment, never
+    /// invented.
+    /// </summary>
+    private static void EmitCallLog(ILogger logger, string system, string endpoint, bool succeeded, string? failureReason, IReadOnlyDictionary<string, object?> context)
+    {
+        var patientId = context.TryGetValue("PatientId", out var p) ? p?.ToString() : null;
+        var encounterId = context.TryGetValue("EncounterId", out var e) ? e?.ToString() : null;
+
+        CallRoutingInfo? routing = null;
+        if (context.TryGetValue("Routing.DbServerHost", out var dbHost) && dbHost is not null)
+        {
+            context.TryGetValue("Routing.Environment", out var env);
+            context.TryGetValue("Routing.DbName", out var dbName);
+            context.TryGetValue("Routing.PracticeId", out var practiceId);
+            routing = new CallRoutingInfo(system, practiceId?.ToString() ?? "-", env?.ToString() ?? "-", dbHost.ToString()!, dbName?.ToString() ?? "-");
+        }
+
+        // Optional: a caller that already knows the exact field names returned (e.g. via
+        // RoutingSummaryFormatter.GetNonNullPropertyNames on its own result type) can pass them
+        // through context["FieldsReturned"] for a richer line; generic callers simply omit it.
+        var fieldsReturned = context.TryGetValue("FieldsReturned", out var fields) ? fields as IReadOnlyCollection<string> : null;
+        var summary = RoutingSummaryFormatter.BuildCallLogLine(system, endpoint, patientId, encounterId, succeeded, failureReason, fieldsReturned, routing);
+        logger.LogInformation("{System} [CallLog] {CallSummary}", system, summary);
+    }
 
     /// <summary>
     /// For controllers that don't route their success path through <see cref="ObserveAsync{TResult}"/>/
@@ -128,7 +215,12 @@ public sealed class LegacyOperationObserver
     /// class on the failure branch) - lets a success path still tag the trace span with real business
     /// context, without implying a warning/error the way `RecordExpectedFailure` would.
     /// </summary>
-    public void Tag(string system, string endpoint, IReadOnlyDictionary<string, object?> context) => TagActivity(system, endpoint, context);
+    public void Tag(ILogger logger, string system, string endpoint, IReadOnlyDictionary<string, object?> context, object? response = null)
+    {
+        TagActivity(system, endpoint, context);
+        EmitCallLog(logger, system, endpoint, succeeded: true, failureReason: null, context);
+        LogVerbosePayload(logger, system, endpoint, context, response);
+    }
 
     /// <summary>
     /// Attaches business context (patientId, sessionKey, encounterId, etc.) directly onto the current

@@ -9,6 +9,8 @@ export interface RunResult {
   raw: string;
   summary: string;
   durationMs: number;
+  /** FR-12 call-flow traceability: plain-English "what happened, where" sentence from the X-Hek-Routing-Summary response header, when the API set one. */
+  routingSummary?: string;
 }
 
 function buildQuery(values: Record<string, string>): string {
@@ -78,6 +80,7 @@ export async function runEndpoint(
     const res = await fetch(fetchUrl, { method: endpoint.method, headers, body });
     const text = await res.text();
     const durationMs = Math.round(performance.now() - started);
+    const routingSummary = res.headers.get("X-Hek-Routing-Summary") ?? undefined;
 
     let parsed: unknown = text;
     const contentType = res.headers.get("content-type") ?? "";
@@ -90,19 +93,19 @@ export async function runEndpoint(
     }
 
     if (!res.ok) {
-      return { status: "error", httpStatus: res.status, raw: text, summary: `HTTP ${res.status}`, durationMs };
+      return { status: "error", httpStatus: res.status, raw: text, summary: `HTTP ${res.status}`, durationMs, routingSummary };
     }
 
     const bodyError = detectBodyLevelError(endpoint.system, text, parsed);
     if (bodyError) {
-      return { status: "error", httpStatus: res.status, raw: text, summary: bodyError, durationMs };
+      return { status: "error", httpStatus: res.status, raw: text, summary: bodyError, durationMs, routingSummary };
     }
 
     if (isEmptyPayload(parsed)) {
-      return { status: "empty", httpStatus: res.status, raw: text, summary: "No data returned", durationMs };
+      return { status: "empty", httpStatus: res.status, raw: text, summary: "No data returned", durationMs, routingSummary };
     }
 
-    return { status: "success", httpStatus: res.status, raw: text, summary: "OK", durationMs };
+    return { status: "success", httpStatus: res.status, raw: text, summary: "OK", durationMs, routingSummary };
   } catch (ex) {
     const durationMs = Math.round(performance.now() - started);
     return { status: "error", raw: String(ex), summary: ex instanceof Error ? ex.message : "Network error", durationMs };

@@ -1,5 +1,8 @@
 # Documentation Index
 
+**Start here:** `docs/PROJECT_MASTER.md` is the single source of truth for "what's
+actually done" and "what's open" — read it before this index.
+
 **API contract source of truth:** `hek_analysis/docs/architecture/Unified-Healthcare-API_openapi.yaml`
 (OpenAPI 3.0.3, version `1.1.4`, companion design rationale in
 `hek_analysis/docs/architecture/Unified-Healthcare-API_API-Contract-Design.md`), verified live via

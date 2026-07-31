@@ -23,16 +23,13 @@ older assumptions that no compose file was present):
   (unauthenticated in this compose file — demo/dev only). `api` points at it via
   `Otel__OtlpEndpoint=http://aspire-dashboard:18889`.
 
-### Known blocker (PROJECT_STATUS.md open item 33) — NOT resolved
-`docker compose up -d --build` builds and starts cleanly, and `sqlserver` reports healthy, but the
-`api` container crashes on startup with `SqlException ... error: 40` — it cannot reach the
-`sqlserver` container over TCP, even though the same target is reachable from other containers on
-the same host/network using non-.NET tools. Not a regression from any specific session's code
-changes. Likely next step is host-side investigation (Docker Desktop networking settings,
-AV/EDR/VPN filtering) rather than a code fix.
-
-**Current working path:** `dotnet run` locally (bypasses Docker networking entirely) — this is how
-every "verified against real production data" claim in `PROJECT_STATUS.md` was actually run.
+### Container networking — resolved
+Earlier sessions saw the `api` container fail to reach `sqlserver` over TCP (`SqlException ... error:
+40`) on some dev machines. As of 2026-07-30, `docker compose up -d --build` runs cleanly end-to-end on
+the current dev machine — `api`, `frontend`, and `aspire-dashboard` all come up healthy, and real
+legacy-compat calls (ERMS `Authenticate`, host-routed — see below) succeed against the containerized
+`api` on port 8080. If this resurfaces on a different machine, treat it as local Docker
+Desktop networking/AV/VPN config, not a code issue — `dotnet run` remains a valid fallback.
 
 ## Config / secrets
 `ISecretProvider` (`src/Application/Common/Interfaces/ISecretProvider.cs`) abstracts secret
@@ -73,6 +70,66 @@ Wired in `src/Api/Program.cs`:
   `{"status":"ok"}` shape (KARO Ping / ERMS Ping equivalent).
 - `GET /health/ready` — readiness, includes a SQL dependency check (`AddHealthChecks()` registers a
   SQL check per Program.cs).
+
+## Legacy host-based routing (KARO/ERMS/COL) — how one Azure app serves 4 real URLs
+
+**The question this answers:** the app only gets one Azure URL (e.g.
+`hekcoreapi.azurewebsites.net`). When a real client calls `hss.itsmyhealth.nz`, how does that request
+end up at the KARO controller and not somewhere else?
+
+**Simple answer:** it's not the *app* that has one URL each for KARO/ERMS/COL/HISO — DNS points all of
+those real hostnames at the *same* Azure app. Azure lets one App Service / Container App answer to
+many "custom domains" at once (this is a standard Azure feature, not something built for this
+project). When `hss.itsmyhealth.nz` resolves via DNS to this app, the incoming request still carries
+`Host: hss.itsmyhealth.nz` exactly as the client sent it — Azure doesn't rewrite it. Inside the app,
+`LegacyHostRoutingMiddleware` (`src/Api/Middleware/LegacyHostRoutingMiddleware.cs`) reads that `Host`
+header, matches it against `LegacyHostRouting:Rules` in `appsettings.json`
+(`"hss" -> Karo`, `"erms" -> Erms`/`Col`), and rewrites the request path onto this hub's internal
+route (`/karo/*`, `/erms/*`, `/erms/col/*`) *before* MVC picks a controller. So the request that left
+the client as `POST hss.itsmyhealth.nz/api/Authenticate` lands, unmodified from the client's point of
+view, on `KaroCompatController.Authenticate`.
+
+HISO doesn't need any of this — `hiso.itsmyhealth.nz` only ever serves the SOAP endpoint
+(`/FormSessionService.svc`), so there's no other system's path for it to collide with.
+
+### Deployment checklist (do this once per environment — dev/staging/prod)
+
+1. **DNS**: for each real hostname (`hss.itsmyhealth.nz`, `southerms.indici.nz`,
+   `hiso.itsmyhealth.nz`, and their `dev*` equivalents), point the DNS record (CNAME, or A record per
+   Azure's custom-domain instructions) at this app's Azure hostname instead of the old legacy server's
+   IP. This is the actual cutover step — until DNS is repointed, old traffic keeps hitting the old
+   legacy server.
+2. **Azure custom domain binding**: in the Azure Portal (App Service/Container App → Custom domains),
+   add each of those same hostnames as a custom domain on this one app. Azure verifies domain
+   ownership (TXT/CNAME record) before it'll accept the binding.
+3. **TLS certificate per hostname**: bind a certificate for each custom domain (Azure App Service
+   Managed Certificate is the simplest — free, auto-renewing, one per custom domain).
+4. **Confirm `appsettings.json`'s `LegacyHostRouting:Rules`** still contains the right
+   `HostContains` substrings for whatever the real hostnames are in that environment (they don't need
+   to be exact matches — `"hss"` matches both `hss.itsmyhealth.nz` and `devhss.itsmyhealth.nz`).
+5. **Smoke test after cutover**: call each real hostname's real legacy path
+   (`/api/Ping`, `/api/Authenticate`, `/COL/Authenticate`) from *outside* Azure (not from inside the
+   container, to prove DNS + custom domain + TLS + routing all actually work together) and confirm a
+   200-with-real-body response, not a 404.
+
+### Local/Postman testing without a real DNS record
+
+Locally there's no DNS entry for `hss.itsmyhealth.nz`, so `Host` defaults to `localhost:8080` and the
+routing rule never matches (404, same shape as the KARO/ERMS collision this middleware exists to
+solve). Two ways to test against the real hostnames locally, without touching any code:
+
+- **One-off in Postman**: add a `Host` header manually (`Host: southerms.indici.nz`), keep the URL as
+  `http://localhost:8080/...`. Works immediately but has to be re-added per request/collection.
+- **Permanent fix, closer to real behavior — edit the Windows hosts file** (`C:\Windows\System32\drivers\etc\hosts`, needs admin) and add:
+  ```
+  127.0.0.1 hss.local
+  127.0.0.1 erms.local
+  ```
+  Then call `http://hss.local:8080/api/Ping` / `http://erms.local:8080/API/Authenticate` directly —
+  no manual header needed, Postman/curl/browser all send `Host: hss.local`/`erms.local` automatically,
+  which still matches the `"hss"`/`"erms"` substring rules. This is the closer-to-production way to
+  test locally since it exercises hostname-based dispatch exactly like Azure will, just via a hosts
+  file entry instead of real DNS.
 
 ## Current known gaps
 - No confirmed working containerized end-to-end run (see blocker above) — `dotnet run` is the only

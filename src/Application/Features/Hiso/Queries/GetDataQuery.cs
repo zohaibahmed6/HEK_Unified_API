@@ -17,7 +17,7 @@ namespace HekCoreApi.Application.Features.Hiso.Queries;
 public sealed record GetDataQuery(Guid SessionKey, string CalledServerAddress, string? FormInstanceOperationMode, string? SubmittedDataXml)
     : IRequest<GetDataQueryResult>;
 
-public sealed record GetDataQueryResult(bool SessionResolved, string? FilledSubmittedDataXml);
+public sealed record GetDataQueryResult(bool SessionResolved, string? FilledSubmittedDataXml, Application.Common.Models.CallRoutingInfo? Routing = null);
 
 /// <summary>
 /// The real `getData` "dynamic mode" pipeline, ported from `legacy-reference/Hiso/FormSessionService.svc.cs`'s
@@ -34,6 +34,7 @@ public sealed class GetDataQueryHandler : IRequestHandler<GetDataQuery, GetDataQ
     private readonly IHisoRequestEngine _requestEngine;
     private readonly HisoGetDataOptions _options;
     private readonly ILogger<GetDataQueryHandler> _logger;
+    private readonly IHisoSessionRegistryRepository _sessionRegistry;
 
     public GetDataQueryHandler(
         IMediator mediator,
@@ -41,7 +42,8 @@ public sealed class GetDataQueryHandler : IRequestHandler<GetDataQuery, GetDataQ
         IHisoConceptDictionary conceptDictionary,
         IHisoRequestEngine requestEngine,
         IOptions<HisoGetDataOptions> options,
-        ILogger<GetDataQueryHandler> logger)
+        ILogger<GetDataQueryHandler> logger,
+        IHisoSessionRegistryRepository sessionRegistry)
     {
         _mediator = mediator;
         _hisoExecutor = hisoExecutor;
@@ -49,6 +51,7 @@ public sealed class GetDataQueryHandler : IRequestHandler<GetDataQuery, GetDataQ
         _requestEngine = requestEngine;
         _options = options.Value;
         _logger = logger;
+        _sessionRegistry = sessionRegistry;
     }
 
     public async Task<GetDataQueryResult> Handle(GetDataQuery request, CancellationToken cancellationToken)
@@ -60,6 +63,11 @@ public sealed class GetDataQueryHandler : IRequestHandler<GetDataQuery, GetDataQ
             return new GetDataQueryResult(false, null);
         }
 
+        // FR-12: same registry row the practice-connection resolver looks up internally, fetched here
+        // too purely to surface routing (which physical DB server/environment fulfilled this call).
+        var sessionRoute = await _sessionRegistry.FindAsync(request.SessionKey, cancellationToken);
+        var routing = sessionRoute is not null ? Application.Common.Models.CallRoutingInfo.FromHisoSessionRoute(sessionRoute) : null;
+
         // Legacy: only IsDynamic=="1" AND formInstanceOperationMode=="N" has real logic - every other
         // combination is a genuine empty stub in legacy too (static mode; parked/resume mode).
         if (!_options.IsDynamic || request.FormInstanceOperationMode != "N" || string.IsNullOrWhiteSpace(request.SubmittedDataXml))
@@ -67,10 +75,10 @@ public sealed class GetDataQueryHandler : IRequestHandler<GetDataQuery, GetDataQ
             _logger.LogDebug(
                 "GetData: static/non-dynamic branch, returning stub response (IsDynamic={IsDynamic}, Mode={Mode})",
                 _options.IsDynamic, request.FormInstanceOperationMode);
-            return new GetDataQueryResult(true, null);
+            return new GetDataQueryResult(true, null, routing);
         }
 
-        var session = Application.Common.Models.HealthLinkSession.FromSessionContext(lookup.Context);
+        var session = Application.Common.Models.HealthLinkSession.FromSessionContext(lookup.Context, request.SessionKey);
 
         var xDoc = new XmlDocument();
         xDoc.LoadXml(request.SubmittedDataXml);
@@ -93,13 +101,13 @@ public sealed class GetDataQueryHandler : IRequestHandler<GetDataQuery, GetDataQ
 
         await _requestEngine.FillXmlDetailsAsync(procedureResults, xDoc, concepts, preparedRequests, cancellationToken);
 
-        return new GetDataQueryResult(true, xDoc.OuterXml);
+        return new GetDataQueryResult(true, xDoc.OuterXml, routing);
     }
 
     /// <summary>Legacy: `addDMSRef` branch - stamps an empty `referenceID` onto diagnosticReport/scannedDocument group nodes missing one.</summary>
     private static void StampEmptyDmsReferenceIds(XmlDocument doc)
     {
-        var groups = doc.DocumentElement?.GetElementsByTagName("group");
+        var groups = doc.DocumentElement?.GetElementsByTagName("group", "*");
         if (groups is null)
         {
             return;

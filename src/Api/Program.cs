@@ -44,12 +44,100 @@ try
     // never committed. Optional, so nothing breaks when the file doesn't exist.
     builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.local.json", optional: true, reloadOnChange: true);
 
-    builder.Host.UseSerilog((context, services, configuration) => configuration
-        .ReadFrom.Configuration(context.Configuration)
-        .ReadFrom.Services(services)
-        .Enrich.FromLogContext()
-        .Enrich.WithMachineName()
-        .Enrich.WithEnvironmentName());
+    builder.Host.UseSerilog((context, services, configuration) =>
+    {
+        configuration
+            .ReadFrom.Configuration(context.Configuration)
+            .ReadFrom.Services(services)
+            .Enrich.FromLogContext()
+            .Enrich.WithMachineName()
+            .Enrich.WithEnvironmentName();
+
+        // Per-system logging overhaul (2026-07-29, see hek_analysis/LOGGING_OVERHAUL_PLAN.md):
+        // every legacy-compat log line already carries a "System" property (the message templates
+        // in LegacyOperationObserver use "{System} ..." as their first token), so routing by system
+        // needs no extra enrichment - just filter on that existing property. Three files per system:
+        // technical (JSON, everything, 30 days), readable (only "[CallLog]"-tagged plain-English
+        // lines, 30 days), errors (Warning+, 60-90 days - kept longer since they're rarer and more
+        // valuable for later troubleshooting). CorrelationIdMiddleware already pushes a per-request
+        // "CorrelationId" property that ties entries across all three files together.
+        foreach (var system in new[] { "hiso", "karo", "erms", "col" })
+        {
+            var systemName = system;
+
+            // StartsWith (not Equals) so transport-suffixed system names still route here - e.g.
+            // FormSessionService.cs (real HISO SOAP endpoint) deliberately tags its calls "hiso-soap"
+            // (not "hiso") to stay distinguishable in the OTel metric, but that call still belongs in
+            // logs/hiso/*.log alongside HisoCompatController's REST traffic. Confirmed live 2026-07-30:
+            // under exact-match, every SOAP call silently matched none of the 4 per-system loggers.
+            bool MatchesSystem(Serilog.Events.LogEvent evt) =>
+                evt.Properties.TryGetValue("System", out var value) &&
+                value.ToString().Trim('"').StartsWith(systemName, StringComparison.OrdinalIgnoreCase);
+
+            configuration.WriteTo.Logger(lc => lc
+                .Filter.ByIncludingOnly(MatchesSystem)
+                .WriteTo.File(
+                    new HekCoreApi.Api.Telemetry.SeparatedCompactJsonFormatter(),
+                    $"logs/{systemName}/technical-.log",
+                    rollingInterval: RollingInterval.Day,
+                    retainedFileTimeLimit: TimeSpan.FromDays(30),
+                    fileSizeLimitBytes: 52_428_800,
+                    rollOnFileSizeLimit: true));
+
+            configuration.WriteTo.Logger(lc => lc
+                .Filter.ByIncludingOnly(evt => MatchesSystem(evt) && evt.MessageTemplate.Text.Contains("[CallLog]"))
+                .WriteTo.File(
+                    $"logs/{systemName}/readable-.log",
+                    // [{CorrelationId}] ties this line to its full detail in technical-*.log/errors-*.log -
+                    // CorrelationIdMiddleware already pushes this property on every request.
+                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{CorrelationId}] {Message:lj}{NewLine}--------------------------------------------------------------------------------{NewLine}",
+                    rollingInterval: RollingInterval.Day,
+                    retainedFileTimeLimit: TimeSpan.FromDays(30),
+                    fileSizeLimitBytes: 52_428_800,
+                    rollOnFileSizeLimit: true));
+
+            configuration.WriteTo.Logger(lc => lc
+                .Filter.ByIncludingOnly(evt => MatchesSystem(evt) && evt.Level >= Serilog.Events.LogEventLevel.Warning)
+                .WriteTo.File(
+                    new HekCoreApi.Api.Telemetry.SeparatedCompactJsonFormatter(),
+                    $"logs/{systemName}/errors-.log",
+                    rollingInterval: RollingInterval.Day,
+                    retainedFileTimeLimit: TimeSpan.FromDays(90),
+                    fileSizeLimitBytes: 52_428_800,
+                    rollOnFileSizeLimit: true));
+        }
+
+        // Safety net: every request, even ones that never reach a controller (404s, CORS
+        // rejections, wrong path) - see RequestLoggingMiddleware. These carry no "System" property
+        // so they'd otherwise be invisible to the per-system files above.
+        configuration.WriteTo.Logger(lc => lc
+            .Filter.ByIncludingOnly(evt => evt.Properties.ContainsKey("SourceContext") &&
+                evt.Properties["SourceContext"].ToString().Contains("RequestLoggingMiddleware"))
+            .WriteTo.File(
+                "logs/requests-.log",
+                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{CorrelationId}] [{Level:u3}] {Message:lj}{NewLine}--------------------------------------------------------------------------------{NewLine}",
+                rollingInterval: RollingInterval.Day,
+                retainedFileTimeLimit: TimeSpan.FromDays(14),
+                fileSizeLimitBytes: 52_428_800,
+                rollOnFileSizeLimit: true));
+
+        // Dedicated cross-system DB-error file (2026-07-30, Zohaib's ask): any caught database
+        // exception (SqlException etc. - all derive from DbException), from any of the 4 legacy
+        // systems, in one place - regardless of whether the catching code happens to tag a "System"
+        // property (some internal catch blocks, e.g. HisoConceptExecutor.ExecuteAsync, don't). Filters
+        // on the log event's actual Exception type rather than any string/property convention, so it
+        // can't be missed by a caller forgetting to tag it. CorrelationId comes for free via
+        // Enrich.FromLogContext() above - every request-scoped log line already carries it.
+        configuration.WriteTo.Logger(lc => lc
+            .Filter.ByIncludingOnly(evt => evt.Exception is System.Data.Common.DbException)
+            .WriteTo.File(
+                "logs/db-errors-.log",
+                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{CorrelationId}] [{Level:u3}] {Message:lj}{NewLine}{Exception}{NewLine}--------------------------------------------------------------------------------{NewLine}",
+                rollingInterval: RollingInterval.Day,
+                retainedFileTimeLimit: TimeSpan.FromDays(90),
+                fileSizeLimitBytes: 52_428_800,
+                rollOnFileSizeLimit: true));
+    });
 
     // ---- Options (IOptions pattern - coding-standards: do not hardcode settings) ----
     builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOptions.SectionName));
@@ -63,6 +151,7 @@ try
     builder.Services.Configure<HisoConceptMappingOptions>(builder.Configuration.GetSection(HisoConceptMappingOptions.SectionName));
     builder.Services.Configure<HisoGetDataOptions>(builder.Configuration.GetSection(HisoGetDataOptions.SectionName));
     builder.Services.Configure<LegacyHostRoutingOptions>(builder.Configuration.GetSection(LegacyHostRoutingOptions.SectionName));
+    builder.Services.Configure<VerboseDiagnosticLoggingOptions>(builder.Configuration.GetSection(VerboseDiagnosticLoggingOptions.SectionName));
 
     // ---- Secrets (Block 0 vertical slice) ----
     builder.Services.AddSingleton<ISecretProvider, EnvironmentVariableSecretProvider>();
@@ -112,7 +201,20 @@ try
     var signingKeyValue = builder.Configuration[signingKeySecretName]
         ?? "DEV-ONLY-INSECURE-SIGNING-KEY-REPLACE-VIA-SECRET-PROVIDER-0000000000";
 
-    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    // ---- Entra ID inbound bearer scheme (2026-07-30 fix, ADR-002/item 13 of the auth research
+    // log): a *calling application* that has its own Entra ID App Registration acquires its own
+    // token via the Client Credentials flow and presents it to us as `Authorization: Bearer`. We
+    // validate that inbound token against Entra's own public signing keys/issuer here. This is the
+    // counterpart to (and replaces relying on) EntraIdIdentityValidator's flawed prior approach of
+    // acquiring a token for our OWN app instead of checking the caller's - see that file's updated
+    // comments. Wired only when both Entra config values are present, so local/dev setups without a
+    // real tenant are unaffected.
+    const string EntraBearerAuthenticationScheme = "EntraBearer";
+    var entraTenantId = builder.Configuration["Entra:TenantId"];
+    var entraAudience = builder.Configuration["Entra:ClientId"];
+    var entraBearerConfigured = !string.IsNullOrWhiteSpace(entraTenantId) && !string.IsNullOrWhiteSpace(entraAudience);
+
+    var authenticationBuilder = builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(options =>
         {
             options.TokenValidationParameters = new TokenValidationParameters
@@ -125,6 +227,22 @@ try
             };
         });
 
+    if (entraBearerConfigured)
+    {
+        authenticationBuilder.AddJwtBearer(EntraBearerAuthenticationScheme, options =>
+        {
+            options.Authority = $"https://login.microsoftonline.com/{entraTenantId}/v2.0";
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidAudience = entraAudience,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true
+            };
+        });
+    }
+
     builder.Services.AddAuthorization(options =>
     {
         options.AddPolicy(AuthorizationPolicyNames.ResourceScoped, policy =>
@@ -133,10 +251,23 @@ try
             policy.RequireClaim(HekClaimTypes.Scope, "platform-admin"));
         options.AddPolicy(AuthorizationPolicyNames.BillingWrite, policy =>
             policy.RequireClaim(HekClaimTypes.Scope, "billing:write"));
+
+        // Default [Authorize] (no explicit policy) accepts either our own JWT or, once a real
+        // Entra tenant/App Registration exists, an Entra-issued caller token - see the
+        // AddJwtBearer(EntraBearerAuthenticationScheme, ...) registration above.
+        var defaultSchemes = entraBearerConfigured
+            ? new[] { JwtBearerDefaults.AuthenticationScheme, EntraBearerAuthenticationScheme }
+            : new[] { JwtBearerDefaults.AuthenticationScheme };
+        options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder(defaultSchemes)
+            .RequireAuthenticatedUser()
+            .Build();
     });
     builder.Services.AddSingleton<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, ResourceScopeAuthorizationHandler>();
 
     // ---- Rate limiting (ADR-008, config-toggle default off) ----
+    // Two tiers: a "standard" global limit for all endpoints, and a tighter "auth-strict" named
+    // policy applied via [EnableRateLimiting] on login/authenticate endpoints specifically, to
+    // guard against brute-force/credential-stuffing without disrupting normal data-endpoint use.
     var rateLimitOptions = builder.Configuration.GetSection(RateLimitOptions.SectionName).Get<RateLimitOptions>() ?? new RateLimitOptions();
     if (rateLimitOptions.Enabled)
     {
@@ -151,13 +282,24 @@ try
                         PermitLimit = rateLimitOptions.PermitLimit,
                         Window = TimeSpan.FromSeconds(rateLimitOptions.WindowSeconds)
                     }));
+            options.AddPolicy(RateLimitPolicyNames.AuthStrict, context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = rateLimitOptions.AuthPermitLimit,
+                        Window = TimeSpan.FromSeconds(rateLimitOptions.AuthWindowSeconds)
+                    }));
         });
     }
 
     // ---- CORS (explicit allow-list, replacing legacy wildcard config) ----
     var corsOptions = builder.Configuration.GetSection(CorsOptions.SectionName).Get<CorsOptions>() ?? new CorsOptions();
     builder.Services.AddCors(options => options.AddPolicy(CorsOptions.PolicyName, policy =>
-        policy.WithOrigins(corsOptions.AllowedOrigins).AllowAnyHeader().AllowAnyMethod()));
+        policy.WithOrigins(corsOptions.AllowedOrigins).AllowAnyHeader().AllowAnyMethod()
+            // FR-12: custom response headers are hidden from browser JS cross-origin unless explicitly
+            // exposed - AllowAnyHeader() above only covers request headers, not response ones.
+            .WithExposedHeaders("X-Hek-Routing-System", "X-Hek-Routing-Environment", "X-Hek-Routing-DbServer", "X-Hek-Routing-DbName", "X-Hek-Routing-PracticeId", "X-Hek-Routing-Summary")));
 
     // ---- Telemetry (NFR-5): OpenTelemetry traces + metrics, additive to Serilog (which keeps
     // handling text logs unchanged). Exports via OTLP to the Aspire Dashboard container in
@@ -288,15 +430,27 @@ try
         await TenantRegistrySeeder.SeedAsync(db);
     }
 
-    // v1.1 spec follow-through Step 4: real HISO SOAP endpoint, registered first (SoapCore's own raw
-    // path-matching middleware, independent of MVC routing) at the real address.
+    // Correlation ID first - every downstream log line and the exception handler's traceId depend on it.
+    app.UseCorrelationId();
+    app.UseMiddleware<HekCoreApi.Api.Middleware.RequestLoggingMiddleware>();
+
+    // Full request/response body capture + ambient "System" LogContext tag (2026-07-31) - see
+    // RequestResponseLoggingMiddleware's doc comment. Positioned before the SOAP endpoint so it also
+    // wraps HISO's SOAP traffic, which short-circuits the pipeline before reaching anything below it.
+    app.UseRequestResponseLogging();
+
+    // v1.1 spec follow-through Step 4: real HISO SOAP endpoint (SoapCore's own raw path-matching
+    // middleware, independent of MVC routing) at the real address. Registered after
+    // UseCorrelationId/RequestLoggingMiddleware (2026-07-30 fix, was registered before them) - both are
+    // plain pass-through middleware (push a LogContext property / log after `await _next`), so this
+    // doesn't affect SoapCore reading the request; it just means SOAP requests now get a CorrelationId
+    // and land in logs/requests-*.log's safety net like every other request already does. Confirmed
+    // live: SOAP calls previously never reached either middleware, since SoapCore short-circuits
+    // matched paths before continuing the pipeline.
     ((IApplicationBuilder)app).UseSoapEndpoint<HekCoreApi.Api.Features.Hiso.Soap.IFormSessionService>(
         "/FormSessionService.svc",
         new SoapEncoderOptions(),
         SoapSerializer.XmlSerializer);
-
-    // Correlation ID first - every downstream log line and the exception handler's traceId depend on it.
-    app.UseCorrelationId();
     app.UseExceptionHandler();
 
     // v1.1 spec follow-through Step 2: rewrite real external legacy paths (/api/..., /COL/...) onto

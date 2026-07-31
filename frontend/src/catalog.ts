@@ -29,7 +29,7 @@ export const sharedParams: Record<SystemId, ParamDef[]> = {
   hiso: [{ key: "sessionKey", label: "Session Key", default: "" }],
   karo: [
     { key: "patientId", label: "Patient ID", default: "2459731" },
-    { key: "encounterId", label: "Encounter ID", default: "2147488418__901__-__local" },
+    { key: "encounterId", label: "Encounter ID", default: "2147488418__901__FZZ999-B__local" },
     { key: "system", label: "System", default: "hss" },
     { key: "pho", label: "PHO", default: "NBPH0" },
   ],

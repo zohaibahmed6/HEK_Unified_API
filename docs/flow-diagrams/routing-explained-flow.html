@@ -1,0 +1,333 @@
+<title>How Routing Works — HISO vs KARO/ERMS/COL</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default' });
+</script>
+<style>
+  :root {
+    --ink: #161a1d; --paper: #f3f1ea; --panel: #ffffff; --line: #dcd7c9; --muted: #64655c;
+    --accent: #2f6f6d; --accent-strong: #1c4b49; --accent-soft: #dfeae8;
+    --amber: #a8621a; --amber-soft: #f4e6d4; --code-bg: #eee9db;
+    --hiso: #2f6f6d; --karo: #a8621a; --db: #1b5e8a; --db-soft: #dfeaf3;
+    --shadow: 0 1px 2px rgba(22,26,29,0.06), 0 8px 24px rgba(22,26,29,0.05);
+  }
+  :root[data-theme="dark"] {
+    --ink: #eceae3; --paper: #14171a; --panel: #1b1f22; --line: #2c3033; --muted: #9a9c93;
+    --accent: #63b8b3; --accent-strong: #8fd0cb; --accent-soft: #1f3634;
+    --amber: #e2984f; --amber-soft: #3a2c1a; --code-bg: #23272a;
+    --hiso: #63b8b3; --karo: #e2984f; --db: #7fb8e0; --db-soft: #1a2c38;
+    --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.35);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #eceae3; --paper: #14171a; --panel: #1b1f22; --line: #2c3033; --muted: #9a9c93;
+      --accent: #63b8b3; --accent-strong: #8fd0cb; --accent-soft: #1f3634; --amber: #e2984f;
+      --amber-soft: #3a2c1a; --code-bg: #23272a; --hiso: #63b8b3; --karo: #e2984f; --db: #7fb8e0; --db-soft: #1a2c38;
+      --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.35);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { background: var(--paper); color: var(--ink); margin: 0; font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+  body { padding: 48px 24px 96px; }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  .eyebrow { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 12.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-strong); margin: 0 0 10px; }
+  h1 { font-family: ui-serif, "Iowan Old Style", "Palatino Linotype", Georgia, serif; font-weight: 600; font-size: clamp(28px, 4vw, 38px); line-height: 1.12; letter-spacing: -0.01em; margin: 0 0 12px; text-wrap: balance; }
+  .dek { font-size: 16px; line-height: 1.55; color: var(--muted); max-width: 68ch; margin: 0 0 36px; }
+  .dek code, p code, li code, td code { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 0.92em; background: var(--code-bg); padding: 0.08em 0.4em; border-radius: 4px; }
+  section { margin-bottom: 48px; }
+  h2 { font-family: ui-serif, "Iowan Old Style", "Palatino Linotype", Georgia, serif; font-size: 21px; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.005em; }
+  .section-note { font-size: 13.5px; color: var(--muted); margin: 0 0 18px; }
+  .diagram-frame { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 20px 18px; margin-bottom: 18px; }
+  .diagram-label { display: flex; align-items: center; gap: 8px; font-family: ui-monospace, monospace; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 10px; }
+  .diagram-label .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .diagram-label.hiso .dot { background: var(--hiso); } .diagram-label.hiso { color: var(--hiso); }
+  .diagram-label.karo .dot { background: var(--karo); } .diagram-label.karo { color: var(--karo); }
+  .zoom-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .zoom-bar button { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 15px; line-height: 1; width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); cursor: pointer; }
+  .zoom-bar button:hover { border-color: var(--accent); color: var(--accent-strong); }
+  .zoom-bar .pct { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--muted); min-width: 46px; text-align: center; }
+  .zoom-bar .hint { font-size: 12.5px; color: var(--muted); margin-left: auto; }
+  .diagram-scroll { overflow: auto; max-height: 70vh; padding-bottom: 4px; border-radius: 6px; }
+  .diagram-scroll .mermaid { min-width: 1300px; }
+  .diagram-scroll svg { display: block; }
+  .diagram-scroll .mermaid text, .diagram-scroll svg text { font-size: 15px !important; }
+  .diagram-scroll .mermaid .messageText, .diagram-scroll svg .messageText { font-size: 15px !important; }
+  .diagram-scroll .mermaid .labelText, .diagram-scroll .mermaid .loopText, .diagram-scroll svg .labelText, .diagram-scroll svg .loopText { font-size: 14px !important; }
+
+  .legend-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+  .legend-card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; box-shadow: var(--shadow); }
+  .legend-card .tag { display: inline-block; font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 11.5px; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); margin-bottom: 10px; }
+  .legend-card h3 { font-size: 15.5px; margin: 0 0 8px; font-weight: 650; }
+  .legend-card p { font-size: 13.8px; line-height: 1.55; color: var(--muted); margin: 0 0 8px; }
+  .legend-card p:last-child { margin-bottom: 0; }
+
+  table.schema, table.steps { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  table.schema th, table.schema td, table.steps th, table.steps td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.schema th, table.steps th { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  table.steps td.n { font-variant-numeric: tabular-nums; color: var(--accent-strong); font-weight: 700; width: 28px; }
+  table.schema td code, table.steps td code { font-size: 11.8px; white-space: nowrap; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: var(--shadow); margin-bottom: 8px; }
+  .table-wrap table { border: none; box-shadow: none; }
+  .table-wrap td, .table-wrap th { border-color: var(--line); }
+  .schema-caption { font-size: 12.5px; color: var(--muted); margin: 0 0 10px; }
+
+  .example-box {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px;
+    box-shadow: var(--shadow); font-size: 13.8px; line-height: 1.6;
+  }
+  .example-box .row { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; margin-bottom: 6px; }
+  .example-box .row:last-child { margin-bottom: 0; }
+  .example-box .k { font-family: ui-monospace, monospace; font-size: 12px; color: var(--muted); min-width: 130px; }
+  .example-box .v { font-family: ui-monospace, monospace; font-size: 12.5px; color: var(--ink); }
+  .example-box .v.bad { color: #c0392b; text-decoration: line-through; }
+  .example-box .v.good { color: var(--accent-strong); font-weight: 700; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 780px) { .two-col { grid-template-columns: 1fr; } }
+
+  footer { margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+</style>
+
+<div class="wrap">
+  <p class="eyebrow">HEK Core API — legacy-compat wire flow</p>
+  <h1>How routing actually works: HISO vs KARO/ERMS/COL</h1>
+  <p class="dek">
+    Two genuinely different mechanisms decide "which real SQL Server, which real database" for a
+    request — HISO uses one central table keyed by its own session GUID; KARO, ERMS, and COL share a
+    second table keyed by a composite practice identity parsed out of the encounter ID. Traced from the
+    real, verified source in this repo, including the exact matching rule and a real routing bug found
+    and fixed this session.
+  </p>
+
+  <section>
+    <h2>Two separate registry tables, one database</h2>
+    <p class="section-note">Both live in the same <code>HekTenantRegistry</code> SQL Server database, but they're queried completely differently and never share a row.</p>
+    <div class="table-wrap">
+      <table class="schema">
+        <thead><tr><th>Table</th><th>Used by</th><th>Looked up by</th><th>Real columns</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>Practices</code></td>
+            <td>KARO, ERMS, COL (COL reuses ERMS's own resolver)</td>
+            <td>A 4-part composite key: <code>PracticeId</code> + <code>PracticeCode</code> + <code>Environment</code> + <code>SourceSystem</code></td>
+            <td><code>PracticeId</code>, <code>PracticeCode</code>, <code>Environment</code>, <code>SourceSystem</code>, <code>DbServerHost</code>, <code>DbName</code>, <code>RowLevelSecurityEnabled</code>, <code>IsActive</code></td>
+          </tr>
+          <tr>
+            <td><code>HisoSessions</code></td>
+            <td>HISO only</td>
+            <td>The session's own <code>SessionGuid</code> (or, in a few call sites, <code>PracticeId</code> alone)</td>
+            <td><code>SessionGuid</code>, <code>PracticeId</code>, <code>PracticeCode</code>, <code>Environment</code>, <code>PracticeName</code>, <code>SourceSystem</code> (always "Hiso"), <code>DbServerHost</code>, <code>DbName</code>, <code>RowLevelSecurityEnabled</code>, <code>IsActive</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="schema-caption">Confirmed in code: <code>HisoSessionRegistryEntry.cs</code> is deliberately shaped to mirror <code>Practices</code> field-for-field, plus <code>SessionGuid</code> — but it is a genuinely separate table. A HISO row is <b>self-sufficient</b>: it already carries its own <code>DbServerHost</code>/<code>DbName</code>, so resolving a HISO session never has to go back and query <code>Practices</code>.</p>
+  </section>
+
+  <section>
+    <div class="diagram-label hiso"><span class="dot"></span>HISO routing — session-registry lookup</div>
+    <p class="section-note">One lookup, by SessionGuid, into a table that already has everything.</p>
+    <div class="diagram-frame">
+      <div class="zoom-bar">
+        <button type="button" id="zoomOut1" aria-label="Zoom out">−</button>
+        <span class="pct" id="zoomPct1">140%</span>
+        <button type="button" id="zoomIn1" aria-label="Zoom in">+</button>
+        <span class="hint">Drag or scroll to pan</span>
+      </div>
+      <div class="diagram-scroll" id="diagramScroll1">
+        <pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor Client
+    participant Ctrl as HisoCompatController
+    participant Hnd as ResolveHisoSessionQueryHandler
+    participant Reg as IHisoSessionRegistryRepository
+    participant HisoSessions as HisoSessions (HekTenantRegistry)
+    participant Secret as ISecretProvider
+    participant PracticeDb as Practice DB (real DbServerHost/DbName)
+
+    Client->>Ctrl: POST getData { sessionKey: GUID, submittedDataXml }
+    Ctrl->>Hnd: ResolveHisoSessionQuery(SessionGuid)
+
+    Hnd->>Reg: FindAsync(sessionGuid)
+    Reg->>HisoSessions: SELECT * WHERE SessionGuid = @sessionGuid AND IsActive = 1
+    HisoSessions-->>Reg: one self-sufficient row —<br/>PracticeId, DbServerHost, DbName already on it
+    Reg-->>Hnd: HisoSessionRoute
+
+    Note over Hnd: no second lookup into Practices —<br/>this row already has everything needed
+
+    Hnd->>Secret: GetRequiredSecretAsync("Legacy:DbCredentials:" + DbServerHost)
+    Secret-->>Hnd: credential (User Id / Password only)
+    Hnd->>Hnd: build "Server={DbServerHost};Database={DbName};{credential}"
+
+    Hnd->>PracticeDb: SELECT ProviderId, PatientId, AppointmentId<br/>FROM tblHealthLinkSession WHERE SessionGuid = @sessionGuid
+    PracticeDb-->>Hnd: HisoSessionContext
+
+    Hnd-->>Ctrl: HisoSessionLookupResult Success
+    Ctrl-->>Client: (continues into the real getData concept pipeline)
+        </pre>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="diagram-label karo"><span class="dot"></span>KARO / ERMS / COL routing — composite match against <code>Practices</code></div>
+    <p class="section-note">The encounter ID itself is parsed into four pieces before any database is touched.</p>
+    <div class="diagram-frame">
+      <div class="zoom-bar">
+        <button type="button" id="zoomOut2" aria-label="Zoom out">−</button>
+        <span class="pct" id="zoomPct2">140%</span>
+        <button type="button" id="zoomIn2" aria-label="Zoom in">+</button>
+        <span class="hint">Drag or scroll to pan</span>
+      </div>
+      <div class="diagram-scroll" id="diagramScroll2">
+        <pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor Client
+    participant Ctrl as Karo/Erms/ColCompatController
+    participant Route as Karo/ErmsRoutingResolver
+    participant Conn as Karo/ErmsPracticeConnectionResolver
+    participant Tenant as TenantRegistryService
+    participant Practices as Practices (HekTenantRegistry)
+    participant Secret as ISecretProvider
+    participant PracticeDb as Practice DB (real DbServerHost/DbName)
+
+    Client->>Ctrl: any call, encounterId = "id__practiceId__practiceCode__environment"
+    Ctrl->>Route: Resolve(encounterId)
+    Route->>Route: split on "__" —<br/>segments[1]=PracticeId, segments[2]=PracticeCode (if present),<br/>segments[3]=Environment (if present)
+    Note over Route: missing segments default to the Unscoped<br/>sentinel "-", not blank/null
+    Route-->>Ctrl: RoutingContext { PracticeId, PracticeCode,<br/>Environment, SourceSystem=Karo|Erms }
+
+    Ctrl->>Conn: ResolveAsync(routingContext)
+    Conn->>Tenant: ResolveRouteAsync(routingContext)
+    Tenant->>Practices: SELECT * WHERE PracticeId=@PracticeId<br/>AND PracticeCode=@PracticeCode<br/>AND Environment=@Environment<br/>AND IsActive=1<br/>[AND SourceSystem=@SourceSystem — only when<br/>PracticeCode or Environment isn't Unscoped]
+    Practices-->>Tenant: zero or exactly one row
+    Tenant-->>Conn: PracticeRoute { DbServerHost, DbName } — or null
+
+    alt no matching row
+        Conn-->>Ctrl: NotFoundException "practice ... is not registered"
+    else row found
+        Conn->>Secret: GetRequiredSecretAsync("Karo|Erms:DbCredentials:" + DbServerHost)
+        Secret-->>Conn: credential (scoped per server, not per practice)
+        Conn-->>Ctrl: "Server={DbServerHost};Database={DbName};{credential}"
+        Ctrl->>PracticeDb: the real stored procedure call
+        PracticeDb-->>Ctrl: real data
+    end
+        </pre>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>The exact matching rule</h2>
+    <p class="section-note">Confirmed from <code>TenantRegistryService.ResolveRouteAsync</code> — the <code>SourceSystem</code> filter is conditional, not always applied.</p>
+    <div class="legend-grid">
+      <div class="legend-card">
+        <span class="tag">Two lookup modes, one method</span>
+        <h3>Flat PracticeId vs full composite</h3>
+        <p>The 29 "generic" legacy repositories that never learned their own origin call <code>ResolveRouteAsync(string practiceId)</code>, which quietly becomes <code>RoutingContext.FromPracticeId(practiceId, Unscoped)</code> — <code>PracticeCode</code>/<code>Environment</code> both default to <code>"-"</code>, and the <code>SourceSystem</code> filter is skipped entirely. KARO/ERMS's own resolvers always call the full <code>RoutingContext</code> overload instead.</p>
+      </div>
+      <div class="legend-card">
+        <span class="tag">Real, confirmed live</span>
+        <h3>Same PracticeId can be two different rows</h3>
+        <p>Practice <code>901</code> has <b>two real rows</b> in <code>Practices</code> — one with <code>SourceSystem="Karo"</code>, one with <code>SourceSystem="Erms"</code>, both currently pointing at <code>dbserver-local</code>/<code>PMS_NZ_V2</code> in this environment, but architecturally free to diverge (e.g. the same practice on Karo vs Erms in different real environments).</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>A real bug this session: wrong segment, wrong row (or no row)</h2>
+    <p class="section-note">The dashboard's own default encounter ID used to be 3 segments; the real seeded practice needed 4.</p>
+    <div class="two-col">
+      <div class="example-box">
+        <div class="row"><span class="k">encounterId</span><span class="v bad">2147488418__901__FZZ999-B</span></div>
+        <div class="row"><span class="k">segments</span><span class="v">[id, 901, FZZ999-B]</span></div>
+        <div class="row"><span class="k">→ PracticeId</span><span class="v">901</span></div>
+        <div class="row"><span class="k">→ PracticeCode</span><span class="v bad">FZZ999-B</span></div>
+        <div class="row"><span class="k">→ Environment</span><span class="v bad">"-" (Unscoped, no 4th segment)</span></div>
+        <div class="row"><span class="k">Practices match?</span><span class="v bad">✗ no row — real seeded row has PracticeCode="-", Environment="local"</span></div>
+      </div>
+      <div class="example-box">
+        <div class="row"><span class="k">encounterId</span><span class="v good">2147488418__901__-__local</span></div>
+        <div class="row"><span class="k">segments</span><span class="v">[id, 901, -, local]</span></div>
+        <div class="row"><span class="k">→ PracticeId</span><span class="v">901</span></div>
+        <div class="row"><span class="k">→ PracticeCode</span><span class="v good">-</span></div>
+        <div class="row"><span class="k">→ Environment</span><span class="v good">local</span></div>
+        <div class="row"><span class="k">Practices match?</span><span class="v good">✓ matches the real seeded row → dbserver-local / PMS_NZ_V2</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>The DMS twist: same route, different database name</h2>
+    <p class="section-note">Fixed this session — the DMS (document storage) connection is not a separate registry entry.</p>
+    <div class="legend-grid">
+      <div class="legend-card">
+        <span class="tag">Confirmed from the real legacy Web.config</span>
+        <h3>DMS shares the server and credential, only the catalog differs</h3>
+        <p><code>KaroDmsConnectionResolver</code>/<code>ErmsDmsConnectionResolver</code> now call the exact same <code>ResolveRouteAsync(routingContext)</code> as the primary connection resolvers, reuse the same <code>DbServerHost</code> and the same credential secret, and only swap <code>Database</code> to <code>DMS_PMS</code> (default, configurable via <code>Erms:DmsDatabaseName</code>/<code>Karo:DmsDatabaseName</code>). Before this fix, each DMS resolver looked up its own flat <code>{System}:DbCredentials:ConnDMSDB{practiceSuffix}</code> secret that was never configured — every document write failed with "connection target is not configured," independent of whether the primary connection worked.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Step-by-step source index</h2>
+    <div class="table-wrap">
+      <table class="steps">
+        <thead><tr><th>#</th><th>Stage</th><th>Real source</th></tr></thead>
+        <tbody>
+          <tr><td class="n">1</td><td>HISO session lookup (self-sufficient row)</td><td class="src"><code>ResolveHisoSessionQueryHandler.cs</code>, <code>IHisoSessionRegistryRepository.cs</code>, <code>HisoSessionRegistryEntry.cs</code></td></tr>
+          <tr><td class="n">2</td><td>HISO connection resolution (by PracticeId, other call sites)</td><td class="src"><code>HisoPracticeConnectionResolver.cs</code></td></tr>
+          <tr><td class="n">3</td><td>KARO/ERMS encounter-ID parsing into RoutingContext</td><td class="src"><code>KaroRoutingResolver.cs</code>, <code>ErmsRoutingResolver.cs</code>, <code>RoutingContext.cs</code></td></tr>
+          <tr><td class="n">4</td><td>Composite-key match against Practices</td><td class="src"><code>TenantRegistryService.cs</code> (<code>ResolveRouteAsync</code>)</td></tr>
+          <tr><td class="n">5</td><td>Primary connection resolvers</td><td class="src"><code>KaroPracticeConnectionResolver.cs</code>, <code>ErmsPracticeConnectionResolver.cs</code></td></tr>
+          <tr><td class="n">6</td><td>DMS connection resolvers (fixed this session)</td><td class="src"><code>KaroDmsConnectionResolver.cs</code>, <code>ErmsDmsConnectionResolver.cs</code></td></tr>
+          <tr><td class="n">7</td><td>Credential lookup (never hardcoded)</td><td class="src"><code>ISecretProvider</code> / <code>EnvironmentVariableSecretProvider.cs</code></td></tr>
+          <tr><td class="n">8</td><td>Table definitions</td><td class="src"><code>db-scripts/01_TenantRegistry_InitialCreate.sql</code>, <code>PracticeRoute.cs</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    Built from the verified source in <code>HEK Core API</code> — every table name, column, method, and
+    the segment-parsing example above is confirmed against real code and this session's own live
+    testing, not inferred. Companion diagrams in this same folder cover individual endpoints in more
+    depth: <code>karo-authenticate-flow.html</code>, <code>karo-document-flow.html</code>,
+    <code>legacy-endpoints-detailed-trace.html</code>.
+  </footer>
+</div>
+
+<script>
+  (function () {
+    function wireZoom(scrollId, inId, outId, pctId, baseWidth) {
+      var scrollBox = document.getElementById(scrollId);
+      var pctLabel = document.getElementById(pctId);
+      var scale = 1.4;
+      var svgEl = null;
+      function apply() {
+        if (!svgEl) return;
+        svgEl.style.width = (baseWidth * scale) + 'px';
+        svgEl.style.height = 'auto';
+        svgEl.style.maxWidth = 'none';
+        pctLabel.textContent = Math.round(scale * 100) + '%';
+      }
+      function findSvgAndInit() {
+        var svg = scrollBox.querySelector('svg');
+        if (!svg || svg === svgEl) return;
+        svgEl = svg;
+        apply();
+      }
+      var observer = new MutationObserver(findSvgAndInit);
+      observer.observe(scrollBox, { childList: true, subtree: true });
+      findSvgAndInit();
+      setTimeout(findSvgAndInit, 300);
+      setTimeout(findSvgAndInit, 1000);
+      document.getElementById(inId).addEventListener('click', function () { scale = Math.min(scale + 0.25, 4); apply(); });
+      document.getElementById(outId).addEventListener('click', function () { scale = Math.max(scale - 0.25, 0.5); apply(); });
+    }
+    wireZoom('diagramScroll1', 'zoomIn1', 'zoomOut1', 'zoomPct1', 1300);
+    wireZoom('diagramScroll2', 'zoomIn2', 'zoomOut2', 'zoomPct2', 1300);
+  })();
+</script>

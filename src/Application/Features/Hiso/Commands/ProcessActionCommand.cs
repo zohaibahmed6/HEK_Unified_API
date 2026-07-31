@@ -1,4 +1,5 @@
 using HekCoreApi.Application.Common.Interfaces;
+using HekCoreApi.Application.Common.Models;
 using HekCoreApi.Application.Common.Options;
 using HekCoreApi.Application.Features.Auth.Hiso;
 using MediatR;
@@ -9,7 +10,7 @@ namespace HekCoreApi.Application.Features.Hiso.Commands;
 public sealed record ProcessActionCommand(Guid SessionKey, string CalledServerAddress, string ActionId, Dictionary<string, object?>? ActionContainer, string? ActionContainerXml = null)
     : IRequest<ProcessActionCommandResult>;
 
-public sealed record ProcessActionCommandResult(bool SessionResolved, bool Processed);
+public sealed record ProcessActionCommandResult(bool SessionResolved, bool Processed, CallRoutingInfo? Routing = null);
 
 /// <summary>
 /// Ported from `FormSessionService.svc.cs`'s `processAction`/`saveProcessAction`/`Task.processTask`.
@@ -25,13 +26,15 @@ public sealed class ProcessActionCommandHandler : IRequestHandler<ProcessActionC
     private readonly IHisoTaskRepository _taskRepository;
     private readonly IHisoProcessActionSaveRepository _saveRepository;
     private readonly HisoGetDataOptions _options;
+    private readonly IHisoSessionRegistryRepository _sessionRegistry;
 
-    public ProcessActionCommandHandler(IMediator mediator, IHisoTaskRepository taskRepository, IHisoProcessActionSaveRepository saveRepository, IOptions<HisoGetDataOptions> options)
+    public ProcessActionCommandHandler(IMediator mediator, IHisoTaskRepository taskRepository, IHisoProcessActionSaveRepository saveRepository, IOptions<HisoGetDataOptions> options, IHisoSessionRegistryRepository sessionRegistry)
     {
         _mediator = mediator;
         _taskRepository = taskRepository;
         _saveRepository = saveRepository;
         _options = options.Value;
+        _sessionRegistry = sessionRegistry;
     }
 
     public async Task<ProcessActionCommandResult> Handle(ProcessActionCommand request, CancellationToken cancellationToken)
@@ -42,15 +45,18 @@ public sealed class ProcessActionCommandHandler : IRequestHandler<ProcessActionC
             return new ProcessActionCommandResult(false, false);
         }
 
+        var sessionRoute = await _sessionRegistry.FindAsync(request.SessionKey, cancellationToken);
+        var routing = sessionRoute is not null ? CallRoutingInfo.FromHisoSessionRoute(sessionRoute) : null;
+
         switch (request.ActionId)
         {
             case "save":
                 if (!_options.IsDynamic)
                 {
-                    return new ProcessActionCommandResult(true, true);
+                    return new ProcessActionCommandResult(true, true, routing);
                 }
 
-                var session = Application.Common.Models.HealthLinkSession.FromSessionContext(lookup.Context);
+                var session = Application.Common.Models.HealthLinkSession.FromSessionContext(lookup.Context, request.SessionKey);
                 var xml = request.ActionContainerXml ?? "<container/>";
 
                 // Legacy: PatientBuilder/PatientConsultBuilder/PatientProblemBuilder/RegisteredPractitionerBuilder
@@ -65,7 +71,7 @@ public sealed class ProcessActionCommandHandler : IRequestHandler<ProcessActionC
 
                 // Legacy: individual builder save results are discarded - saveProcessAction always
                 // returns true once all five have run (reproduced faithfully, not "fixed").
-                return new ProcessActionCommandResult(true, true);
+                return new ProcessActionCommandResult(true, true, routing);
 
             case "addTask":
                 var container = request.ActionContainer ?? [];
@@ -77,15 +83,15 @@ public sealed class ProcessActionCommandHandler : IRequestHandler<ProcessActionC
 
                 var input = new HisoTaskInput(code, description, dueDate, complete, lookup.Context.ProviderId, lookup.Context.PatientId, null, lookup.Context.ProviderId);
                 var processed = await _taskRepository.AddTaskAsync(input, lookup.Context.PracticeId, cancellationToken);
-                return new ProcessActionCommandResult(true, processed);
+                return new ProcessActionCommandResult(true, processed, routing);
 
             case "addInvoice":
             case "launchForm":
                 // Legacy: comment-only stubs, no code at all - reproduced exactly.
-                return new ProcessActionCommandResult(true, false);
+                return new ProcessActionCommandResult(true, false, routing);
 
             default:
-                return new ProcessActionCommandResult(true, false);
+                return new ProcessActionCommandResult(true, false, routing);
         }
     }
 }

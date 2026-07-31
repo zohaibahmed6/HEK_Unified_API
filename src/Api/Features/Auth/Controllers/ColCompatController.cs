@@ -3,8 +3,10 @@ using System.Text.Json;
 using HekCoreApi.Adapters.Erms.Col;
 using HekCoreApi.Api.Telemetry;
 using HekCoreApi.Application.Features.Col;
+using HekCoreApi.Api.Security;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace HekCoreApi.Api.Features.Auth.Controllers;
 
@@ -34,18 +36,29 @@ public sealed class ColCompatController : ControllerBase
 
     /// <summary>Legacy: `POST Authenticate()` (`COLController.cs:24`) - JSON Credential body (confirmed real shape), `UserAuthenticate` JSON reply with an `error` field, always HTTP 200. No base64 step (unlike ERMS).</summary>
     [HttpPost("authenticate")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthStrict)]
     public async Task<IActionResult> Authenticate([FromBody] ColCredential credential, CancellationToken ct)
     {
         var result = await _mediator.Send(new ColAuthenticateQuery(credential.Username, credential.Password, credential.PatientId, credential.EncounterId), ct);
         var authContext = new Dictionary<string, object?> { ["PatientId"] = credential.PatientId, ["EncounterId"] = credential.EncounterId };
+        if (result.Routing is { } routing)
+        {
+            authContext["Routing.DbServerHost"] = routing.DbServerHost;
+            authContext["Routing.Environment"] = routing.Environment;
+            authContext["Routing.DbName"] = routing.DbName;
+            authContext["Routing.PracticeId"] = routing.PracticeId;
+        }
+
         if (!string.IsNullOrEmpty(result.Error))
         {
-            _observer.RecordExpectedFailure(_logger, "col", nameof(Authenticate), result.Error, authContext);
+            _observer.RecordExpectedFailure(_logger, "col", nameof(Authenticate), result.Error, authContext, result);
         }
         else
         {
-            _observer.Tag("col", nameof(Authenticate), authContext);
+            _observer.Tag(_logger, "col", nameof(Authenticate), authContext, result);
         }
+
+        Response.WriteRoutingHeaders("col", result.Routing);
 
         var reply = new ColUserAuthenticate { Token = result.Token, Expiry = result.Expiry, PracticeId = result.PracticeId, error = result.Error };
         return Json(JsonSerializer.Serialize(reply, LegacyJson));
@@ -105,14 +118,23 @@ public sealed class ColCompatController : ControllerBase
             invoice.ServiceProvider, invoice.ServiceProviderType, invoice.ServiceDate, invoice.PegasusReference,
             invoice.ClaimShortCode, GetAuthorizationToken()), ct);
 
+        Response.WriteRoutingHeaders("col", result.Routing);
         var invoiceContext = new Dictionary<string, object?> { ["PatientId"] = invoice.PatientID, ["EncounterId"] = invoice.EncounterID };
+        if (result.Routing is { } saveInvoiceRouting)
+        {
+            invoiceContext["Routing.DbServerHost"] = saveInvoiceRouting.DbServerHost;
+            invoiceContext["Routing.Environment"] = saveInvoiceRouting.Environment;
+            invoiceContext["Routing.DbName"] = saveInvoiceRouting.DbName;
+            invoiceContext["Routing.PracticeId"] = saveInvoiceRouting.PracticeId;
+        }
+
         if (!string.IsNullOrEmpty(result.Error))
         {
-            _observer.RecordExpectedFailure(_logger, "col", nameof(SaveInvoice), result.Error, invoiceContext);
+            _observer.RecordExpectedFailure(_logger, "col", nameof(SaveInvoice), result.Error, invoiceContext, result);
             return Json(result.Error);
         }
 
-        _observer.Tag("col", nameof(SaveInvoice), invoiceContext);
+        _observer.Tag(_logger, "col", nameof(SaveInvoice), invoiceContext, result);
 
         return Json(result.ServiceMappingId == -3
             ? "{\"status\":\"success\",\"message\":\" Invoice Already exist.}"
@@ -125,6 +147,14 @@ public sealed class ColCompatController : ControllerBase
         var body = string.Empty;
         var error = result.Error;
         var context = new Dictionary<string, object?> { ["PatientId"] = patientId, ["EncounterId"] = encounterId };
+        Response.WriteRoutingHeaders("col", result.Routing);
+        if (result.Routing is { } routing)
+        {
+            context["Routing.DbServerHost"] = routing.DbServerHost;
+            context["Routing.Environment"] = routing.Environment;
+            context["Routing.DbName"] = routing.DbName;
+            context["Routing.PracticeId"] = routing.PracticeId;
+        }
 
         if (result.Succeeded)
         {
@@ -141,7 +171,7 @@ public sealed class ColCompatController : ControllerBase
         }
         else if (!string.IsNullOrEmpty(error))
         {
-            _observer.RecordExpectedFailure(_logger, "col", endpoint, error, context);
+            _observer.RecordExpectedFailure(_logger, "col", endpoint, error, context, result);
         }
 
         return Json(string.IsNullOrEmpty(error) ? body : error);

@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HEK Unified API — Required vs Done vs Remaining</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --paper: #faf9f6; --panel: #ffffff; --ink: #1c1e1a; --muted: #5c5c54;
+    --line: #dedad0; --rule: #c9c4b6;
+    --accent: #3a5a78; --accent-strong: #24374a; --accent-soft: #e7edf2;
+    --done: #4a7a3f; --done-soft: #e6efe1;
+    --left: #a8501c; --left-soft: #f5e6db;
+    --code-bg: #f0ede3;
+    --shadow: 0 1px 2px rgba(28,30,26,0.05), 0 6px 20px rgba(28,30,26,0.04);
+  }
+  :root[data-theme="dark"] {
+    --paper: #15160f; --panel: #1d1f17; --ink: #ece9dd; --muted: #a9a495;
+    --line: #33342a; --rule: #454634;
+    --accent: #8fb2d4; --accent-strong: #b7d1ea; --accent-soft: #223140;
+    --done: #9ccb8a; --done-soft: #223a1c;
+    --left: #e0a06a; --left-soft: #3a2a1c;
+    --code-bg: #262619;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 6px 20px rgba(0,0,0,0.28);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #15160f; --panel: #1d1f17; --ink: #ece9dd; --muted: #a9a495;
+      --line: #33342a; --rule: #454634;
+      --accent: #8fb2d4; --accent-strong: #b7d1ea; --accent-soft: #223140;
+      --done: #9ccb8a; --done-soft: #223a1c;
+      --left: #e0a06a; --left-soft: #3a2a1c;
+      --code-bg: #262619;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 6px 20px rgba(0,0,0,0.28);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body {
+    font-family: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+    font-size: 15px; line-height: 1.5;
+  }
+  .page { max-width: 980px; margin: 0 auto; padding: 40px 28px 80px; }
+
+  .cover {
+    border: 1px solid var(--line); border-radius: 4px; padding: 26px 32px; margin-bottom: 32px;
+    background: var(--panel); box-shadow: var(--shadow);
+  }
+  .cover .eyebrow {
+    font-family: -apple-system, "Segoe UI", sans-serif; font-size: 11px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--accent-strong); margin: 0 0 10px; font-weight: 600;
+  }
+  .cover h1 { font-size: 26px; line-height: 1.2; margin: 0 0 14px; font-weight: 700; letter-spacing: -0.01em; }
+  .meta-grid {
+    display: grid; grid-template-columns: auto 1fr; gap: 4px 16px;
+    font-family: -apple-system, "Segoe UI", sans-serif; font-size: 12.5px;
+  }
+  .meta-grid dt { color: var(--muted); font-weight: 600; }
+  .meta-grid dd { margin: 0; }
+
+  h2 {
+    font-size: 19px; font-weight: 700; letter-spacing: -0.005em; margin: 30px 0 4px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--rule);
+    display: flex; align-items: center; gap: 8px;
+  }
+  h2 .badge {
+    font-family: -apple-system, "Segoe UI", sans-serif; font-size: 10px; font-weight: 800;
+    letter-spacing: 0.05em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent-strong);
+  }
+  h2 .badge.done { background: var(--done-soft); color: var(--done); }
+  h2 .badge.left { background: var(--left-soft); color: var(--left); }
+  h3 { font-size: 14.5px; font-weight: 700; margin: 18px 0 6px; color: var(--accent-strong); }
+  p { margin: 0 0 10px; }
+  .section-intro { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
+
+  .table-wrap { overflow-x: auto; margin: 0 0 14px; border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow); }
+  table { width: 100%; border-collapse: collapse; font-family: -apple-system, "Segoe UI", sans-serif; font-size: 12.5px; background: var(--panel); }
+  th, td { text-align: left; padding: 7px 11px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  thead th { font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 700; border-bottom: 1px solid var(--rule); }
+  tbody tr:last-child td { border-bottom: none; }
+  td.id, th.id-col { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; font-weight: 700; color: var(--accent-strong); white-space: nowrap; width: 1%; }
+  td.stat { white-space: nowrap; width: 1%; font-weight: 700; }
+  .ok { color: var(--done); }
+  .gap { color: var(--left); }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 760px) { .two-col { grid-template-columns: 1fr; } }
+
+  .stat-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0 16px; }
+  .stat {
+    font-family: -apple-system, "Segoe UI", sans-serif; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 6px; padding: 8px 14px; box-shadow: var(--shadow); min-width: 110px;
+  }
+  .stat .n { font-size: 20px; font-weight: 800; color: var(--accent-strong); display: block; }
+  .stat .l { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .item-list { list-style: none; margin: 0 0 10px; padding: 0; }
+  .item-list li {
+    padding: 6px 0 6px 20px; position: relative; font-size: 13px; border-bottom: 1px solid var(--line);
+  }
+  .item-list li:last-child { border-bottom: none; }
+  .item-list.done li::before { content: "✓"; position: absolute; left: 0; color: var(--done); font-weight: 800; }
+  .item-list.left li::before { content: "○"; position: absolute; left: 0; color: var(--left); font-weight: 800; }
+  .item-list .src { display: block; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+
+  footer {
+    margin-top: 36px; padding-top: 14px; border-top: 1px solid var(--rule);
+    font-family: -apple-system, "Segoe UI", sans-serif; font-size: 11px; color: var(--muted);
+  }
+  footer code { font-family: ui-monospace, Menlo, Consolas, monospace; background: var(--code-bg); padding: 0.1em 0.4em; border-radius: 4px; }
+
+  .page-break { break-before: page; page-break-before: always; }
+
+  @media print {
+    body { font-size: 11pt; }
+    .page { max-width: 100%; padding: 0 8mm; }
+    .cover, .table-wrap, .stat { box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="cover">
+    <p class="eyebrow">HEK · Status Summary</p>
+    <h1>HEK Unified Healthcare API Hub — Required vs. Done vs. Remaining</h1>
+    <dl class="meta-grid">
+      <dt>Project</dt><dd>HEK Unified Healthcare API (API Hub / Integration Gateway)</dd>
+      <dt>Snapshot date</dt><dd>2026-07-29 — point-in-time, not live-synced</dd>
+      <dt>Sources</dt><dd><code>docs/HEK_UNIFIED_API_SPEC.md</code> (v1.0) + <code>_v1.1.md</code> addendum · <code>hek_analysis/PROJECT_STATUS.md</code> · <code>hek_analysis/v1.1-plan-status.md</code> · <code>LEGACY_PARITY_VALIDATOR.md</code></dd>
+    </dl>
+  </div>
+
+  <h2><span class="badge">Required</span>What the spec asks for</h2>
+  <p class="section-intro">Dr. Ahmed Javad's directive: replace three separate integrations (HISO, Karo, ERMS) with one unified REST API Hub that every consumer calls through — with <strong>zero change</strong> for existing callers (v1.1's sharpened core constraint).</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th class="id-col">ID</th><th>Requirement</th></tr></thead>
+      <tbody>
+        <tr><td class="id">FR-1/2</td><td>Extract each system's data set (HISO/Karo/ERMS) and derive one unified/canonical model.</td></tr>
+        <tr><td class="id">FR-3/4</td><td>Single REST API; return only what a consumer requests — never "return everything."</td></tr>
+        <tr><td class="id">FR-5</td><td>Per-consumer field scoping — a consumer only ever gets its own system's fields.</td></tr>
+        <tr><td class="id">FR-6</td><td>Full request auditing: who called, when, exactly which fields.</td></tr>
+        <tr><td class="id">FR-7/8</td><td>Extensible gateway — future integrations onboard without redesign.</td></tr>
+        <tr><td class="id">FR-9</td><td>Simulation/demo proving parity with each legacy consumer's current API.</td></tr>
+        <tr><td class="id">FR-10</td><td><strong>Zero-change guarantee:</strong> HISO/Karo/ERMS keep calling exactly as today — same shape, same format.</td></tr>
+        <tr><td class="id">FR-11</td><td>Bring <em>all</em> running integrations onto the hub, not just the original three (incl. an unconfirmed "Florence" system).</td></tr>
+        <tr><td class="id">FR-12</td><td>Call-flow traceability — show per-request which environment a call originated/routed from.</td></tr>
+        <tr><td class="id">FR-13</td><td>Working demo <strong>interface (UI)</strong>, not a bare token/mock exchange.</td></tr>
+        <tr><td class="id">NFR</td><td>.NET Core/REST, Docker/containerized, horizontally scalable, top-notch security, full telemetry &amp; logging, systematic error handling, clean minimal code, research-grounded (Azure/AWS gateway patterns).</td></tr>
+        <tr><td class="id">PR-7</td><td>Next checkpoint demo: real systems/data (no mocks) + an architecture/call-flow diagram.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="page-break"></div>
+
+  <div class="two-col">
+    <div>
+      <h2><span class="badge done">Done</span>What's built &amp; verified</h2>
+      <div class="stat-row">
+        <div class="stat"><span class="n">13/17</span><span class="l">Lifecycle phases</span></div>
+        <div class="stat"><span class="n">61/61</span><span class="l">Legacy ops matching</span></div>
+        <div class="stat"><span class="n">17/17</span><span class="l">v1.1 plan steps</span></div>
+      </div>
+
+      <h3>Architecture &amp; design (Phases 1–11)</h3>
+      <ul class="item-list done">
+        <li>Full analysis of HISO/Karo/ERMS + SRS + Enterprise Architecture Doc (8 PASS/4 WARNING)
+          <span class="src">PROJECT_STATUS.md phases 1–5</span></li>
+        <li>API Contract Design, 42 canonical endpoints + OpenAPI 3.0.3 spec
+          <span class="src">PROJECT_STATUS.md phase 7</span></li>
+        <li>Tenant registry routes to sharded legacy DB servers, zero-migration ADRs (001–012) approved
+          <span class="src">PROJECT_STATUS.md §2</span></li>
+      </ul>
+
+      <h3>Development (Phase 12, in progress)</h3>
+      <ul class="item-list done">
+        <li>Day-1 build sprint complete: scaffolding, security core, all 18 domain endpoint groups (42 ops)
+          <span class="src">PROJECT_STATUS.md phase 12</span></li>
+        <li>FR-5 field isolation live-verified: cross-origin fields silently dropped, no error</li>
+        <li>3 canonical resources built &amp; DB-verified: Demographics, Conditions, Documents</li>
+      </ul>
+
+      <h3>v1.1 follow-through — all 17 steps done</h3>
+      <ul class="item-list done">
+        <li>Legacy host routing (KARO/ERMS/COL by hostname), zero-change compat endpoints</li>
+        <li>HISO real SOAP facade at <code>/FormSessionService.svc</code> — all 5 operations live-verified</li>
+        <li>Real AWS DLL (AWSDocCore) wired for HISO/ERMS/KARO document flows</li>
+        <li>Frontend (React/TS/Vite): HISO/KARO/ERMS/COL panels, all live-verified against real data</li>
+        <li>Telemetry on every legacy endpoint incl. SOAP; call-flow tracing via Aspire dashboard (FR-12)</li>
+      </ul>
+
+      <h3>Per-system logging overhaul (FR-12/FR-6 follow-on, done 2026-07-29)</h3>
+      <ul class="item-list done">
+        <li>Per-call human-readable log line (who called, for which patient, what fields came back, which DB server/environment served it — field <em>names</em> only, never values, per NZ HIPC compliance) — <strong>centralized in <code>LegacyOperationObserver</code>, covers every legacy-compat endpoint automatically</strong>, not just the original pilot
+          <span class="src">RoutingSummaryFormatter.BuildCallLogLine, LegacyOperationObserver.EmitCallLog</span></li>
+        <li>12 files total: 4 systems (HISO/KARO/ERMS/COL) × 3 kinds — technical (JSON, 30d), readable (plain-English, 30d), errors-only (90d) — real host folder (<code>logs/{system}/</code>), not a Docker volume, directly browsable
+          <span class="src">docker-compose.yml bind mount, Program.cs per-system sub-loggers</span></li>
+        <li>Every log line for one request carries a shared <code>CorrelationId</code> (reused existing middleware) so a readable-file entry can be matched to its full technical/error detail</li>
+        <li>Dashboard <strong>"Logs" tab</strong> — browses these plain-English lines with no terminal/Docker CLI needed, aggregated across all 4 systems
+          <span class="src">frontend/src/LogsPanel.tsx, GET /admin/logs/recent</span></li>
+      </ul>
+
+      <h3>Legacy parity (validator)</h3>
+      <ul class="item-list done">
+        <li><strong>61 of 61 operations present and matching</strong> — HISO 6/6, KARO 24/24, COL 7/7, ERMS 23/23 (Authenticate's Azure-forwarding sub-path runs locally instead of proxying — a working, deliberate substitution, not a missing operation; see Remaining)
+          <span class="src">LEGACY_PARITY_VALIDATOR.md</span></li>
+        <li>Field-level diff pass (2026-07-27) on all previously-unverified rows, 5/5 confirmed exact</li>
+        <li>Nearly all Block 2 stored-procedure/column mappings now real-source-derived and live-verified (not guessed) — only a short named list remains, see Remaining
+          <span class="src">PROJECT_STATUS.md item 28, corrected 2026-07-28</span></li>
+      </ul>
+    </div>
+
+    <div>
+      <h2><span class="badge left">Remaining</span>What's left</h2>
+
+      <h3>13 · Testing — done</h3>
+      <ul class="item-list done">
+        <li>66/66 unit tests + 43 live integration tests (HISO/KARO/ERMS/COL against the real Docker stack) exist and pass, with an HTML evidence report
+          <span class="src">docs/unit_test/live-integration-report.html</span></li>
+      </ul>
+
+      <h3>Phases genuinely not started</h3>
+      <ul class="item-list left">
+        <li><strong>14 · Performance Testing</strong> — 10,000 concurrent-user target has no confirmed SLA/latency figures</li>
+        <li><strong>15 · Security Review</strong> — standalone review not run; security tasks so far only embedded in build sprint</li>
+        <li><strong>16 · Deployment</strong> — staged rollout, real hosting target not yet executed</li>
+        <li><strong>17 · Production Readiness</strong> — final go-live gate</li>
+      </ul>
+
+      <h3>Known gaps</h3>
+      <ul class="item-list left">
+        <li>A short, named list of stored procedures/operations still unverified against live production schema: Observations, Measurements (delimiter shape undecoded), Encounter Summary (confirmed legacy stub, correctly left as-is), COL <code>GetSessionData</code> (preserves a known legacy bug)
+          <span class="src">PROJECT_STATUS.md item 28 (corrected 2026-07-28) · CLIENT_DELIVERY_READINESS.md</span></li>
+        <li>FR-12 call-flow/environment traceability response headers/"Call Flow" card still only on the original 7 pilot endpoints — but per-call plain-English logging is now centralized and covers <strong>every legacy-compat endpoint automatically</strong> (live-verified: ~15 KARO operations alone produced correct log entries with zero per-endpoint code, via <code>LegacyOperationObserver</code>). Remaining gap: most endpoints outside the 7-pilot set don't yet resolve routing (DB server/environment), so they log honestly without that detail rather than a full "Call Flow" — closing that is the one piece of follow-up work left
+          <span class="src">hek_analysis/LOGGING_OVERHAUL_PLAN.md, done 2026-07-29</span></li>
+      </ul>
+      <h3>Working as-is, no action currently required</h3>
+      <ul class="item-list done">
+        <li><strong>ERMS Authenticate's Azure-forwarding proxy runs locally instead of proxying to the Azure mirror.</strong> Implemented and functioning on the local path — not broken, not blocking. No action required.
+          <span class="src">LEGACY_PARITY_VALIDATOR.md — Gaps found</span></li>
+      </ul>
+      <h3>Resolved (previously mis-tracked as open)</h3>
+      <ul class="item-list done">
+        <li>Docker Compose networking — resolved via architecture change (<code>api</code> now points at <code>host.docker.internal</code> directly, no <code>sqlserver</code> container dependency); container verified up 3+ days serving real data
+          <span class="src">PROJECT_STATUS.md item 33, closed 2026-07-28</span></li>
+        <li>Aspose HTML/image→PDF rendering — real licensed DLL was already present, vendored and verified under .NET 8
+          <span class="src">PROJECT_STATUS.md item 30, closed 2026-07-28</span></li>
+      </ul>
+
+      <h3>Open items from the spec itself</h3>
+      <ul class="item-list left">
+        <li><strong>"Florence"</strong> — name of an additional integration mentioned in the transcript, unconfirmed (FR-11)</li>
+        <li><strong>"~18 environments"</strong> industry figure — needs verification, transcription uncertain</li>
+        <li>Full list of "several other" integrations beyond HISO/Karo/ERMS/Florence still to be identified</li>
+        <li>HISO practice routing map and session-expiry column still built on inferred design, not confirmed against live HISO schema</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer>
+    Snapshot compiled 2026-07-29 from the project's own source-of-truth documents — this page does not live-sync with them.
+    Re-generate after significant status changes. Full detail and evidence trail: <code>hek_analysis/PROJECT_STATUS.md</code>,
+    <code>hek_analysis/v1.1-plan-status.md</code>, <code>LEGACY_PARITY_VALIDATOR.md</code>, <code>hek_analysis/LOGGING_OVERHAUL_PLAN.md</code>,
+    <code>docs/HEK_UNIFIED_API_SPEC.md</code> + <code>_v1.1.md</code>.
+  </footer>
+</div>
+</body>
+</html>

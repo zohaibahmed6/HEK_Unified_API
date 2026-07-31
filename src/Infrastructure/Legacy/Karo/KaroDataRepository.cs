@@ -219,8 +219,10 @@ public sealed class KaroDataRepository : IKaroDataRepository
         return results;
     }
 
-    private static string? Str(DataRow row, string column) =>
-        row.Table.Columns.Contains(column) && row[column] is not DBNull ? row[column].ToString() : null;
+    // Returns "" (not null) for a DBNull column, matching real legacy's `Convert.ChangeType(DBNull.Value,
+    // typeof(string))` behavior - see DataTableMapper.cs's doc comment for the confirmed root cause.
+    private static string Str(DataRow row, string column) =>
+        row.Table.Columns.Contains(column) && row[column] is not DBNull ? row[column].ToString() ?? string.Empty : string.Empty;
 
     private async Task<List<T>> RunAsync<T>(RoutingContext routingContext, string procedureName, List<SqlParameter> parameters, CancellationToken ct) where T : new()
     {

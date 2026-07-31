@@ -1,0 +1,343 @@
+<title>Legacy Crosscheck — 2026-07-30</title>
+<style>
+:root{
+  --ink:#12151a; --paper:#f4f5f0; --panel:#ffffff; --panel-2:#eceee8;
+  --line:#dcded6; --text:#1c2024; --text-dim:#5c636b;
+  --accent:#1f8f8a; --accent-soft:#e3f3f1;
+  --good:#2f8f5b; --good-soft:#e5f4ea;
+  --warn:#b8791b; --warn-soft:#faf0dd;
+  --crit:#c0392f; --crit-soft:#fbe7e4;
+  --unk:#6b7280; --unk-soft:#eceef0;
+  --radius:6px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#f4f5f0; --paper:#12151a; --panel:#1a1e24; --panel-2:#20252c;
+    --line:#2c323a; --text:#e7e9e4; --text-dim:#9aa0a8;
+    --accent:#4fc4bd; --accent-soft:#16302e;
+    --good:#5cbf8b; --good-soft:#132a1e;
+    --warn:#e0a94a; --warn-soft:#2e2412;
+    --crit:#e2685c; --crit-soft:#301917;
+    --unk:#9aa0a8; --unk-soft:#20242a;
+  }
+}
+:root[data-theme="dark"]{
+  --ink:#f4f5f0; --paper:#12151a; --panel:#1a1e24; --panel-2:#20252c;
+  --line:#2c323a; --text:#e7e9e4; --text-dim:#9aa0a8;
+  --accent:#4fc4bd; --accent-soft:#16302e;
+  --good:#5cbf8b; --good-soft:#132a1e;
+  --warn:#e0a94a; --warn-soft:#2e2412;
+  --crit:#e2685c; --crit-soft:#301917;
+  --unk:#9aa0a8; --unk-soft:#20242a;
+}
+:root[data-theme="light"]{
+  --ink:#12151a; --paper:#f4f5f0; --panel:#ffffff; --panel-2:#eceee8;
+  --line:#dcded6; --text:#1c2024; --text-dim:#5c636b;
+  --accent:#1f8f8a; --accent-soft:#e3f3f1;
+  --good:#2f8f5b; --good-soft:#e5f4ea;
+  --warn:#b8791b; --warn-soft:#faf0dd;
+  --crit:#c0392f; --crit-soft:#fbe7e4;
+  --unk:#6b7280; --unk-soft:#eceef0;
+}
+
+*{box-sizing:border-box;}
+body{
+  margin:0; background:var(--paper); color:var(--text);
+  font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif;
+  line-height:1.5;
+}
+::selection{background:var(--accent-soft);}
+
+.mono{font-family:ui-monospace,"Cascadia Code","SF Mono",Consolas,"Roboto Mono",monospace;}
+
+/* ---------- header ---------- */
+header{
+  padding:2.2rem clamp(1rem,4vw,3rem) 1.4rem;
+  border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,var(--panel),var(--paper));
+}
+.eyebrow{
+  font-family:ui-monospace,"Cascadia Code",monospace;
+  font-size:.72rem; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--accent); font-weight:600; margin:0 0 .5rem;
+}
+h1{
+  font-size:clamp(1.5rem,3vw,2.1rem); margin:0 0 .35rem; letter-spacing:-.01em;
+  text-wrap:balance;
+}
+.sub{color:var(--text-dim); font-size:.95rem; max-width:62ch;}
+.envline{
+  margin-top:1rem; display:flex; flex-wrap:wrap; gap:.4rem .9rem;
+  font-family:ui-monospace,"Cascadia Code",monospace; font-size:.78rem; color:var(--text-dim);
+}
+.envline b{color:var(--text); font-weight:600;}
+
+/* ---------- scoreboard ---------- */
+.scoreboard{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:1px; background:var(--line); border:1px solid var(--line);
+  border-radius:var(--radius); overflow:hidden; margin:1.5rem clamp(1rem,4vw,3rem) 0;
+}
+.score-cell{
+  background:var(--panel); padding:1rem 1.1rem; display:flex; flex-direction:column; gap:.25rem;
+}
+.score-num{font-family:ui-monospace,monospace; font-variant-numeric:tabular-nums; font-size:1.9rem; font-weight:600; line-height:1;}
+.score-label{font-size:.74rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:.06em;}
+.score-cell.crit .score-num{color:var(--crit);}
+.score-cell.warn .score-num{color:var(--warn);}
+.score-cell.good .score-num{color:var(--good);}
+.score-cell.unk .score-num{color:var(--unk);}
+
+/* ---------- layout ---------- */
+main{padding:2rem clamp(1rem,4vw,3rem) 4rem; max-width:1180px; margin:0 auto;}
+.layout{display:grid; grid-template-columns:200px 1fr; gap:2.2rem; align-items:start;}
+@media (max-width:820px){ .layout{grid-template-columns:1fr;} nav.toc{position:static !important;} }
+
+nav.toc{
+  position:sticky; top:1.5rem; display:flex; flex-direction:column; gap:.15rem;
+  font-size:.85rem;
+}
+nav.toc a{
+  color:var(--text-dim); text-decoration:none; padding:.4rem .6rem; border-radius:5px;
+  border-left:2px solid transparent;
+}
+nav.toc a:hover, nav.toc a:focus-visible{color:var(--text); background:var(--panel-2);}
+nav.toc a.priority{color:var(--crit); font-weight:600;}
+nav.toc .toc-head{font-size:.72rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text-dim); padding:.4rem .6rem 0;}
+
+/* ---------- priority box ---------- */
+.priority-box{
+  background:var(--crit-soft); border:1px solid color-mix(in srgb, var(--crit) 35%, var(--line));
+  border-radius:var(--radius); padding:1.3rem 1.4rem; margin-bottom:2.2rem;
+}
+.priority-box h2{margin:0 0 .8rem; font-size:1.05rem; color:var(--crit); display:flex; align-items:center; gap:.5rem;}
+.priority-box ol{margin:0; padding-left:1.3rem; display:flex; flex-direction:column; gap:.55rem;}
+.priority-box li{font-size:.92rem;}
+.priority-box li b{font-weight:650;}
+.priority-box li .why{color:var(--text-dim); font-size:.85rem;}
+
+/* ---------- system sections ---------- */
+section.system{margin-bottom:2.6rem; scroll-margin-top:1.5rem;}
+.system-head{
+  display:flex; align-items:baseline; gap:.7rem; flex-wrap:wrap;
+  border-bottom:1px solid var(--line); padding-bottom:.6rem; margin-bottom:1rem;
+}
+.system-head h2{margin:0; font-size:1.25rem;}
+.system-head .count{font-size:.8rem; color:var(--text-dim); font-family:ui-monospace,monospace;}
+.system-head .endpoint{
+  font-family:ui-monospace,monospace; font-size:.76rem; color:var(--accent);
+  background:var(--accent-soft); padding:.15rem .5rem; border-radius:4px; margin-left:auto;
+}
+
+table{width:100%; border-collapse:collapse; font-size:.88rem;}
+.table-wrap{overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius);}
+thead th{
+  text-align:left; font-size:.72rem; text-transform:uppercase; letter-spacing:.06em;
+  color:var(--text-dim); padding:.6rem .8rem; background:var(--panel-2); border-bottom:1px solid var(--line);
+  white-space:nowrap;
+}
+tbody td{padding:.65rem .8rem; border-bottom:1px solid var(--line); vertical-align:top;}
+tbody tr:last-child td{border-bottom:none;}
+tbody tr:hover{background:var(--panel-2);}
+td.op{font-family:ui-monospace,monospace; font-size:.83rem; white-space:nowrap; font-weight:500;}
+td.note{color:var(--text-dim); font-size:.85rem;}
+td.note b{color:var(--text); font-weight:600;}
+
+.chip{
+  display:inline-flex; align-items:center; gap:.35rem; padding:.22rem .55rem;
+  border-radius:99px; font-size:.74rem; font-weight:600; white-space:nowrap;
+  font-family:ui-monospace,monospace;
+}
+.chip::before{content:""; width:.5rem; height:.5rem; border-radius:50%; flex:none;}
+.chip.good{background:var(--good-soft); color:var(--good);}
+.chip.good::before{background:var(--good);}
+.chip.warn{background:var(--warn-soft); color:var(--warn);}
+.chip.warn::before{background:var(--warn);}
+.chip.crit{background:var(--crit-soft); color:var(--crit);}
+.chip.crit::before{background:var(--crit);}
+.chip.unk{background:var(--unk-soft); color:var(--unk);}
+.chip.unk::before{background:var(--unk);}
+
+.section-note{
+  margin-top:.7rem; font-size:.85rem; color:var(--text-dim); background:var(--panel-2);
+  border-radius:var(--radius); padding:.7rem .9rem; border-left:3px solid var(--accent);
+}
+.section-note b{color:var(--text);}
+
+footer{
+  padding:1.5rem clamp(1rem,4vw,3rem) 3rem; color:var(--text-dim); font-size:.82rem;
+  border-top:1px solid var(--line); margin-top:1rem;
+}
+footer code{font-family:ui-monospace,monospace; background:var(--panel-2); padding:.1rem .35rem; border-radius:4px;}
+</style>
+
+<header>
+  <p class="eyebrow">HekCoreApi &middot; Legacy Parity Crosscheck</p>
+  <h1>Legacy vs New API — full picture, 2026-07-30</h1>
+  <p class="sub">Har ek legacy operation live call karke naye API se compare kiya gaya — HISO (SOAP), ERMS, KARO/HSS aur COL. 60 operations, real legacy servers ke against.</p>
+  <div class="envline">
+    <span><b>HISO</b> :53507/FormSessionService.svc</span>
+    <span><b>ERMS+COL</b> :2003</span>
+    <span><b>KARO/HSS</b> :2345</span>
+    <span><b>New API</b> :8080 (Docker)</span>
+  </div>
+</header>
+
+<div class="scoreboard">
+  <div class="score-cell crit"><span class="score-num">0</span><span class="score-label">Critical / crash</span></div>
+  <div class="score-cell warn"><span class="score-num">4</span><span class="score-label">Mismatch</span></div>
+  <div class="score-cell good"><span class="score-num">49</span><span class="score-label">Matched / fixed</span></div>
+  <div class="score-cell unk"><span class="score-num">0</span><span class="score-label">Needs real payload</span></div>
+</div>
+
+<main>
+<div class="layout">
+
+<nav class="toc">
+  <div class="toc-head">Jump to</div>
+  <a href="#priority" class="priority">⚠ Fix order</a>
+  <a href="#hiso">HISO — 6 ops</a>
+  <a href="#erms">ERMS — 23 ops</a>
+  <a href="#karo">KARO/HSS — 24 ops</a>
+  <a href="#col">COL — 7 ops</a>
+</nav>
+
+<div>
+
+<div class="priority-box" id="priority">
+  <h2>⚠ Pehle kya fix karna hai (overall order)</h2>
+  <ol>
+    <li style="text-decoration:line-through; opacity:.6;"><b>KARO ka routing bug</b> <span class="why">— ✅ FIXED 2026-07-30, Docker mein verify kiya</span></li>
+    <li style="text-decoration:line-through; opacity:.6;"><b>HISO <code class="mono">getFormView</code> missing hai</b> <span class="why">— ✅ FIXED 2026-07-30, Docker mein verify kiya</span></li>
+    <li style="text-decoration:line-through; opacity:.6;"><b>COL <code class="mono">GetSessionData</code> crash</b> <span class="why">— ✅ CORRECTED 2026-07-31, ye jaan-boojh kar copy kiya legacy bug hai, fix karne wali cheez nahi</span></li>
+    <li style="text-decoration:line-through; opacity:.6;"><b>HISO <code class="mono">getDeliveryOptions</code> config missing</b> <span class="why">— ✅ FIXED 2026-07-31, config keys add ki</span></li>
+    <li style="text-decoration:line-through; opacity:.6;"><b>COL Authenticate ka Expiry "+0" bug</b> <span class="why">— ✅ FIXED 2026-07-31</span></li>
+    <li style="text-decoration:line-through; opacity:.6;"><b>ERMS ke 4 data-gap endpoints</b> <span class="why">— ✅ CORRECTED 2026-07-31, bug nahi thay (row-order non-determinism)</span></li>
+    <li style="text-decoration:line-through; opacity:.6;"><b>KARO <code class="mono">GetRecallCategories</code> galat validation</b> <span class="why">— ✅ FIXED 2026-07-31</span></li>
+    <li style="text-decoration:line-through; opacity:.6;"><b>Baaki sab — wrapper naming, null-vs-empty-string, line-endings, extra JSON field</b> <span class="why">— ✅ FIXED 2026-07-31, real legacy se live-verify kiya</span></li>
+    <li style="text-decoration:line-through; opacity:.6;"><b>KARO <code class="mono">SaveRecall</code></b> <span class="why">— ✅ RESOLVED 2026-07-31, bug tha hi nahi — real valid group/categoryId se retest kiya, dono APIs match</span></li>
+  </ol>
+  <p style="margin-top:.8rem; opacity:.75; font-size:.9rem;">Sirf ek item genuinely open hai: <b>COL SaveInvoice</b> — <code class="mono">tblMasterService</code> level ka NOT NULL crash fix ho gaya (row seed ki), lekin ab ek dusri, zyada gehri wajah se <code class="mono">tblMasterSubService.InsertedBy</code> par phir fail hota hai — SP ka T-SQL source is DB user ke paas nahi hai (sirf EXECUTE permission, VIEW DEFINITION nahi), isliye DBA access ya SP source chahiye aage badhne ke liye. ERMS GetScannedDetails/GetDischargeSummaryDetails ✅ FIXED 2026-07-31 — real content ke sath retest kar ke genuine <code class="mono">Content</code> column MaxLength bug mila aur fix kiya. COL Authenticate ka legacy-side fail (unreachable-remote-DB) hamara masla nahi.</p>
+</div>
+
+<section class="system" id="hiso">
+  <div class="system-head">
+    <h2>HISO</h2>
+    <span class="count">6 operations</span>
+    <span class="endpoint">SOAP /FormSessionService.svc</span>
+  </div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Operation</th><th>Status</th><th>Detail</th></tr></thead>
+    <tbody>
+      <tr><td class="op">getVersion</td><td><span class="chip good">✅ fixed 07-31</span></td><td class="note">Values sahi thin, wrapper naming bhi fix: ab real legacy jaisa <code class="mono">&lt;return&gt;</code> element (live-verified)</td></tr>
+      <tr><td class="op">getDeliveryOptions</td><td><span class="chip good">✅ fixed 07-31</span></td><td class="note">Wrapper fix + config keys add ki (<code class="mono">senderAccount</code> ab real session PracticeEDI se resolve hota hai). Password/URL abhi CHANGE_ME placeholder - real HealthLink credential kabhi nahi mila</td></tr>
+      <tr><td class="op">getData</td><td><span class="chip good">✅ fixed 07-31</span></td><td class="note">2 bugs mile aur fix huay: missing formMetaData fields, aur response ka <code class="mono">submittedData</code>+<code class="mono">dummy</code> wrapper missing tha</td></tr>
+      <tr><td class="op">saveContainer</td><td><span class="chip good">✅ fixed 07-31</span></td><td class="note">Real form data se test kar ke <b>4 alag bugs</b> mile aur fix huay — SOAP shape, missing config, SQL parameter types. Ab document real DMS mein byte-for-byte match</td></tr>
+      <tr><td class="op">getFormView</td><td><span class="chip good">✅ fixed 07-30/31</span></td><td class="note">3 masle fix: wiring, galat SQL parameter, aur `view` content ab seedha DMS_PMS DB se (external DMSProxy service kabhi is env mein reachable nahi thi, legacy ke liye bhi nahi)</td></tr>
+      <tr><td class="op">processAction</td><td><span class="chip good">✅ fixed 07-31</span></td><td class="note">Value sahi tha (<code class="mono">processed=false</code>), wrapper naming bhi fix - ab <code class="mono">&lt;return&gt;</code> element</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section class="system" id="erms">
+  <div class="system-head">
+    <h2>ERMS</h2>
+    <span class="count">23 operations</span>
+    <span class="endpoint">Host: southerms.indici.nz</span>
+  </div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Operation</th><th>Status</th><th>Detail</th></tr></thead>
+    <tbody>
+      <tr><td class="op">Ping</td><td><span class="chip good">match</span></td><td class="note">—</td></tr>
+      <tr><td class="op">Authenticate</td><td><span class="chip good">match</span></td><td class="note">Byte-for-byte match (aaj fix hui)</td></tr>
+      <tr><td class="op">GetPatientData</td><td><span class="chip good">match</span></td><td class="note">—</td></tr>
+      <tr><td class="op">GetPatientMeasurement</td><td><span class="chip good">match</span></td><td class="note">—</td></tr>
+      <tr><td class="op">GetSmokingStatus</td><td><span class="chip good">match</span></td><td class="note">—</td></tr>
+      <tr><td class="op">GetCurrentUser</td><td><span class="chip good">match</span></td><td class="note">—</td></tr>
+      <tr><td class="op">GetNextOfKin</td><td><span class="chip good">match</span></td><td class="note">—</td></tr>
+      <tr><td class="op">GetAccidents</td><td><span class="chip good">match</span></td><td class="note">—</td></tr>
+      <tr><td class="op">GetClassifications</td><td><span class="chip good">match</span></td><td class="note">—</td></tr>
+      <tr><td class="op">GetMedicalAllergies</td><td><span class="chip good">match</span></td><td class="note">—</td></tr>
+      <tr><td class="op">GetLaboratoryReportList</td><td><span class="chip good">match</span></td><td class="note">—</td></tr>
+      <tr><td class="op">GetRadiologyReportList</td><td><span class="chip good">match</span></td><td class="note">—</td></tr>
+      <tr><td class="op">GetRadiologyReportDetails</td><td><span class="chip good">match</span></td><td class="note">—</td></tr>
+      <tr><td class="op">GetDischargeSummaryReportList</td><td><span class="chip good">match</span></td><td class="note">—</td></tr>
+      <tr><td class="op">GetScannedList</td><td><span class="chip good">match</span></td><td class="note">—</td></tr>
+      <tr><td class="op">SaveDocument</td><td><span class="chip good">match</span></td><td class="note">Dono same 400 error dete hain (test payload ke sath)</td></tr>
+      <tr><td class="op">GetRegisteredPractitioners</td><td><span class="chip good">✅ verified 07-31</span></td><td class="note">Bug nahi tha — same records, sirf order (legacy khud bhi non-deterministic order deta hai)</td></tr>
+      <tr><td class="op">GetPrescribedMedications</td><td><span class="chip good">✅ verified 07-31</span></td><td class="note">Same — sab rows match, sirf order</td></tr>
+      <tr><td class="op">GetRegularMedications</td><td><span class="chip good">✅ verified 07-31</span></td><td class="note">Same</td></tr>
+      <tr><td class="op">GetConsultNotes</td><td><span class="chip good">✅ verified 07-31</span></td><td class="note">41 records dono jagah, sirf order</td></tr>
+      <tr><td class="op">GetLaboratoryReportDetails</td><td><span class="chip good">✅ fixed 07-31</span></td><td class="note">Root cause: <code class="mono">ErmsRtfConverter</code> ka <code class="mono">Environment.NewLine</code> Windows/Linux ke beech alag resolve hota tha - literal <code class="mono">\r\n</code> se badla, ab byte-for-byte legacy jaisa (live-verified)</td></tr>
+      <tr><td class="op">GetScannedDetails</td><td><span class="chip good">✅ fixed 07-31</span></td><td class="note">Retest me real bug mila: <code class="mono">Content</code> column MaxLength overflow real document ke sath (empty-content test record ye expose nahi karta tha). <code class="mono">ErmsDataRepository.GetDocResultsAsync</code> mein fix ki, live-verify: full 194KB real content ab return hota hai</td></tr>
+      <tr><td class="op">GetDischargeSummaryDetails</td><td><span class="chip good">✅ fixed 07-31</span></td><td class="note">Same code path (<code class="mono">GetDocResultsAsync</code>), upar wala MaxLength fix isay bhi cover karta hai. "Hang" note bhi correct kiya — legacy slow hai (2-14s) phir real NullReferenceException deta hai khali referenceId par</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section class="system" id="karo">
+  <div class="system-head">
+    <h2>KARO / HSS</h2>
+    <span class="count">24 operations</span>
+    <span class="endpoint">Host: hss.itsmyhealth.nz</span>
+  </div>
+  <div class="section-note"><b>Sabse zaroori masla:</b> real URL (<code class="mono">/api/GetDemographics</code> waghera) se call karo to <b>404</b> aata hai — routing middleware sirf <code class="mono">/api</code>→<code class="mono">/karo</code> prefix badalta hai, operation ka naam nahi. Neeche jo rows "internal route se test" bolti hain, wo <code class="mono">/karo/...</code> seedha call karke test hui hain (data confirm karne ke liye), lekin production mein real URL abhi fail karegi.</div>
+  <div class="table-wrap" style="margin-top:1rem;">
+  <table>
+    <thead><tr><th>Operation</th><th>Status</th><th>Detail</th></tr></thead>
+    <tbody>
+      <tr><td class="op">Ping</td><td><span class="chip good">match</span></td><td class="note">—</td></tr>
+      <tr><td class="op">Authenticate (GET+POST)</td><td><span class="chip good">✅ fixed 07-31</span></td><td class="note">Extra field <code class="mono">"message":null</code> hata diya - ab fail branch sirf <code class="mono">{"status","message"}</code>, exact legacy jaisa</td></tr>
+      <tr><td class="op">Sab real GET/POST routes</td><td><span class="chip good">✅ fixed 07-30</span></td><td class="note">Pehle 404 aata tha (13+ GET, 8+ POST) — ab <code class="mono">KaroOperationNameMap</code> add karke fix, Docker mein verify kiya</td></tr>
+      <tr><td class="op">GetDemographics</td><td><span class="chip good">✅ fixed 07-31</span></td><td class="note"><code class="mono">endEnrolmentDate</code> field add kiya (pehle bilkul missing tha); <code class="mono">dayPhone</code>/<code class="mono">endEnrolmentDate</code> ab <code class="mono">""</code> return karte hain (real legacy se directly confirm kiya)</td></tr>
+      <tr><td class="op">GetRecallCategories</td><td><span class="chip good">✅ fixed 07-31</span></td><td class="note"><code class="mono">group</code> param ko nullable banaya — ab blank/missing dono par legacy jaisa empty result</td></tr>
+      <tr><td class="op">GetRecalls</td><td><span class="chip good">✅ fixed 07-31</span></td><td class="note">Shared <code class="mono">DataTableMapper</code> fix se null-vs-empty-string gap band ho gaya</td></tr>
+      <tr><td class="op">GetObservations / GetConditions / GetPatientAttachment / GetMedications</td><td><span class="chip good">✅ fixed 07-31</span></td><td class="note">Same shared fix - sab automatically theek</td></tr>
+      <tr><td class="op">GetLabResults / GetClinicalNotes</td><td><span class="chip good">✅ fixed 07-31</span></td><td class="note">Same <code class="mono">DataTableMapper</code> fix - GetClinicalNotes 42/50 mismatch tha, ab 0/50</td></tr>
+      <tr><td class="op">GetScreeningCodes / GetEncounterSummary / GetProvider / GetDocuments</td><td><span class="chip good">match</span></td><td class="note">Data internal route se identical</td></tr>
+      <tr><td class="op">SaveScreeningCode</td><td><span class="chip good">match</span></td><td class="note">Stub behavior confirm — dono identical</td></tr>
+      <tr><td class="op">SaveClinicalNotes</td><td><span class="chip good">✅ verified 07-31</span></td><td class="note">Real model legacy source se nikala — match</td></tr>
+      <tr><td class="op">SaveCondition</td><td><span class="chip good">✅ verified 07-31</span></td><td class="note">Match, idempotency sentinel bhi sahi</td></tr>
+      <tr><td class="op">SaveObservations</td><td><span class="chip good">✅ verified 07-31</span></td><td class="note">Match</td></tr>
+      <tr><td class="op">SaveSummary</td><td><span class="chip good">✅ verified 07-31</span></td><td class="note">Dono same validation error — match</td></tr>
+      <tr><td class="op">SaveDocument</td><td><span class="chip good">✅ fixed 07-31</span></td><td class="note">SQL parameter types + missing DMSDocTypes config — dono fix, ab real document DMS mein save hota hai</td></tr>
+      <tr><td class="op">SaveInvoice</td><td><span class="chip good">✅ fixed 07-31</span></td><td class="note">Galat <code class="mono">@pPayee</code> parameter hata diya (legacy khud nahi bhejta) — ab kaam karta hai</td></tr>
+      <tr><td class="op">SaveRecall</td><td><span class="chip good">✅ resolved 07-31</span></td><td class="note">Bug tha hi nahi — test data galat tha. Real patient ke existing recalls se valid <code class="mono">group="Vaccine"</code>/<code class="mono">categoryId=4690</code> nikala (<code class="mono">uspGetRecalls</code>/<code class="mono">uspGetRecallCategories</code> se confirm), dono APIs se retest kiya — real legacy (<code class="mono">localhost:2345</code>) aur naya API dono <code class="mono">{"status":"success"}</code> dete hain, byte-for-byte match</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section class="system" id="col">
+  <div class="system-head">
+    <h2>COL</h2>
+    <span class="count">7 operations</span>
+    <span class="endpoint">Host: southerms.indici.nz /COL</span>
+  </div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Operation</th><th>Status</th><th>Detail</th></tr></thead>
+    <tbody>
+      <tr><td class="op">Authenticate</td><td><span class="chip good">✅ confirmed 07-31</span></td><td class="note">Expiry ab <code class="mono">+12</code> deta hai. Real production credentials se live-test: naya API 0.68s mein real token deta hai. Legacy <b>hang ho jata hai</b> (4+ min) - root cause: is account/practice ke liye connection-string ek unreachable remote IP par point karta hai (bilkul HISO DMSProxy jaisa - legacy khud bhi is dev env mein wahan nahi pahunch sakta)</td></tr>
+      <tr><td class="op">GetCurrentPatientData</td><td><span class="chip good">✅ confirmed 07-31</span></td><td class="note">Real data confirm - patient ka poora demographic record sahi aata hai</td></tr>
+      <tr><td class="op">GetSessionData</td><td><span class="chip good">✅ verified 07-31</span></td><td class="note">Pehle critical bug bola gaya tha — asal mein legacy ka khud ka bug hai (khaali proc name), jaan-boojh kar copy kiya gaya, kuch fix nahi karna</td></tr>
+      <tr><td class="op">GetProviderData</td><td><span class="chip good">✅ confirmed 07-31</span></td><td class="note">Real data confirm - 150+ providers sahi aate hain</td></tr>
+      <tr><td class="op">GetSurgeryData</td><td><span class="chip good">✅ confirmed 07-31</span></td><td class="note">Real data confirm - practice location sahi aata hai</td></tr>
+      <tr><td class="op">GetDiagnosisData</td><td><span class="chip good">✅ confirmed 07-31</span></td><td class="note">Real data confirm - 50+ diagnosis records (SNOMED codes) sahi aate hain</td></tr>
+      <tr><td class="op">SaveInvoice</td><td><span class="chip warn">open — SP source needed</span></td><td class="note"><code class="mono">tblMasterService</code> mein <code class="mono">('COL', PracticeID=901, InsertedBy=1)</code> row seed ki (real historical value, guess nahi) - pehla crash clear hua. Direct <code class="mono">sqlcmd EXEC</code> se SP ka poora swallowed error capture kiya: (1) <code class="mono">@pServiceDate</code> ambiguous format reject karta hai, ISO (<code class="mono">"20260731"</code>) se fix hota hai; (2) us ke baad bhi <code class="mono">tblMasterSubService.InsertedBy</code> NOT NULL par fail hota hai - matching subservice row seed karne se bhi nahi bana, matlab real link mechanism kuch aur hai jo abhi tak nahi mila. <code class="mono">sys.procedures</code>/<code class="mono">INFORMATION_SCHEMA.ROUTINES</code> dono is DB user ke liye access-denied (<code class="mono">fn_my_permissions</code> se confirm: sirf EXECUTE, VIEW DEFINITION nahi) - SP ka T-SQL source is session se bilkul nahi dekha ja sakta. Aage badhne ke liye DBA se VIEW DEFINITION grant ya kahin se real SP source chahiye</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+</div>
+</div>
+</main>
+
+<footer>
+  Poori detail: <code>crosscheck/mismatched.md</code> &middot; <code>crosscheck/errors.md</code> &middot; raw request/response: <code>crosscheck/PARITY_MEMORY.md</code> &middot; Postman collection: <code>crosscheck/HekCoreApi-Crosscheck.postman_collection.json</code>
+</footer>

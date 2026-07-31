@@ -5,6 +5,7 @@ using HekCoreApi.Adapters.Hiso.GetVersion;
 using HekCoreApi.Adapters.Hiso.ProcessAction;
 using HekCoreApi.Adapters.Hiso.SaveContainer;
 using HekCoreApi.Api.Telemetry;
+using HekCoreApi.Application.Common.Models;
 using HekCoreApi.Application.Features.Hiso.Commands;
 using HekCoreApi.Application.Features.Hiso.Queries;
 using MediatR;
@@ -18,10 +19,15 @@ namespace HekCoreApi.Api.Features.Hiso.Controllers;
 /// clients must use). This controller exists solely so the project's own frontend dashboard
 /// (`frontend/src/hisoView.tsx`/`catalog.ts`) has a plain JSON transport to call - it is not a
 /// public legacy-compat surface and should not be advertised to real external HISO clients.
-/// `getFormView` has no SOAP equivalent (dashboard-only convenience, not a real legacy operation).
 /// v1.1 plan Step 4 follow-up (2026-07-27): originally flagged as a not-yet-retired duplicate
 /// JSON door; scoped down to "internal dashboard API only" instead of deletion, since the
 /// frontend calls these JSON routes directly and has no SOAP client of its own.
+/// CORRECTION (2026-07-30): this comment previously claimed `getFormView` "has no SOAP equivalent...
+/// not a real legacy operation" - that was wrong. A live WSDL fetch against the real legacy server
+/// (`http://localhost:53507/FormSessionService.svc?wsdl`) during that day's crosscheck confirmed
+/// `getFormView` is a genuine 6th real SOAP operation, now wired into
+/// <see cref="Soap.IFormSessionService"/>/<see cref="Soap.FormSessionService"/> alongside the other 5.
+/// This JSON copy stays as-is for the frontend dashboard; both transports now exist.
 /// </summary>
 [ApiController]
 [Route("hiso")]
@@ -39,6 +45,13 @@ public sealed class HisoCompatController : ControllerBase
         _observer = observer;
     }
 
+    /// <summary>Routing is only known after the mediator call resolves the session - this enriches the
+    /// CallLog readable line to reflect it too, via ObserveAsync's enrichContext hook (not just headers).</summary>
+    private static Dictionary<string, object?> RoutingContext(CallRoutingInfo? routing) =>
+        routing is { } r
+            ? new Dictionary<string, object?> { ["Routing.DbServerHost"] = r.DbServerHost, ["Routing.Environment"] = r.Environment, ["Routing.DbName"] = r.DbName, ["Routing.PracticeId"] = r.PracticeId }
+            : new Dictionary<string, object?>();
+
     [HttpPost("getData")]
     public async Task<IActionResult> GetData([FromBody] GetDataRequest request, CancellationToken ct)
     {
@@ -51,7 +64,10 @@ public sealed class HisoCompatController : ControllerBase
                 new GetDataQuery(request.SessionKey, calledServerAddress, request.DataContainer.FormMetaData.FormInstanceOperationMode, request.DataContainer.SubmittedDataXml),
                 ct),
             isExpectedFailure: r => !r.SessionResolved,
-            expectedFailureReason: "InvalidSessionKey");
+            expectedFailureReason: "InvalidSessionKey",
+            enrichContext: r => RoutingContext(r.Routing));
+
+        Response.WriteRoutingHeaders("hiso", result.Routing);
 
         // Legacy: FaultException("Invalid Session Key") - reproduced as the literal message text,
         // matching the real fault string exactly rather than a generic 401.
@@ -76,13 +92,16 @@ public sealed class HisoCompatController : ControllerBase
         var calledServerAddress = HttpContext.Request.Host.Value;
         var context = new Dictionary<string, object?> { ["SessionKey"] = request.SessionKey };
 
-        var sessionResolved = await _observer.ObserveAsync(
+        var result = await _observer.ObserveAsync(
             _logger, "hiso", "getVersion", context,
             () => _mediator.Send(new GetVersionQuery(request.SessionKey, calledServerAddress), ct),
-            isExpectedFailure: resolved => !resolved,
-            expectedFailureReason: "InvalidSessionKey");
+            isExpectedFailure: r => !r.SessionResolved,
+            expectedFailureReason: "InvalidSessionKey",
+            enrichContext: r => RoutingContext(r.Routing));
 
-        return sessionResolved ? Ok(GetVersionResponse.Real()) : Unauthorized(new { message = "Invalid Session Key" });
+        Response.WriteRoutingHeaders("hiso", result.Routing);
+
+        return result.SessionResolved ? Ok(GetVersionResponse.Real()) : Unauthorized(new { message = "Invalid Session Key" });
     }
 
     [HttpPost("getDeliveryOptions")]
@@ -95,7 +114,10 @@ public sealed class HisoCompatController : ControllerBase
             _logger, "hiso", "getDeliveryOptions", context,
             () => _mediator.Send(new GetDeliveryOptionsQuery(request.SessionKey, calledServerAddress), ct),
             isExpectedFailure: r => !r.SessionResolved,
-            expectedFailureReason: "InvalidSessionKey");
+            expectedFailureReason: "InvalidSessionKey",
+            enrichContext: r => RoutingContext(r.Routing));
+
+        Response.WriteRoutingHeaders("hiso", result.Routing);
 
         if (!result.SessionResolved)
         {
@@ -115,7 +137,10 @@ public sealed class HisoCompatController : ControllerBase
             _logger, "hiso", "processAction", context,
             () => _mediator.Send(new ProcessActionCommand(request.SessionKey, calledServerAddress, request.ActionId, request.ActionContainer, request.ActionContainerXml), ct),
             isExpectedFailure: r => !r.SessionResolved,
-            expectedFailureReason: "InvalidSessionKey");
+            expectedFailureReason: "InvalidSessionKey",
+            enrichContext: r => RoutingContext(r.Routing));
+
+        Response.WriteRoutingHeaders("hiso", result.Routing);
 
         return result.SessionResolved
             ? Ok(ProcessActionResponse.From(result.Processed))
@@ -138,7 +163,10 @@ public sealed class HisoCompatController : ControllerBase
                 new SaveContainerCommand(request.SessionKey, calledServerAddress, metaData, request.ResumePath, request.View, request.ViewType, request.ViewSignature, request.Completed, request.SubmittedDataXml),
                 ct),
             isExpectedFailure: r => !r.SessionResolved,
-            expectedFailureReason: "InvalidSessionKey");
+            expectedFailureReason: "InvalidSessionKey",
+            enrichContext: r => RoutingContext(r.Routing));
+
+        Response.WriteRoutingHeaders("hiso", result.Routing);
 
         return result.SessionResolved
             ? Ok(SaveContainerResponse.From(result.Response))
@@ -155,7 +183,10 @@ public sealed class HisoCompatController : ControllerBase
             _logger, "hiso", "getFormView", context,
             () => _mediator.Send(new GetFormViewQuery(request.SessionKey, calledServerAddress), ct),
             isExpectedFailure: r => !r.SessionResolved,
-            expectedFailureReason: "InvalidSessionKey");
+            expectedFailureReason: "InvalidSessionKey",
+            enrichContext: r => RoutingContext(r.Routing));
+
+        Response.WriteRoutingHeaders("hiso", result.Routing);
 
         return result.SessionResolved
             ? Ok(GetFormViewResponse.From(result.ResumePath, result.ViewType, result.View))

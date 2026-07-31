@@ -1,7 +1,9 @@
 using HekCoreApi.Application.Features.Auth.Commands;
+using HekCoreApi.Api.Security;
 using HekCoreApi.Contracts.Auth;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace HekCoreApi.Api.Features.Auth.Controllers;
 
@@ -28,6 +30,7 @@ public sealed class AuthController : ControllerBase
     [HttpPost("token")]
     [ProducesResponseType(typeof(TokenResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthStrict)]
     public async Task<IActionResult> IssueToken([FromBody] TokenRequest request, CancellationToken ct)
     {
         var result = await _mediator.Send(new AuthenticateCommand(request, request.OriginScope), ct);

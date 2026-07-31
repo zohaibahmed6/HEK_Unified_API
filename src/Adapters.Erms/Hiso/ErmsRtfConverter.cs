@@ -18,9 +18,14 @@ public static class ErmsRtfConverter
         backslashed.Replace(@"\", @"\\");
         backslashed.Replace(@"{", @"\{");
         backslashed.Replace(@"}", @"\}");
-        backslashed.Replace("|br|", Environment.NewLine + Environment.NewLine);
+        // Literal "\r\n", not Environment.NewLine: real legacy always runs on Windows (where
+        // Environment.NewLine is "\r\n"), but this port runs in a Linux Docker container, where
+        // Environment.NewLine resolves to "\n" - confirmed live 2026-07-31 as the exact cause of a
+        // real content mismatch (legacy's decoded content: "\r\n\r\nCBC:..."; ours: "\n\nCBC:...").
+        // Using the literal keeps the output correct regardless of which OS this runs on.
+        backslashed.Replace("|br|", "\r\n\r\n");
         backslashed.Replace("|t|", "\t");
-        backslashed.Replace("<br/>", Environment.NewLine);
+        backslashed.Replace("<br/>", "\r\n");
 
         var sb = new StringBuilder();
         foreach (var character in backslashed.ToString())

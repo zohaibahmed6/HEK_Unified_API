@@ -30,7 +30,16 @@ public sealed class HisoRequestEngine : IHisoRequestEngine
     public List<HisoRequest> ParseRequest(XmlDocument requestDocument)
     {
         var results = new List<HisoRequest>();
-        var fieldNodes = requestDocument.DocumentElement?.SelectNodes("//field") ?? requestDocument.SelectNodes("//field");
+
+        // Real legacy `submittedData` always carries its `<form>` root under the
+        // `urn:net.healthlink.genericform.model` namespace (confirmed via a live capture) - and once it
+        // round-trips through `XmlAnyElement`/SoapCore, .NET re-serializes it with an explicit `urn:`
+        // prefix rather than a bare default `xmlns`. Plain `SelectNodes("//field")` XPath only matches
+        // elements in NO namespace, and single-arg `GetElementsByTagName("field")` only matches the exact
+        // qualified Name (misses prefixed `urn:field`) - both silently return zero matches against the
+        // real wire shape. The 2-arg overload with `namespaceURI: "*"` matches by local name regardless
+        // of prefix/namespace, which is what actually works here.
+        var fieldNodes = requestDocument.DocumentElement?.GetElementsByTagName("field", "*");
         if (fieldNodes is null)
         {
             return results;
@@ -40,10 +49,14 @@ public sealed class HisoRequestEngine : IHisoRequestEngine
         {
             var parent = field.ParentNode;
             var grandparent = parent?.ParentNode;
-            var isParentGroup = parent is { Name: "group" };
-            var sectionName = parent is { Name: "section" }
+            // `Name` includes any namespace prefix (e.g. `urn:group` once this content round-trips
+            // through SoapCore's `[XmlAnyElement]` handling, confirmed live 2026-07-30 - same root cause
+            // as the `GetElementsByTagName` fix above) - `LocalName` strips it, matching regardless of
+            // prefix/namespace.
+            var isParentGroup = parent is XmlElement { LocalName: "group" };
+            var sectionName = parent is XmlElement { LocalName: "section" }
                 ? parent.Attributes?["name"]?.Value ?? string.Empty
-                : (grandparent is { Name: "section" } ? grandparent.Attributes?["name"]?.Value ?? string.Empty : string.Empty);
+                : (grandparent is XmlElement { LocalName: "section" } ? grandparent.Attributes?["name"]?.Value ?? string.Empty : string.Empty);
 
             results.Add(new HisoRequest
             {
@@ -122,7 +135,7 @@ public sealed class HisoRequestEngine : IHisoRequestEngine
                         (!string.IsNullOrEmpty(c.HisoGroupID) && !string.IsNullOrEmpty(req.GroupConceptID) && c.HisoGroupID == req.GroupConceptID) ||
                         (!string.IsNullOrEmpty(c.ConceptName) && !string.IsNullOrEmpty(req.GroupConceptName) && c.ConceptName == req.GroupConceptName)).ToList();
 
-                    var groupNodes = requestDocument.DocumentElement?.GetElementsByTagName("group");
+                    var groupNodes = requestDocument.DocumentElement?.GetElementsByTagName("group", "*");
                     if (groupNodes is not null)
                     {
                         var processedNodes = new List<XmlNode>();
@@ -333,7 +346,7 @@ public sealed class HisoRequestEngine : IHisoRequestEngine
         List<HisoRequest> requests,
         CancellationToken ct = default)
     {
-        var sectionNodes = requestDocument.DocumentElement?.GetElementsByTagName("section");
+        var sectionNodes = requestDocument.DocumentElement?.GetElementsByTagName("section", "*");
         if (sectionNodes is null)
         {
             return;
@@ -350,7 +363,7 @@ public sealed class HisoRequestEngine : IHisoRequestEngine
 
             foreach (XmlNode child in groupNodes)
             {
-                if (string.Equals(child.Name, "group", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(child.LocalName, "group", StringComparison.OrdinalIgnoreCase))
                 {
                     await FillGroupAsync(procedures, requests, concepts, child, nodeProcess, ct);
                 }
@@ -427,7 +440,7 @@ public sealed class HisoRequestEngine : IHisoRequestEngine
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[FillXMLDetails] Failed processing group: {GroupXml}", group.InnerXml);
+            _logger.LogError(ex, "{System} [FillXMLDetails] Failed processing group: {GroupXml}", "hiso", group.InnerXml);
         }
     }
 

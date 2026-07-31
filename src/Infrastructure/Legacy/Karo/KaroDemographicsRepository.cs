@@ -29,7 +29,8 @@ public sealed class KaroDemographicsRepository : IKaroDemographicsRepository
                 Str(row, "Nhi"), Str(row, "BirthDate"), Str(row, "Type"), Str(row, "TitleCode"), Str(row, "Given"), Str(row, "Family"), Str(row, "Gender"),
                 Int(row, "Ethnicity1"), Int(row, "Ethnicity2"), Int(row, "Ethnicity3"), Str(row, "Quintile"), Str(row, "Meshblock"), Str(row, "CellNumber"),
                 Str(row, "DayPhone"), Str(row, "Email"), Str(row, "FullAddress"), Str(row, "EnrolmentStatus"), Str(row, "SmokingStatus"),
-                Str(row, "Street"), Str(row, "Suburb"), Str(row, "City"), Str(row, "PostCode"), Str(row, "IsNZResident"), Str(row, "DateOfEnrolment"));
+                Str(row, "Street"), Str(row, "Suburb"), Str(row, "City"), Str(row, "PostCode"), Str(row, "IsNZResident"), Str(row, "DateOfEnrolment"),
+                Str(row, "EndEnrolmentDate"));
         }
 
         var cards = new List<KaroCardInfo>();
@@ -50,8 +51,11 @@ public sealed class KaroDemographicsRepository : IKaroDemographicsRepository
         return new KaroDemographicsResult(demographic, cards);
     }
 
-    private static string? Str(DataRow row, string column) =>
-        row.Table.Columns.Contains(column) && row[column] is not DBNull ? row[column].ToString() : null;
+    // Returns "" (not null) for a DBNull column, matching real legacy's `Convert.ChangeType(DBNull.Value,
+    // typeof(string))` behavior - see DataTableMapper.cs's doc comment for the confirmed root cause
+    // (2026-07-31, verified live against the real legacy server: "dayPhone":""/"endEnrolmentDate":"").
+    private static string Str(DataRow row, string column) =>
+        row.Table.Columns.Contains(column) && row[column] is not DBNull ? row[column].ToString() ?? string.Empty : string.Empty;
 
     private static int Int(DataRow row, string column) =>
         row.Table.Columns.Contains(column) && row[column] is not DBNull && int.TryParse(row[column].ToString(), out var value) ? value : 0;

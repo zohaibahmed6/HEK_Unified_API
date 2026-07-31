@@ -2,14 +2,10 @@ namespace HekCoreApi.Api.Configuration;
 
 /// <summary>
 /// ADR-008: rate limiting is built as a real, working capability but rolled out via the same
-/// config-toggle pattern as auth - generous/effectively-off at launch, tightened once monitoring
-/// confirms real thresholds are safe. No source document has quantitative traffic figures (SRS
-/// §5.5/§19: "cannot be confirmed from analysis" beyond a qualitative 10,000-concurrent-users
-/// target) - PROJECT_STATUS.md open item 18, resolved 2026-07-20: rather than fabricate a "final"
-/// number no evidence supports, Zohaib confirmed these values ARE the deliberate Day-1 setting
-/// (per the Contract Design doc's own already-approved "generous now, tighten after monitoring"
-/// decision, Section 14), not an unconfirmed placeholder awaiting a real number. Revisit once real
-/// production traffic/monitoring data exists to tighten safely.
+/// config-toggle pattern as auth - off by default, enabled once ready. Two tiers (2026-07-30, per
+/// Zohaib): a tight limit on login/authenticate endpoints (brute-force/credential-stuffing guard)
+/// and a looser general limit on everything else. Revisit these numbers once real production
+/// traffic/monitoring data exists.
 /// </summary>
 public sealed class RateLimitOptions
 {
@@ -17,7 +13,13 @@ public sealed class RateLimitOptions
 
     public bool Enabled { get; set; }
 
-    public int PermitLimit { get; set; } = 10_000;
+    /// <summary>General limit applied to all endpoints.</summary>
+    public int PermitLimit { get; set; } = 30;
 
     public int WindowSeconds { get; set; } = 60;
+
+    /// <summary>Tighter limit applied to login/authenticate endpoints only (see <see cref="HekCoreApi.Api.Security.RateLimitPolicyNames.AuthStrict"/>).</summary>
+    public int AuthPermitLimit { get; set; } = 10;
+
+    public int AuthWindowSeconds { get; set; } = 60;
 }

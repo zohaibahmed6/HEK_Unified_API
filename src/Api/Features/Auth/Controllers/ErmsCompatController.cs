@@ -7,8 +7,10 @@ using HekCoreApi.Api.Telemetry;
 using HekCoreApi.Application.Common.Interfaces;
 using HekCoreApi.Application.Features.Erms.Commands;
 using HekCoreApi.Application.Features.Erms.Queries;
+using HekCoreApi.Api.Security;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace HekCoreApi.Api.Features.Auth.Controllers;
 
@@ -43,6 +45,7 @@ public sealed class ErmsCompatController : ControllerBase
     /// <summary>Legacy: `POST Authenticate()` (`APIController.cs:35`) - real `GetBase64Value`+`GetDcrptValue`+`[HSS].[uspInsertAndValidateToken]` pipeline.</summary>
     [HttpPost("authenticate")]
     [Consumes("application/xml", "text/xml", "text/plain")]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthStrict)]
     public async Task<IActionResult> Authenticate([FromBody] string rawXml, CancellationToken ct)
     {
         ErmsCredential? credential;
@@ -60,28 +63,63 @@ public sealed class ErmsCompatController : ControllerBase
         if (credential is null)
         {
             _logger.LogWarning("Erms authenticate: request body failed to deserialize as {Type}", nameof(ErmsCredential));
-            return XmlResult(new ErmsErrorResponse());
+            return SetToXml(string.Empty, "Invalid request body!");
         }
 
         var result = await _mediator.Send(new ErmsAuthenticateQuery(credential.Username, credential.Password, credential.PatientId, credential.EncounterId), ct);
         var authContext = new Dictionary<string, object?> { ["PatientId"] = credential.PatientId, ["EncounterId"] = credential.EncounterId };
+        if (result.Routing is { } routing)
+        {
+            authContext["Routing.DbServerHost"] = routing.DbServerHost;
+            authContext["Routing.Environment"] = routing.Environment;
+            authContext["Routing.DbName"] = routing.DbName;
+            authContext["Routing.PracticeId"] = routing.PracticeId;
+        }
+
         if (result.Succeeded)
         {
-            _observer.Tag("erms", nameof(Authenticate), authContext);
+            _observer.Tag(_logger, "erms", nameof(Authenticate), authContext, result);
         }
         else
         {
-            _observer.RecordExpectedFailure(_logger, "erms", nameof(Authenticate), result.ErrorMessage ?? "AuthenticationFailed", authContext);
+            _observer.RecordExpectedFailure(_logger, "erms", nameof(Authenticate), result.ErrorMessage ?? "AuthenticationFailed", authContext, result);
         }
 
-        return result.Succeeded
-            ? XmlResult(new ErmsAuthenticationResponse
-            {
-                Token = result.Token ?? string.Empty,
-                Expiry = result.Expiry!.Value.ToString("yyyy-MM-ddTHH:mm:ssz"),
-                PracticeId = result.PracticeId ?? string.Empty
-            })
-            : XmlResult(new ErmsErrorResponse { Message = result.ErrorMessage ?? "Authentication failed!" });
+        Response.WriteRoutingHeaders("erms", result.Routing);
+
+        // Legacy: `Authenticate` (`APIController.cs:103-109`) builds this XML via plain string
+        // concatenation, never `XmlSerializer` - so the real response never carries the
+        // `xmlns:xsi`/`xmlns:xsd` attributes .NET's `XmlSerializer` adds by default. Reproduced the
+        // same way here (via `SetToXml`, matching every other legacy-ported ERMS endpoint) instead of
+        // `XmlResult<T>`, confirmed against a live Postman capture showing the real legacy response has
+        // no such attributes.
+        if (!result.Succeeded)
+        {
+            return SetToXml(string.Empty, result.ErrorMessage ?? "Authentication failed!");
+        }
+
+        var xml = "<?xml version=\"1.0\" encoding=\"utf-16\"?>" +
+                  "<Authentication>" +
+                  "<Token>" + (result.Token ?? string.Empty) + "</Token>" +
+                  "<Expiry>" + FormatExpiryLikeLegacy(result.Expiry!.Value) + "</Expiry>" +
+                  "<PracticeId>" + (result.PracticeId ?? string.Empty) + "</PracticeId>" +
+                  "</Authentication>";
+        return SetToXml(xml, string.Empty);
+    }
+
+    // Legacy's real server always ran with its local system clock set to NZ time, so its
+    // `dtExpiry.ToString("yyyy-MM-ddTHH:mm:ssz")` (`APIController.cs:107`) picked up NZ's UTC offset
+    // (+12/+13) implicitly via the OS timezone. This app's containers run in UTC (confirmed via
+    // `docker exec ... date`), so relying on the machine's local timezone here would silently produce
+    // "+0" instead of "+12" - reproduced the real legacy value explicitly against the "Pacific/Auckland"
+    // zone (Linux container IANA id) instead of the ambient system timezone, which isn't guaranteed
+    // across dev/Docker/Azure. Legacy's "z" format specifier shows the offset hours only, no leading
+    // zero, no minutes - reproduced literally (NZ's offset is always a whole number of hours).
+    private static string FormatExpiryLikeLegacy(DateTime expiry)
+    {
+        var nzZone = TimeZoneInfo.FindSystemTimeZoneById(OperatingSystem.IsWindows() ? "New Zealand Standard Time" : "Pacific/Auckland");
+        var offsetHours = nzZone.GetUtcOffset(DateTime.SpecifyKind(expiry, DateTimeKind.Unspecified)).Hours;
+        return expiry.ToString("yyyy-MM-ddTHH:mm:ss") + (offsetHours >= 0 ? "+" : "-") + Math.Abs(offsetHours);
     }
 
     /// <summary>Legacy: `GET GetPatientData(pmsPatientId, pmsEncounterId)` (`APIController.cs:856`) - bearer-token-validated `[HSS].[uspGetDemographics]` read, `ERMSDataTableToListHiso&lt;PatientData&gt;` mapping, first row (or empty `PatientData`) serialized.</summary>
@@ -93,6 +131,15 @@ public sealed class ErmsCompatController : ControllerBase
         var context = new Dictionary<string, object?> { ["PatientId"] = pmsPatientId, ["EncounterId"] = pmsEncounterId };
 
         var queryResult = await _mediator.Send(new ErmsGetPatientDataQuery(pmsPatientId, pmsEncounterId, GetAuthorizationToken()), ct);
+        Response.WriteRoutingHeaders("erms", queryResult.Routing);
+        if (queryResult.Routing is { } routing)
+        {
+            context["Routing.DbServerHost"] = routing.DbServerHost;
+            context["Routing.Environment"] = routing.Environment;
+            context["Routing.DbName"] = routing.DbName;
+            context["Routing.PracticeId"] = routing.PracticeId;
+        }
+
         if (queryResult.Succeeded)
         {
             var (mapped, mapError) = await _observer.ObserveSwallowedAsync(_logger, "erms", nameof(GetPatientData), context, () =>
@@ -108,7 +155,7 @@ public sealed class ErmsCompatController : ControllerBase
         }
         else
         {
-            _observer.RecordExpectedFailure(_logger, "erms", nameof(GetPatientData), queryResult.ErrorMessage ?? "Unknown", context);
+            _observer.RecordExpectedFailure(_logger, "erms", nameof(GetPatientData), queryResult.ErrorMessage ?? "Unknown", context, queryResult);
             error = queryResult.ErrorMessage ?? string.Empty;
         }
 
@@ -506,10 +553,18 @@ public sealed class ErmsCompatController : ControllerBase
                 objDocument.ProviderID, objDocument.Type, objDocument.ItemType, objDocument.CreatedDate,
                 objDocument.ContentType, objDocument.Content, GetAuthorizationToken()), ct);
             error = result.Error;
+            Response.WriteRoutingHeaders("erms", result.Routing);
+            if (result.Routing is { } routing)
+            {
+                context["Routing.DbServerHost"] = routing.DbServerHost;
+                context["Routing.Environment"] = routing.Environment;
+                context["Routing.DbName"] = routing.DbName;
+                context["Routing.PracticeId"] = routing.PracticeId;
+            }
 
             if (!string.IsNullOrEmpty(error))
             {
-                _observer.RecordExpectedFailure(_logger, "erms", nameof(SaveDocument), error, context);
+                _observer.RecordExpectedFailure(_logger, "erms", nameof(SaveDocument), error, context, result);
             }
         }
         catch (Exception ex)
@@ -535,7 +590,7 @@ public sealed class ErmsCompatController : ControllerBase
             return new ContentResult { Content = "BadRequest", ContentType = "application/xml; charset=utf-8", StatusCode = StatusCodes.Status400BadRequest };
         }
 
-        _observer.Tag("erms", nameof(SaveDocument), context);
+        _observer.Tag(_logger, "erms", nameof(SaveDocument), context, objDocument);
 
         var responseSerializer = new XmlSerializer(typeof(ReferralDocument));
         using var writer = new StringWriter();
@@ -556,10 +611,18 @@ public sealed class ErmsCompatController : ControllerBase
     {
         var result = string.Empty;
         var error = string.Empty;
+        Response.WriteRoutingHeaders("erms", queryResult.Routing);
         // Read straight from the query string rather than threading patientId/encounterId through
         // every one of this method's ~19 call sites - every real ERMS Get* op takes these same two
         // query params, so they're always present here regardless of which endpoint called in.
         var context = new Dictionary<string, object?> { ["PatientId"] = Request.Query["pmsPatientId"].ToString(), ["EncounterId"] = Request.Query["pmsEncounterId"].ToString() };
+        if (queryResult.Routing is { } routing)
+        {
+            context["Routing.DbServerHost"] = routing.DbServerHost;
+            context["Routing.Environment"] = routing.Environment;
+            context["Routing.DbName"] = routing.DbName;
+            context["Routing.PracticeId"] = routing.PracticeId;
+        }
 
         if (queryResult.Succeeded)
         {
@@ -570,7 +633,7 @@ public sealed class ErmsCompatController : ControllerBase
         else
         {
             error = queryResult.ErrorMessage ?? string.Empty;
-            _observer.RecordExpectedFailure(_logger, "erms", endpoint, error, context);
+            _observer.RecordExpectedFailure(_logger, "erms", endpoint, error, context, queryResult);
         }
 
         return SetToXml(result, error);

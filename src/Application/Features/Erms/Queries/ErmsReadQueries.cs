@@ -7,7 +7,7 @@ using MediatR;
 namespace HekCoreApi.Application.Features.Erms.Queries;
 
 /// <summary>Shared result for all ERMS Get* pipelines - raw DataTable plus (for dated ops) the parsed min/max used for attribute stamping.</summary>
-public sealed record ErmsReadResult(bool Succeeded, DataTable? Table, string? ErrorMessage, DateTime MinDate = default, DateTime MaxDate = default);
+public sealed record ErmsReadResult(bool Succeeded, DataTable? Table, string? ErrorMessage, DateTime MinDate = default, DateTime MaxDate = default, CallRoutingInfo? Routing = null);
 
 public sealed record ErmsGetPatientMeasurementQuery(string? PatientId, string? EncounterId, string? BearerToken) : IRequest<ErmsReadResult>;
 public sealed record ErmsGetSmokingStatusQuery(string? PatientId, string? EncounterId, string? BearerToken) : IRequest<ErmsReadResult>;
@@ -31,12 +31,14 @@ internal sealed class ErmsReadPipeline
     private readonly IErmsRequestParser _parser;
     private readonly IErmsTokenValidator _tokenValidator;
     private readonly IErmsRoutingResolver _routingResolver;
+    private readonly ITenantRegistryService _tenantRegistryService;
 
-    public ErmsReadPipeline(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver)
+    public ErmsReadPipeline(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, ITenantRegistryService tenantRegistryService)
     {
         _parser = parser;
         _tokenValidator = tokenValidator;
         _routingResolver = routingResolver;
+        _tenantRegistryService = tenantRegistryService;
     }
 
     public async Task<ErmsReadResult> RunAsync(string? patientId, string? encounterId, string? bearerToken,
@@ -52,6 +54,11 @@ internal sealed class ErmsReadPipeline
             // key - independent of the legacy practiceSuffix quirks preserved above for the DMS resolver).
             var routingContext = _routingResolver.Resolve(encounterId ?? string.Empty);
 
+            // FR-12/logging overhaul: same lookup the connection resolver performs internally,
+            // done here too purely so the resolved route can be surfaced on the result.
+            var route = await _tenantRegistryService.ResolveRouteAsync(routingContext, ct);
+            var routing = route is not null ? CallRoutingInfo.FromPracticeRoute(route, routingContext.Environment) : null;
+
             // Legacy computes actualPracticeID (Convert.ToInt32) inside the split block, BEFORE token
             // validation - a non-numeric segment throws into the error envelope even on a bad token.
             preValidate?.Invoke(rawSecondSegment);
@@ -60,11 +67,11 @@ internal sealed class ErmsReadPipeline
             var validation = await _tokenValidator.ValidateAsync(practiceSuffix, routingContext, parsedPatientId, parsedEncounterId, bearerToken, ct);
             if (!validation.Valid)
             {
-                return new ErmsReadResult(false, null, validation.ErrorMessage ?? "Invalid token value!");
+                return new ErmsReadResult(false, null, validation.ErrorMessage ?? "Invalid token value!", Routing: routing);
             }
 
             var table = await fetch(practiceSuffix, routingContext, parsedPatientId, parsedEncounterId, rawSecondSegment);
-            return new ErmsReadResult(true, table, null, minDate, maxDate);
+            return new ErmsReadResult(true, table, null, minDate, maxDate, routing);
         }
         catch (Exception ex)
         {
@@ -88,9 +95,9 @@ public sealed class ErmsGetPatientMeasurementQueryHandler : IRequestHandler<Erms
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetPatientMeasurementQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
+    public ErmsGetPatientMeasurementQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository, ITenantRegistryService tenantRegistryService)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver, tenantRegistryService);
         _repository = repository;
     }
 
@@ -104,9 +111,9 @@ public sealed class ErmsGetSmokingStatusQueryHandler : IRequestHandler<ErmsGetSm
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetSmokingStatusQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
+    public ErmsGetSmokingStatusQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository, ITenantRegistryService tenantRegistryService)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver, tenantRegistryService);
         _repository = repository;
     }
 
@@ -120,9 +127,9 @@ public sealed class ErmsGetCurrentUserQueryHandler : IRequestHandler<ErmsGetCurr
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetCurrentUserQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
+    public ErmsGetCurrentUserQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository, ITenantRegistryService tenantRegistryService)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver, tenantRegistryService);
         _repository = repository;
     }
 
@@ -142,9 +149,9 @@ public sealed class ErmsGetNextOfKinQueryHandler : IRequestHandler<ErmsGetNextOf
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetNextOfKinQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
+    public ErmsGetNextOfKinQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository, ITenantRegistryService tenantRegistryService)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver, tenantRegistryService);
         _repository = repository;
     }
 
@@ -158,9 +165,9 @@ public sealed class ErmsGetRegisteredPractitionersQueryHandler : IRequestHandler
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetRegisteredPractitionersQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
+    public ErmsGetRegisteredPractitionersQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository, ITenantRegistryService tenantRegistryService)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver, tenantRegistryService);
         _repository = repository;
     }
 
@@ -175,9 +182,9 @@ public sealed class ErmsGetAccidentsQueryHandler : IRequestHandler<ErmsGetAccide
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetAccidentsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
+    public ErmsGetAccidentsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository, ITenantRegistryService tenantRegistryService)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver, tenantRegistryService);
         _repository = repository;
     }
 
@@ -194,9 +201,9 @@ public sealed class ErmsGetClassificationsQueryHandler : IRequestHandler<ErmsGet
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetClassificationsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
+    public ErmsGetClassificationsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository, ITenantRegistryService tenantRegistryService)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver, tenantRegistryService);
         _repository = repository;
     }
 
@@ -213,9 +220,9 @@ public sealed class ErmsGetConsultNotesQueryHandler : IRequestHandler<ErmsGetCon
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetConsultNotesQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
+    public ErmsGetConsultNotesQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository, ITenantRegistryService tenantRegistryService)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver, tenantRegistryService);
         _repository = repository;
     }
 
@@ -244,9 +251,9 @@ public sealed class ErmsGetMedicalAllergiesQueryHandler : IRequestHandler<ErmsGe
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetMedicalAllergiesQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
+    public ErmsGetMedicalAllergiesQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository, ITenantRegistryService tenantRegistryService)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver, tenantRegistryService);
         _repository = repository;
     }
 
@@ -275,9 +282,9 @@ public sealed class ErmsGetPrescribedMedicationsQueryHandler : IRequestHandler<E
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetPrescribedMedicationsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
+    public ErmsGetPrescribedMedicationsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository, ITenantRegistryService tenantRegistryService)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver, tenantRegistryService);
         _repository = repository;
     }
 
@@ -294,9 +301,9 @@ public sealed class ErmsGetRegularMedicationsQueryHandler : IRequestHandler<Erms
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetRegularMedicationsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
+    public ErmsGetRegularMedicationsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository, ITenantRegistryService tenantRegistryService)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver, tenantRegistryService);
         _repository = repository;
     }
 
@@ -313,9 +320,9 @@ public sealed class ErmsGetLaboratoryReportListQueryHandler : IRequestHandler<Er
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetLaboratoryReportListQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
+    public ErmsGetLaboratoryReportListQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository, ITenantRegistryService tenantRegistryService)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver, tenantRegistryService);
         _repository = repository;
     }
 
@@ -332,9 +339,9 @@ public sealed class ErmsGetRadiologyReportListQueryHandler : IRequestHandler<Erm
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetRadiologyReportListQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
+    public ErmsGetRadiologyReportListQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository, ITenantRegistryService tenantRegistryService)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver, tenantRegistryService);
         _repository = repository;
     }
 
@@ -352,9 +359,9 @@ public sealed class ErmsGetDischargeSummaryReportListQueryHandler : IRequestHand
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetDischargeSummaryReportListQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
+    public ErmsGetDischargeSummaryReportListQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository, ITenantRegistryService tenantRegistryService)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver, tenantRegistryService);
         _repository = repository;
     }
 
@@ -371,9 +378,9 @@ public sealed class ErmsGetScannedListQueryHandler : IRequestHandler<ErmsGetScan
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetScannedListQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
+    public ErmsGetScannedListQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository, ITenantRegistryService tenantRegistryService)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver, tenantRegistryService);
         _repository = repository;
     }
 
@@ -390,9 +397,9 @@ public sealed class ErmsGetLaboratoryReportDetailsQueryHandler : IRequestHandler
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetLaboratoryReportDetailsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
+    public ErmsGetLaboratoryReportDetailsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository, ITenantRegistryService tenantRegistryService)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver, tenantRegistryService);
         _repository = repository;
     }
 
@@ -406,9 +413,9 @@ public sealed class ErmsGetRadiologyReportDetailsQueryHandler : IRequestHandler<
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetRadiologyReportDetailsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
+    public ErmsGetRadiologyReportDetailsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository, ITenantRegistryService tenantRegistryService)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver, tenantRegistryService);
         _repository = repository;
     }
 
@@ -422,9 +429,9 @@ public sealed class ErmsGetDischargeSummaryDetailsQueryHandler : IRequestHandler
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetDischargeSummaryDetailsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
+    public ErmsGetDischargeSummaryDetailsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository, ITenantRegistryService tenantRegistryService)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver, tenantRegistryService);
         _repository = repository;
     }
 
@@ -438,9 +445,9 @@ public sealed class ErmsGetScannedDetailsQueryHandler : IRequestHandler<ErmsGetS
     private readonly ErmsReadPipeline _pipeline;
     private readonly IErmsDataRepository _repository;
 
-    public ErmsGetScannedDetailsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository)
+    public ErmsGetScannedDetailsQueryHandler(IErmsRequestParser parser, IErmsTokenValidator tokenValidator, IErmsRoutingResolver routingResolver, IErmsDataRepository repository, ITenantRegistryService tenantRegistryService)
     {
-        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver);
+        _pipeline = new ErmsReadPipeline(parser, tokenValidator, routingResolver, tenantRegistryService);
         _repository = repository;
     }
 

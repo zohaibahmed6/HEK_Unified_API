@@ -152,6 +152,12 @@ public sealed class ErmsDataRepository : IErmsDataRepository
             var status = await _awsDocumentService.GetDocumentStatusFromIndiciAsync(docKey, practiceIdInt, connectionString, ct);
             if (status?.DocumentType is { } docType && MimeTypes.TryGetValue(docType, out var contentType) && table.Columns.Contains("DataType"))
             {
+                // `uspGetOtherDocs_AWS`'s DataType column comes back flagged read-only by SQL Server's
+                // schema metadata (a computed/derived column in that proc's result set) - DataTable.Load
+                // copies that flag over, so a direct write throws "Column 'DataType' is read only." even
+                // though the plain (non-AWS) uspGetOtherDocs doesn't have this issue. Clear it once per
+                // table before enriching, same real-data enrichment legacy performs unconditionally.
+                table.Columns["DataType"]!.ReadOnly = false;
                 row["DataType"] = row["DataType"] is DBNull ? contentType : row["DataType"] + contentType;
             }
         }
@@ -200,18 +206,28 @@ public sealed class ErmsDataRepository : IErmsDataRepository
 
         var firstRow = table.Rows[0];
         var base64 = singleDoc.DocumentData is null ? string.Empty : Convert.ToBase64String(singleDoc.DocumentData);
+        // `uspGetDocResults_AWS`'s result columns can come back flagged read-only by SQL Server's schema
+        // metadata (computed/derived columns) - DataTable.Load copies that flag over, so a direct write
+        // throws "Column 'X' is read only." Clear it before writing, same enrichment legacy performs
+        // unconditionally on plain (non-computed-flagged) columns from the equivalent non-AWS proc.
         if (table.Columns.Contains("Content"))
         {
+            table.Columns["Content"]!.ReadOnly = false;
+            table.Columns["Content"]!.MaxLength = -1;
             firstRow["Content"] = (firstRow["Content"] is DBNull ? string.Empty : firstRow["Content"]) + base64;
         }
 
         if (table.Columns.Contains("DocumentId"))
         {
+            table.Columns["DocumentId"]!.ReadOnly = false;
+            table.Columns["DocumentId"]!.MaxLength = -1;
             firstRow["DocumentId"] = singleDoc.DocumentId;
         }
 
         if (table.Columns.Contains("DataType") && singleDoc.DocumentType is { } docType && MimeTypes.TryGetValue(docType, out var contentType))
         {
+            table.Columns["DataType"]!.ReadOnly = false;
+            table.Columns["DataType"]!.MaxLength = -1;
             firstRow["DataType"] = (firstRow["DataType"] is DBNull ? string.Empty : firstRow["DataType"]) + contentType;
         }
 

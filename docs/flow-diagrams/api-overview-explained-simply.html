@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>How the HEK API Works — Explained Simply</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --paper: #f5f2ea; --panel: #ffffff; --ink: #201d17; --muted: #6b6255;
+    --line: #e2dbc9; --accent: #2f6f6d; --accent-strong: #1c4b49; --accent-soft: #dfeae8;
+    --amber: #b06a1a; --amber-soft: #f6e6d1;
+    --hiso: #2f6f6d; --hiso-soft: #dfeae8;
+    --hss: #b06a1a; --hss-soft: #f6e6d1;
+    --erms: #6a4f9e; --erms-soft: #eae3f6;
+    --col: #a13a56; --col-soft: #f5e0e6;
+    --shadow: 0 2px 6px rgba(32,29,23,0.06), 0 10px 30px rgba(32,29,23,0.05);
+  }
+  :root[data-theme="dark"] {
+    --paper: #16150f; --panel: #201f18; --ink: #f1ede2; --muted: #b3a996;
+    --line: #322f24; --accent: #6fc2b7; --accent-strong: #9adbcf; --accent-soft: #1e332f;
+    --amber: #e3a75d; --amber-soft: #3a2b16;
+    --hiso: #6fc2b7; --hiso-soft: #1e332f;
+    --hss: #e3a75d; --hss-soft: #3a2b16;
+    --erms: #b6a2e8; --erms-soft: #2b2440;
+    --col: #e893a9; --col-soft: #3a1f28;
+    --shadow: 0 2px 6px rgba(0,0,0,0.35), 0 10px 30px rgba(0,0,0,0.3);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #16150f; --panel: #201f18; --ink: #f1ede2; --muted: #b3a996;
+      --line: #322f24; --accent: #6fc2b7; --accent-strong: #9adbcf; --accent-soft: #1e332f;
+      --amber: #e3a75d; --amber-soft: #3a2b16;
+      --hiso: #6fc2b7; --hiso-soft: #1e332f;
+      --hss: #e3a75d; --hss-soft: #3a2b16;
+      --erms: #b6a2e8; --erms-soft: #2b2440;
+      --col: #e893a9; --col-soft: #3a1f28;
+      --shadow: 0 2px 6px rgba(0,0,0,0.35), 0 10px 30px rgba(0,0,0,0.3);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body {
+    font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.55;
+    padding: 0 0 80px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  a { color: var(--accent-strong); }
+
+  /* ---------- hero ---------- */
+  .hero { padding: 64px 0 40px; text-align: center; }
+  .eyebrow {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent-strong);
+    margin: 0 0 18px;
+  }
+  h1 {
+    font-family: ui-serif, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    font-weight: 600; font-size: clamp(32px, 5vw, 50px); line-height: 1.1;
+    letter-spacing: -0.015em; margin: 0 0 20px; text-wrap: balance;
+  }
+  .lede {
+    font-size: 18px; line-height: 1.6; color: var(--muted);
+    max-width: 58ch; margin: 0 auto 40px;
+  }
+  .lede strong { color: var(--ink); }
+
+  /* translator glyph */
+  .glyph { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 0 0 8px; }
+  .bubble {
+    width: 64px; height: 48px; border-radius: 14px; position: relative;
+    display: flex; align-items: center; justify-content: center;
+    font-family: ui-monospace, monospace; font-size: 13px; font-weight: 700; letter-spacing: 0.02em;
+    box-shadow: var(--shadow);
+  }
+  .bubble::after {
+    content: ""; position: absolute; bottom: -8px; left: 20px; width: 0; height: 0;
+    border-left: 8px solid transparent; border-right: 8px solid transparent;
+  }
+  .bubble.old { background: var(--amber-soft); color: var(--amber); }
+  .bubble.old::after { border-top: 10px solid var(--amber-soft); }
+  .bubble.new { background: var(--accent-soft); color: var(--accent-strong); }
+  .bubble.new::after { border-top: 10px solid var(--accent-soft); }
+  .glyph-arrow { font-size: 22px; color: var(--muted); }
+
+  /* ---------- section shell ---------- */
+  section { padding: 56px 0; border-top: 1px solid var(--line); }
+  .hero + section { border-top: none; }
+  h2 {
+    font-family: ui-serif, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    font-size: clamp(22px, 3vw, 28px); font-weight: 600; letter-spacing: -0.01em;
+    margin: 0 0 10px; text-align: center; text-wrap: balance;
+  }
+  .section-lede {
+    text-align: center; color: var(--muted); max-width: 56ch; margin: 0 auto 40px; font-size: 15.5px;
+  }
+
+  /* ---------- journey ---------- */
+  .journey { display: flex; flex-direction: column; gap: 0; }
+  .step {
+    display: grid; grid-template-columns: 64px 1fr; gap: 22px;
+    padding: 22px 0; position: relative;
+  }
+  .step-rail {
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .step-num {
+    width: 44px; height: 44px; border-radius: 50%; background: var(--panel); border: 2px solid var(--accent);
+    color: var(--accent-strong); font-family: ui-monospace, monospace; font-weight: 700; font-size: 16px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: var(--shadow);
+  }
+  .step-line { flex: 1; width: 2px; background: var(--line); margin-top: 6px; min-height: 20px; }
+  .step:last-child .step-line { display: none; }
+  .step-card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px 24px;
+    box-shadow: var(--shadow);
+  }
+  .step-title { font-size: 17px; font-weight: 700; margin: 0 0 6px; }
+  .step-body { font-size: 15px; color: var(--muted); margin: 0; line-height: 1.6; }
+  .step-body b { color: var(--ink); font-weight: 650; }
+
+  /* ---------- four systems ---------- */
+  .systems-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+  .sys-card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px 22px 20px;
+    box-shadow: var(--shadow); border-top: 4px solid var(--dot);
+  }
+  .sys-card[data-sys="hiso"] { --dot: var(--hiso); }
+  .sys-card[data-sys="hss"] { --dot: var(--hss); }
+  .sys-card[data-sys="erms"] { --dot: var(--erms); }
+  .sys-card[data-sys="col"] { --dot: var(--col); }
+  .sys-name {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-weight: 700; font-size: 15px; color: var(--dot); margin-bottom: 6px;
+  }
+  .sys-desc { font-size: 14.5px; color: var(--muted); line-height: 1.55; }
+
+  /* ---------- reassurance ---------- */
+  .reassure {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+    padding: 32px 36px; text-align: center; box-shadow: var(--shadow);
+  }
+  .reassure p { font-size: 16px; color: var(--muted); max-width: 60ch; margin: 0 auto; }
+  .reassure p + p { margin-top: 12px; }
+  .reassure b { color: var(--ink); }
+
+  footer {
+    text-align: center; font-size: 12.5px; color: var(--muted); padding-top: 48px;
+  }
+
+  @media (max-width: 560px) {
+    .step { grid-template-columns: 44px 1fr; gap: 14px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <p class="eyebrow">HEK Core API — the short version</p>
+    <div class="glyph">
+      <div class="bubble old">OLD<br/>SYSTEM</div>
+      <span class="glyph-arrow">⇄</span>
+      <div class="bubble new">HEK<br/>API</div>
+    </div>
+    <h1>One front door for four different old hospital systems</h1>
+    <p class="lede">
+      Some clinics still run on decades-old software. This project is a <strong>translator</strong> that
+      sits in the middle — it lets modern apps ask one simple, consistent question, then quietly
+      speaks to whichever old system actually holds the answer, in that system's own language.
+    </p>
+  </div>
+
+  <section>
+    <h2>The journey of one request</h2>
+    <p class="section-lede">Say a clinic's app wants to pull up a patient's record, or save a new note. Here's everything that happens, in plain terms.</p>
+
+    <div class="journey">
+      <div class="step">
+        <div class="step-rail"><div class="step-num">1</div><div class="step-line"></div></div>
+        <div class="step-card">
+          <p class="step-title">Someone asks a question</p>
+          <p class="step-body">A clinic's software (or this project's own demo screen) sends a request — <b>"give me this patient's demographics"</b> or <b>"save this consult note."</b> It doesn't need to know which old system the data actually lives in.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-rail"><div class="step-num">2</div><div class="step-line"></div></div>
+        <div class="step-card">
+          <p class="step-title">The API checks who's asking</p>
+          <p class="step-body">Before doing anything, it checks a <b>login token</b> — like showing an ID badge at the door. No valid badge, no access to real patient data.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-rail"><div class="step-num">3</div><div class="step-line"></div></div>
+        <div class="step-card">
+          <p class="step-title">It looks up which "old building" to call</p>
+          <p class="step-body">Every clinic's real records live on a specific, real computer somewhere. The API keeps a kind of <b>phone book</b> (called the Tenant Registry) that says exactly which server holds which clinic's data — so it always calls the right place, not a generic one.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-rail"><div class="step-num">4</div><div class="step-line"></div></div>
+        <div class="step-card">
+          <p class="step-title">It speaks to the old system, in its own language</p>
+          <p class="step-body">Each old system — <b>HISO</b>, <b>HSS/KARO</b>, <b>ERMS</b>, or <b>COL</b> — has its own decades-old way of asking for data. The API knows all four "dialects" and asks the real one correctly, fetching the real record or saving the real note.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-rail"><div class="step-num">5</div><div class="step-line"></div></div>
+        <div class="step-card">
+          <p class="step-title">The answer comes back translated</p>
+          <p class="step-body">Whatever the old system replies with gets shaped back into the exact same format that system's real users already expect — nothing looks broken or different on their end.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-rail"><div class="step-num">6</div></div>
+        <div class="step-card">
+          <p class="step-title">The clinic's app gets its answer</p>
+          <p class="step-body">The original request finally gets its response — a patient's chart, a saved note, a confirmation — and the person using the clinic's software never had to know any of the steps above happened.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Meet the four old systems</h2>
+    <p class="section-lede">Each one is a real piece of software a real clinic or hospital already relies on — this project doesn't replace them, it just learns to talk to them.</p>
+    <div class="systems-grid">
+      <div class="sys-card" data-sys="hiso">
+        <div class="sys-name">HISO</div>
+        <div class="sys-desc">Handles injury/accident claim forms sent between clinics and ACC (New Zealand's accident compensation system).</div>
+      </div>
+      <div class="sys-card" data-sys="hss">
+        <div class="sys-name">HSS / KARO</div>
+        <div class="sys-desc">A GP practice's day-to-day system — patient demographics, consult notes, medications, recalls.</div>
+      </div>
+      <div class="sys-card" data-sys="erms">
+        <div class="sys-name">ERMS</div>
+        <div class="sys-desc">Handles referrals and documents moving between a clinic and specialists or hospitals.</div>
+      </div>
+      <div class="sys-card" data-sys="col">
+        <div class="sys-name">COL</div>
+        <div class="sys-desc">Handles billing and claims — the money side of a visit, sent to the practice's claiming provider.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="reassure">
+      <p><b>Why go to all this trouble?</b> Because these four old systems were never designed to talk to each other, or to modern apps. Rebuilding them from scratch would be slow and risky for real patients. Instead, this API becomes the one, well-tested translator everyone can rely on.</p>
+      <p>Every step above is a real, working part of this project — not a simplified fiction. More detailed, technical versions of this same journey (down to the exact code and database calls) live alongside this page in the same folder, for anyone who wants to go deeper.</p>
+    </div>
+  </section>
+
+  <footer>HEK Core API — plain-language overview, for anyone seeing this project for the first time.</footer>
+</div>
+</body>
+</html>

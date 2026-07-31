@@ -1,0 +1,196 @@
+<title>KARO/HSS observations (write) — Request Flow</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default' });
+</script>
+<style>
+  :root {
+    --ink: #161a1d; --paper: #f3f1ea; --panel: #ffffff; --line: #dcd7c9; --muted: #64655c;
+    --accent: #2f6f6d; --accent-strong: #1c4b49; --accent-soft: #dfeae8;
+    --amber: #a8621a; --amber-soft: #f4e6d4; --code-bg: #eee9db;
+    --shadow: 0 1px 2px rgba(22,26,29,0.06), 0 8px 24px rgba(22,26,29,0.05);
+  }
+  :root[data-theme="dark"] {
+    --ink: #eceae3; --paper: #14171a; --panel: #1b1f22; --line: #2c3033; --muted: #9a9c93;
+    --accent: #63b8b3; --accent-strong: #8fd0cb; --accent-soft: #1f3634;
+    --amber: #e2984f; --amber-soft: #3a2c1a; --code-bg: #23272a;
+    --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.35);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #eceae3; --paper: #14171a; --panel: #1b1f22; --line: #2c3033; --muted: #9a9c93;
+      --accent: #63b8b3; --accent-strong: #8fd0cb; --accent-soft: #1f3634; --amber: #e2984f;
+      --amber-soft: #3a2c1a; --code-bg: #23272a; --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.35);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { background: var(--paper); color: var(--ink); margin: 0; font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+  body { padding: 48px 24px 96px; }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  .eyebrow { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 12.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-strong); margin: 0 0 10px; }
+  h1 { font-family: ui-serif, "Iowan Old Style", "Palatino Linotype", Georgia, serif; font-weight: 600; font-size: clamp(28px, 4vw, 38px); line-height: 1.12; letter-spacing: -0.01em; margin: 0 0 12px; text-wrap: balance; }
+  .dek { font-size: 16px; line-height: 1.55; color: var(--muted); max-width: 62ch; margin: 0 0 36px; }
+  .dek code, p code, li code, td code { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 0.92em; background: var(--code-bg); padding: 0.08em 0.4em; border-radius: 4px; }
+  section { margin-bottom: 44px; }
+  h2 { font-family: ui-serif, "Iowan Old Style", "Palatino Linotype", Georgia, serif; font-size: 20px; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.005em; }
+  .section-note { font-size: 13.5px; color: var(--muted); margin: 0 0 18px; }
+  .diagram-frame { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 20px 18px; }
+  .zoom-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .zoom-bar-bottom { margin-bottom: 0; margin-top: 14px; }
+  .zoom-bar button { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 15px; line-height: 1; width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); cursor: pointer; }
+  .zoom-bar button:hover { border-color: var(--accent); color: var(--accent-strong); }
+  .zoom-bar button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .zoom-bar .pct { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--muted); min-width: 46px; text-align: center; }
+  .zoom-bar .hint { font-size: 12.5px; color: var(--muted); margin-left: auto; }
+  .diagram-scroll { overflow: auto; max-height: 78vh; padding-bottom: 4px; border-radius: 6px; }
+  .diagram-scroll .mermaid { min-width: 1400px; }
+  .diagram-scroll svg { display: block; }
+  .diagram-scroll .mermaid text, .diagram-scroll svg text { font-size: 16px !important; }
+  .diagram-scroll .mermaid .messageText, .diagram-scroll svg .messageText { font-size: 16px !important; }
+  .diagram-scroll .mermaid .labelText, .diagram-scroll .mermaid .loopText, .diagram-scroll svg .labelText, .diagram-scroll svg .loopText { font-size: 15px !important; }
+  .legend-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+  .legend-card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; box-shadow: var(--shadow); }
+  .legend-card .tag { display: inline-block; font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 11.5px; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); margin-bottom: 10px; }
+  .legend-card h3 { font-size: 15.5px; margin: 0 0 8px; font-weight: 650; }
+  .legend-card p { font-size: 13.8px; line-height: 1.55; color: var(--muted); margin: 0 0 8px; }
+  .legend-card p:last-child { margin-bottom: 0; }
+  table.steps { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  table.steps th, table.steps td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.steps th { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  table.steps td.n { font-variant-numeric: tabular-nums; color: var(--accent-strong); font-weight: 700; width: 28px; }
+  table.steps td.src code { font-size: 11.6px; white-space: nowrap; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: var(--shadow); }
+  .table-wrap table.steps { border: none; box-shadow: none; }
+  .table-wrap td, .table-wrap th { border-color: var(--line); }
+  footer { margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+</style>
+
+<div class="wrap">
+  <p class="eyebrow">HEK Core API — legacy-compat wire flow</p>
+  <h1>KARO/HSS <code>observations</code> write: vitals in one call</h1>
+  <p class="dek">Traced from the real, verified source in this repo. Confirmed live this session, then read back via the observations read to verify the round trip.</p>
+
+  <section>
+    <h2>Sequence</h2>
+    <p class="section-note">Use the zoom controls below if the text reads small — the diagram itself scrolls both ways once zoomed in.</p>
+    <div class="diagram-frame">
+      <div class="zoom-bar">
+        <button type="button" id="zoomOut" aria-label="Zoom out">−</button>
+        <span class="pct" id="zoomPct">150%</span>
+        <button type="button" id="zoomIn" aria-label="Zoom in">+</button>
+        <button type="button" id="zoomReset" aria-label="Reset zoom" style="width:auto;padding:0 12px;">Reset</button>
+        <span class="hint">Drag the scrollbars, or scroll while hovering, to pan around</span>
+      </div>
+      <div class="diagram-scroll" id="diagramScroll">
+        <pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor Client
+    participant Ctrl as KaroCompatController
+    participant Hnd as KaroSaveObservationsCommandHandler
+    participant Parser as KaroRequestParser
+    participant Route as KaroRoutingResolver
+    participant TokenVal as KaroTokenValidator
+    participant Repo as KaroWriteRepository
+    participant Conn as KaroPracticeConnectionResolver
+    participant Tenant as TenantRegistryService
+    participant Secret as ISecretProvider
+    participant PracticeDb as Practice DB (PMS_NZ_V2)
+
+    Client->>Ctrl: POST observations (JSON body)
+    Ctrl->>Hnd: KaroSaveObservationsCommand(PatientId, EncounterId, UserId, Temperature,<br/>WaistCircumference, Height, Weight, BPSys, BPDia, HeartRate, Notes, Risk, Framingham, BearerToken)
+
+    Hnd->>Parser: ParseEncounterId / Decrypt
+    Parser-->>Hnd: patientId, encounterId, practiceSuffix
+    Hnd->>Route: Resolve EncounterId
+    Route-->>Hnd: RoutingContext
+    Hnd->>TokenVal: ValidateAsync ...
+    TokenVal-->>Hnd: valid
+
+    Hnd->>Repo: SaveObservationsAsync(practiceSuffix, routingContext, patientId, appointmentId,<br/>userId, temperature, waist, height, weight, bpSys, bpDia, heartRate, notes, risk, framingham, ct)
+    Repo->>Conn: ResolveAsync routingContext
+    Conn->>Tenant: ResolveRouteAsync routingContext
+    Tenant-->>Conn: PracticeRoute
+    Conn->>Secret: GetRequiredSecretAsync
+    Secret-->>Conn: credential
+    Conn-->>Repo: connection string
+
+    Repo->>PracticeDb: EXEC HSS.uspInsertUpdateObservation pPatientId, pAppointmentId, ...(optional vitals)
+    PracticeDb-->>Repo: pOutputParam
+
+    alt pOutputParam greater than 0
+        Repo-->>Hnd: success
+        Hnd-->>Ctrl: KaroWriteResult true
+        Ctrl-->>Client: 200, status success
+        Note over Ctrl: confirmed live this session (36.8°C, HR 72, BP 120/80)
+    else pOutputParam 0 or less
+        Repo-->>Hnd: failure
+        Hnd-->>Ctrl: KaroWriteResult false
+        Ctrl-->>Client: 200, status fail
+    end
+        </pre>
+      </div>
+      <div class="zoom-bar zoom-bar-bottom">
+        <button type="button" id="zoomOutBottom" aria-label="Zoom out">−</button>
+        <span class="pct" id="zoomPctBottom">150%</span>
+        <button type="button" id="zoomInBottom" aria-label="Zoom in">+</button>
+        <button type="button" id="zoomResetBottom" aria-label="Reset zoom" style="width:auto;padding:0 12px;">Reset</button>
+        <span class="hint">Drag the scrollbars, or scroll while hovering, to pan around</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Step-by-step source index</h2>
+    <p class="section-note">Where each stage of the diagram actually lives in the codebase.</p>
+    <div class="table-wrap">
+      <table class="steps">
+        <thead><tr><th>#</th><th>Stage</th><th>Real source</th></tr></thead>
+        <tbody>
+          <tr><td class="n">1</td><td>REST entry point</td><td class="src"><code>KaroCompatController.cs</code></td></tr>
+          <tr><td class="n">2</td><td>Command handler</td><td class="src"><code>KaroWriteCommands.cs</code> (<code>KaroSaveObservationsCommandHandler</code>)</td></tr>
+          <tr><td class="n">3</td><td>Write repository</td><td class="src"><code>KaroWriteRepository.cs</code> (<code>SaveObservationsAsync</code>)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    Built from the verified source in <code>HEK Core API</code> — no procedure name, field, or table
+    above is inferred; each is confirmed against the real controller/repository source. Companion diagrams in this same folder: karo-observations-flow.html.
+  </footer>
+</div>
+
+<script>
+  (function () {
+    var scrollBox = document.getElementById('diagramScroll');
+    var pctLabels = [document.getElementById('zoomPct'), document.getElementById('zoomPctBottom')];
+    var BASE_WIDTH = 1400;
+    var scale = 1.5;
+    var svgEl = null;
+    function apply() {
+      if (!svgEl) return;
+      svgEl.style.width = (BASE_WIDTH * scale) + 'px';
+      svgEl.style.height = 'auto';
+      svgEl.style.maxWidth = 'none';
+      pctLabels.forEach(function (el) { el.textContent = Math.round(scale * 100) + '%'; });
+    }
+    function findSvgAndInit() {
+      var svg = scrollBox.querySelector('svg');
+      if (!svg || svg === svgEl) return;
+      svgEl = svg;
+      apply();
+    }
+    var observer = new MutationObserver(findSvgAndInit);
+    observer.observe(scrollBox, { childList: true, subtree: true });
+    findSvgAndInit();
+    setTimeout(findSvgAndInit, 300);
+    setTimeout(findSvgAndInit, 1000);
+    function zoomIn() { scale = Math.min(scale + 0.25, 4); apply(); }
+    function zoomOut() { scale = Math.max(scale - 0.25, 0.5); apply(); }
+    function zoomReset() { scale = 1.5; apply(); }
+    ['zoomIn', 'zoomInBottom'].forEach(function (id) { document.getElementById(id).addEventListener('click', zoomIn); });
+    ['zoomOut', 'zoomOutBottom'].forEach(function (id) { document.getElementById(id).addEventListener('click', zoomOut); });
+    ['zoomReset', 'zoomResetBottom'].forEach(function (id) { document.getElementById(id).addEventListener('click', zoomReset); });
+  })();
+</script>

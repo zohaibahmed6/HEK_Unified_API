@@ -45,14 +45,16 @@ public sealed class HisoConceptExecutor : IHisoConceptExecutor
 
     private readonly IHisoPracticeConnectionResolver _connectionResolver;
     private readonly ILegacyPracticeConnectionResolver _legacyConnectionResolver;
+    private readonly IHisoDmsConnectionResolver _dmsConnectionResolver;
     private readonly IAwsDocumentService _awsDocumentService;
     private readonly ISecretProvider _secretProvider;
     private readonly ILogger<HisoConceptExecutor> _logger;
 
-    public HisoConceptExecutor(IHisoPracticeConnectionResolver connectionResolver, ILegacyPracticeConnectionResolver legacyConnectionResolver, IAwsDocumentService awsDocumentService, ISecretProvider secretProvider, ILogger<HisoConceptExecutor> logger)
+    public HisoConceptExecutor(IHisoPracticeConnectionResolver connectionResolver, ILegacyPracticeConnectionResolver legacyConnectionResolver, IHisoDmsConnectionResolver dmsConnectionResolver, IAwsDocumentService awsDocumentService, ISecretProvider secretProvider, ILogger<HisoConceptExecutor> logger)
     {
         _connectionResolver = connectionResolver;
         _legacyConnectionResolver = legacyConnectionResolver;
+        _dmsConnectionResolver = dmsConnectionResolver;
         _awsDocumentService = awsDocumentService;
         _secretProvider = secretProvider;
         _logger = logger;
@@ -110,10 +112,27 @@ public sealed class HisoConceptExecutor : IHisoConceptExecutor
                             // Real DMS content lives in a separate DMS_PMS database (confirmed from
                             // the real concept dictionary: Patient_Attachment_Content maps to
                             // DMS_PMS.dbo.tblDocumentDetail) - not the PMS_NZ_V2 connection used for
-                            // everything else. Falls back to the PMS connection if unconfigured, same
-                            // as the earlier flagged assumption, rather than hard-failing.
-                            var dmsConnectionString = await _secretProvider.GetSecretAsync("Hiso:DmsConnectionString", ct) ?? dataConnectionString;
-                            await EnrichWithAwsAsync(awsResult.Tables[0], practiceIdInt, referenceId, dmsConnectionString, dataConnectionString, ct);
+                            // everything else. Routed per-practice via `IHisoDmsConnectionResolver`
+                            // (2026-07-30) - same server/credentials as the practice's primary
+                            // connection, only the database name differs, matching the pattern already
+                            // established for ERMS/KARO. Replaces the earlier single global
+                            // `Hiso:DmsConnectionString` secret, which silently routed every practice to
+                            // the same DMS database regardless of whose session was actually being served.
+                            var dmsConnectionString = await _dmsConnectionResolver.ResolveAsync(session.PracticeId, ct);
+
+                            // The `_AWS` procedure only ever populates Content for documents actually
+                            // stored in S3 (`EnrichWithAwsAsync` below downloads those) - for a document
+                            // stored locally in the DMS (not AWS), the `_AWS` procedure's Content column
+                            // comes back genuinely blank by design, and there is no automatic fallback to
+                            // the plain procedure's own inline content. Confirmed live (2026-07-30): the
+                            // real reference API returns real base64 content for exactly this case, so
+                            // the plain procedure's result is fetched here too and used to backfill
+                            // Content/Size/Filename/DataType for any row the AWS flow left empty.
+                            var plainResult = sqlParams.Count > 0
+                                ? await LegacyDbExecutor.ExecuteDataSetAsync(dataConnectionString, CommandType.StoredProcedure, procedureName, CloneParams(sqlParams), ct)
+                                : await LegacyDbExecutor.ExecuteDataSetAsync(dataConnectionString, CommandType.StoredProcedure, procedureName, null, ct);
+
+                            await EnrichWithAwsAsync(awsResult.Tables[0], practiceIdInt, referenceId, dmsConnectionString, dataConnectionString, ct, plainResult?.Tables.Count > 0 ? plainResult.Tables[0] : null);
                             _logger.LogInformation("[ExecuteHisoProcedure] Completed (AWS flow) | Procedure={ProcedureName}", awsProcedureName);
                             return awsResult;
                         }
@@ -122,7 +141,7 @@ public sealed class HisoConceptExecutor : IHisoConceptExecutor
                     {
                         // Legacy: AWS flow failure falls back to the plain procedure rather than
                         // failing the whole request - reproduced exactly.
-                        _logger.LogWarning(ex, "[ExecuteHisoProcedure] AWS flow failed for {ProcedureName}, falling back to the plain procedure.", awsProcedureName);
+                        _logger.LogWarning(ex, "{System} [ExecuteHisoProcedure] AWS flow failed for {ProcedureName}, falling back to the plain procedure.", "hiso", awsProcedureName);
                     }
                 }
             }
@@ -136,7 +155,7 @@ public sealed class HisoConceptExecutor : IHisoConceptExecutor
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[ExecuteHisoProcedure] Failed executing {ProcedureName}", procedureName);
+            _logger.LogError(ex, "{System} [ExecuteHisoProcedure] Failed executing {ProcedureName}", "hiso", procedureName);
             return null;
         }
     }
@@ -150,9 +169,10 @@ public sealed class HisoConceptExecutor : IHisoConceptExecutor
     /// Real `AWSDocCore.dll` needs two connection strings (DMS + PMS_NZ) for
     /// `DocumentGetByDocumentKeyJsonResult`, unlike legacy's real 2-param call - confirmed from the
     /// real concept dictionary that `Patient_Attachment_Content` lives in a separate `DMS_PMS`
-    /// database (`Hiso:DmsConnectionString`), not the practice's main PMS_NZ connection.
+    /// database (per-practice, via `IHisoDmsConnectionResolver`), not the practice's main PMS_NZ
+    /// connection.
     /// </summary>
-    private async Task EnrichWithAwsAsync(DataTable table, int practiceId, string referenceId, string dmsConnectionString, string pmsConnectionString, CancellationToken ct)
+    private async Task EnrichWithAwsAsync(DataTable table, int practiceId, string referenceId, string dmsConnectionString, string pmsConnectionString, CancellationToken ct, DataTable? plainFallbackTable = null)
     {
         var idColumn = table.Columns.Cast<DataColumn>().FirstOrDefault(c => c.ColumnName.EndsWith("_ID", StringComparison.OrdinalIgnoreCase))?.ColumnName;
         if (idColumn is null)
@@ -207,19 +227,31 @@ public sealed class HisoConceptExecutor : IHisoConceptExecutor
 
                 if (!string.IsNullOrEmpty(referenceId) && status is { IsAws: true })
                 {
-                    var bytes = await _awsDocumentService.DownloadFromAwsAsync(status, ct);
-                    if (!string.IsNullOrEmpty(status.DocumentName) && bytes is { Length: > 0 })
+                    // Isolated in its own try/catch (rather than sharing the outer per-row one) so a
+                    // failed/misconfigured S3 download (confirmed live 2026-07-30: `DocumentManager`'s
+                    // base URL wasn't configured, throwing `ArgumentNullException` deep inside
+                    // `AWSDocCore`) still falls through to the plain-procedure content fallback below,
+                    // instead of aborting the rest of this row's enrichment entirely.
+                    try
                     {
-                        // The `_AWS` procedure's Content column is declared varchar/nvarchar (a
-                        // placeholder), not varbinary like the plain procedure's - assigning a raw
-                        // byte[] into a string-typed DataColumn silently coerces via ToString()
-                        // ("System.Byte[]" garbage), confirmed live (2026-07-24). Write whichever
-                        // shape the column actually declares.
-                        row[contentCol] = table.Columns[contentCol]!.DataType == typeof(byte[])
-                            ? bytes
-                            : Convert.ToBase64String(bytes);
-                        row[sizeCol] = (long)bytes.Length;
-                        row[filenameCol] = status.DocumentName;
+                        var bytes = await _awsDocumentService.DownloadFromAwsAsync(status, ct);
+                        if (!string.IsNullOrEmpty(status.DocumentName) && bytes is { Length: > 0 })
+                        {
+                            // The `_AWS` procedure's Content column is declared varchar/nvarchar (a
+                            // placeholder), not varbinary like the plain procedure's - assigning a raw
+                            // byte[] into a string-typed DataColumn silently coerces via ToString()
+                            // ("System.Byte[]" garbage), confirmed live (2026-07-24). Write whichever
+                            // shape the column actually declares.
+                            row[contentCol] = table.Columns[contentCol]!.DataType == typeof(byte[])
+                                ? bytes
+                                : Convert.ToBase64String(bytes);
+                            row[sizeCol] = (long)bytes.Length;
+                            row[filenameCol] = status.DocumentName;
+                        }
+                    }
+                    catch (Exception downloadEx)
+                    {
+                        _logger.LogWarning(downloadEx, "{System} [EnrichWithAWS] S3 download failed for DocumentKey={DocumentKey}, falling back to plain-procedure content.", "hiso", docKey);
                     }
                 }
 
@@ -235,10 +267,47 @@ public sealed class HisoConceptExecutor : IHisoConceptExecutor
                         row[dataTypeCol] = status.DocumentType;
                     }
                 }
+
+                // Not every document under an AWS-enabled practice is actually stored in S3 - a
+                // locally-stored (DMS) document's `_AWS` row comes back with Content genuinely blank by
+                // design (confirmed live, 2026-07-30: the plain procedure has the real inline content for
+                // exactly such a document, while `_AWS` does not, and `status.IsAws` is false for it).
+                // Legacy's real behavior for this case falls back to the plain procedure's own content
+                // rather than leaving it empty - backfill from the matching plain-procedure row here.
+                if (row[contentCol] is DBNull || (row[contentCol] is string s && string.IsNullOrEmpty(s)))
+                {
+                    var fallbackRow = plainFallbackTable?.Rows.Cast<DataRow>()
+                        .FirstOrDefault(r => table.Columns.Contains(idColumn) && r.Table.Columns.Contains(idColumn)
+                            && string.Equals(r[idColumn]?.ToString(), docKey, StringComparison.OrdinalIgnoreCase));
+
+                    if (fallbackRow is not null)
+                    {
+                        foreach (var col in new[] { sizeCol, filenameCol, dataTypeCol })
+                        {
+                            if (table.Columns.Contains(col) && fallbackRow.Table.Columns.Contains(col) && fallbackRow[col] is not DBNull)
+                            {
+                                row[col] = fallbackRow[col];
+                            }
+                        }
+
+                        // Same type mismatch as the AWS-download path above: the plain procedure's
+                        // Content column is real `varbinary` (byte[]), the `_AWS` procedure's is a
+                        // `varchar` placeholder - a direct assignment silently coerces via ToString()
+                        // ("System.Byte[]" garbage) rather than throwing, so downstream base64 decoding
+                        // fails with a confusing FormatException (confirmed live 2026-07-30).
+                        if (table.Columns.Contains(contentCol) && fallbackRow.Table.Columns.Contains(contentCol) && fallbackRow[contentCol] is not DBNull)
+                        {
+                            var fallbackContent = fallbackRow[contentCol];
+                            row[contentCol] = table.Columns[contentCol]!.DataType == typeof(byte[])
+                                ? fallbackContent
+                                : (fallbackContent is byte[] fallbackBytes ? Convert.ToBase64String(fallbackBytes) : fallbackContent);
+                        }
+                    }
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "[EnrichWithAWS] Error enriching a single row for DocumentKey={DocumentKey}", docKey);
+                _logger.LogWarning(ex, "{System} [EnrichWithAWS] Error enriching a single row for DocumentKey={DocumentKey}", "hiso", docKey);
             }
         }
     }

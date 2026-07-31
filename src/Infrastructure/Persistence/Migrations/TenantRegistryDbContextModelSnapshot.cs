@@ -155,7 +155,6 @@ namespace HekCoreApi.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(256)");
 
                     b.Property<string>("Environment")
-                        .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
 
@@ -163,12 +162,10 @@ namespace HekCoreApi.Infrastructure.Persistence.Migrations
                         .HasColumnType("bit");
 
                     b.Property<string>("PracticeCode")
-                        .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
 
                     b.Property<string>("PracticeId")
-                        .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
 
@@ -190,8 +187,24 @@ namespace HekCoreApi.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Environment", "SourceSystem")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Practices_Tier3_EnvironmentOnly")
+                        .HasFilter("[Environment] IS NOT NULL AND [IsActive] = 1");
+
+                    b.HasIndex("PracticeId", "SourceSystem")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Practices_Tier1_PracticeIdOnly")
+                        .HasFilter("[PracticeCode] IS NULL AND [Environment] IS NULL AND [IsActive] = 1");
+
+                    b.HasIndex("PracticeId", "PracticeCode", "SourceSystem")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Practices_Tier2_PracticeIdAndCode")
+                        .HasFilter("[PracticeCode] IS NOT NULL AND [IsActive] = 1");
+
                     b.HasIndex("PracticeId", "PracticeCode", "Environment", "SourceSystem")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[PracticeId] IS NOT NULL AND [PracticeCode] IS NOT NULL AND [Environment] IS NOT NULL");
 
                     b.ToTable("Practices", (string)null);
                 });

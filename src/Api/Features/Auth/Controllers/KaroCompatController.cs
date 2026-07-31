@@ -4,10 +4,13 @@ using HekCoreApi.Adapters.Karo;
 using HekCoreApi.Adapters.Karo.Auth;
 using HekCoreApi.Adapters.Karo.Demographics;
 using HekCoreApi.Api.Telemetry;
+using HekCoreApi.Application.Common.Models;
 using HekCoreApi.Application.Features.Karo.Commands;
 using HekCoreApi.Application.Features.Karo.Queries;
+using HekCoreApi.Api.Security;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace HekCoreApi.Api.Features.Auth.Controllers;
 
@@ -41,12 +44,14 @@ public sealed class KaroCompatController : ControllerBase
     /// <summary>Legacy: `GET Authenticate(...)` - binds only from the query string (`APIController.cs:31`). A separate real overload from the POST one below, never combined.</summary>
     [HttpGet("authenticate")]
     [ProducesResponseType(typeof(HssAuthenticateResponse), StatusCodes.Status200OK)]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthStrict)]
     public async Task<IActionResult> AuthenticateGet([FromQuery] HssAuthenticateRequest query, CancellationToken ct) =>
         await AuthenticateAsync(query, ct);
 
     /// <summary>Legacy: `POST Authenticate()` - binds only from the JSON body (`APIController.cs:93`). A separate real overload from the GET one above, never combined.</summary>
     [HttpPost("authenticate")]
     [ProducesResponseType(typeof(HssAuthenticateResponse), StatusCodes.Status200OK)]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthStrict)]
     public async Task<IActionResult> AuthenticatePost([FromBody] HssAuthenticateRequest body, CancellationToken ct) =>
         await AuthenticateAsync(body, ct);
 
@@ -55,15 +60,27 @@ public sealed class KaroCompatController : ControllerBase
         var result = await _mediator.Send(
             new KaroAuthenticateQuery(request.Username, request.Password, request.PatientId, request.EncounterId, request.System, request.Pho), ct);
 
-        var authContext = new Dictionary<string, object?> { ["PatientId"] = request.PatientId, ["EncounterId"] = request.EncounterId };
+        var authContext = BuildContext(request.PatientId, request.EncounterId, result.Routing);
+        if (result.Routing is { } routing)
+        {
+            // Human-readable one-liner so the Aspire trace's tag list is understandable without
+            // decoding PracticeId/DbServerHost by hand.
+            authContext["Routing.Summary"] = RoutingSummaryFormatter.BuildSummary("karo", routing);
+        }
+
         if (!result.Succeeded)
         {
-            _observer.RecordExpectedFailure(_logger, "karo", nameof(AuthenticateAsync), result.ErrorMessage ?? "AuthenticationFailed", authContext);
+            _observer.RecordExpectedFailure(_logger, "karo", nameof(AuthenticateAsync), result.ErrorMessage ?? "AuthenticationFailed", authContext, result);
         }
         else
         {
-            _observer.Tag("karo", nameof(AuthenticateAsync), authContext);
+            // Field names for the readable per-call log line (see LegacyOperationObserver.EmitCallLog) -
+            // never the actual token value.
+            authContext["FieldsReturned"] = new[] { "token", "expiry", "practiceId" };
+            _observer.Tag(_logger, "karo", nameof(AuthenticateAsync), authContext, result);
         }
+
+        Response.WriteRoutingHeaders("karo", result.Routing);
 
         return Ok(result.Succeeded
             ? HssAuthenticateResponse.Success(result.Token, result.Expiry!.Value, result.PracticeId)
@@ -77,14 +94,19 @@ public sealed class KaroCompatController : ControllerBase
         var token = GetAuthorizationToken();
         var result = await _mediator.Send(new KaroDemographicsQuery(system, pho, patientId, encounterId, token), ct);
 
+        Response.WriteRoutingHeaders("karo", result.Routing);
+        var demoContext = BuildContext(patientId, encounterId, result.Routing);
+
         if (!result.Succeeded)
         {
-            _observer.RecordExpectedFailure(_logger, "karo", nameof(GetDemographics), result.ErrorMessage ?? "InvalidTokenValue",
-                new Dictionary<string, object?> { ["PatientId"] = patientId, ["EncounterId"] = encounterId });
+            _observer.RecordExpectedFailure(_logger, "karo", nameof(GetDemographics), result.ErrorMessage ?? "InvalidTokenValue", demoContext, result);
             return Ok(KaroFailResponse.Of(result.ErrorMessage ?? "Invalid token value!"));
         }
 
-        _observer.Tag("karo", nameof(GetDemographics), new Dictionary<string, object?> { ["PatientId"] = patientId, ["EncounterId"] = encounterId });
+        // Field names only (never values - PHI must not land in plain-text logs) for the readable
+        // per-call log line (see LegacyOperationObserver.EmitCallLog).
+        demoContext["FieldsReturned"] = RoutingSummaryFormatter.GetNonNullPropertyNames(result.Demographic);
+        _observer.Tag(_logger, "karo", nameof(GetDemographics), demoContext, result);
 
         var demographic = new KaroDemographic(
             result.Demographic is null ? [] : [result.Demographic],
@@ -128,16 +150,26 @@ public sealed class KaroCompatController : ControllerBase
     public async Task<IActionResult> GetProvider(string? system, string? pho, string? patientId, string? encounterId, string? userId, CancellationToken ct) =>
         RootOrFail(await _mediator.Send(new KaroProviderQuery(system, pho, patientId, encounterId, userId, GetAuthorizationToken()), ct), "Provider");
 
-    /// <summary>Legacy: `GET GetRecallCategories(...)` (`APIController.cs:675`) - real `[HSS].[uspGetRecallCategories]`.</summary>
+    /// <summary>
+    /// Legacy: `GET GetRecallCategories(...)` (`APIController.cs:675`) - real `[HSS].[uspGetRecallCategories]`.
+    /// Legacy's own C# signature also declares `group` with no default (`string group`), but old
+    /// ASP.NET Web API (`System.Web.Http`) doesn't enforce non-nullable-by-default binding the way
+    /// ASP.NET Core + `[ApiController]` does with nullable reference types on - so legacy silently
+    /// accepted a blank/omitted `group`, while this port was rejecting it with a 400 until this fix
+    /// (confirmed live 2026-07-31: legacy returns `{"entry":[]}` for a blank `group`, this API 400'd).
+    /// `string?` here reproduces legacy's real tolerance, not a framework quirk to leave unfixed.
+    /// </summary>
     [HttpGet("recallcategories")]
-    public async Task<IActionResult> GetRecallCategories(string? system, string? pho, string? patientId, string? encounterId, string group, CancellationToken ct) =>
-        RootOrFail(await _mediator.Send(new KaroRecallCategoriesQuery(system, pho, patientId, encounterId, group, GetAuthorizationToken()), ct), "RecallCategories");
+    public async Task<IActionResult> GetRecallCategories(string? system, string? pho, string? patientId, string? encounterId, string? group, CancellationToken ct) =>
+        RootOrFail(await _mediator.Send(new KaroRecallCategoriesQuery(system, pho, patientId, encounterId, group ?? string.Empty, GetAuthorizationToken()), ct), "RecallCategories");
 
     /// <summary>Legacy: `GET GetEncounterSummary(...)` (`APIController.cs:407`) - real, genuinely hardcoded stub responses, reproduced verbatim.</summary>
     [HttpGet("encountersummary")]
     public async Task<IActionResult> GetEncounterSummary(string? system, string? pho, string? patientId, string? encounterId, string? identifier, CancellationToken ct)
     {
         var result = await _mediator.Send(new KaroEncounterSummaryQuery(system, pho, patientId, encounterId, identifier, GetAuthorizationToken()), ct);
+        Response.WriteRoutingHeaders("karo", result.Routing);
+        _observer.Tag(_logger, "karo", nameof(GetEncounterSummary), BuildContext(patientId, encounterId, result.Routing), result);
         return Content(result.Json, "application/json");
     }
 
@@ -237,27 +269,48 @@ public sealed class KaroCompatController : ControllerBase
         return WriteResult(await _mediator.Send(new KaroSaveSummaryCommand(patientId, encounterId, system, identifier, providerId, dateTimeRecorded, entriesJson, GetAuthorizationToken()), ct));
     }
 
+    /// <summary>Common per-call context dict entries: patient/encounter + routing (DB server/environment/name/practice), when resolved.</summary>
+    private static Dictionary<string, object?> BuildContext(string? patientId, string? encounterId, CallRoutingInfo? routing)
+    {
+        var context = new Dictionary<string, object?> { ["PatientId"] = patientId, ["EncounterId"] = encounterId };
+        if (routing is { } r)
+        {
+            context["Routing.DbServerHost"] = r.DbServerHost;
+            context["Routing.Environment"] = r.Environment;
+            context["Routing.DbName"] = r.DbName;
+            context["Routing.PracticeId"] = r.PracticeId;
+        }
+
+        return context;
+    }
+
     private IActionResult WriteResult(KaroWriteResult result, [CallerMemberName] string endpoint = "")
     {
+        Response.WriteRoutingHeaders("karo", result.Routing);
+        var context = BuildContext(Request.Query["patientId"].ToString(), Request.Query["encounterId"].ToString(), result.Routing);
+
         if (!result.Succeeded)
         {
-            _observer.RecordExpectedFailure(_logger, "karo", endpoint, result.ErrorMessage ?? "InvalidTokenValue", new Dictionary<string, object?>());
+            _observer.RecordExpectedFailure(_logger, "karo", endpoint, result.ErrorMessage ?? "InvalidTokenValue", context, result);
             return Ok(KaroFailResponse.Of(result.ErrorMessage ?? "Invalid token value!"));
         }
 
-        _observer.Tag("karo", endpoint, new Dictionary<string, object?> { ["PatientId"] = Request.Query["patientId"].ToString() });
+        _observer.Tag(_logger, "karo", endpoint, context, result);
         return Ok(new { status = "success", message = result.SuccessMessage ?? string.Empty });
     }
 
     private IActionResult RootOrFail<T>(Application.Features.Karo.Queries.KaroListResult<T> result, string resourceType, [CallerMemberName] string endpoint = "")
     {
+        Response.WriteRoutingHeaders("karo", result.Routing);
+        var context = BuildContext(result.PatientId, Request.Query["encounterId"].ToString(), result.Routing);
+
         if (!result.Succeeded)
         {
-            _observer.RecordExpectedFailure(_logger, "karo", endpoint, result.ErrorMessage ?? "InvalidTokenValue", new Dictionary<string, object?> { ["PatientId"] = result.PatientId });
+            _observer.RecordExpectedFailure(_logger, "karo", endpoint, result.ErrorMessage ?? "InvalidTokenValue", context, result);
             return Ok(KaroFailResponse.Of(result.ErrorMessage ?? "Invalid token value!"));
         }
 
-        _observer.Tag("karo", endpoint, new Dictionary<string, object?> { ["PatientId"] = result.PatientId });
+        _observer.Tag(_logger, "karo", endpoint, context, result);
         return Ok(new KaroRootResponse<T>(result.PatientId, resourceType, "hss", result.Entries ?? []));
     }
 

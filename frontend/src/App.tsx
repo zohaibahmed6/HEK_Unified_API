@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Activity, FileText, ClipboardList, Receipt, Menu, X, Stethoscope } from "lucide-react";
+import { Activity, FileText, ClipboardList, Receipt, Menu, X, Stethoscope, ScrollText } from "lucide-react";
 import { systems, type SystemId } from "./systems";
 import { SystemDashboard } from "./SystemDashboard";
+import { LogsPanel } from "./LogsPanel";
 import { useDashboardStore } from "./store";
 import "./App.css";
 
@@ -12,19 +13,22 @@ const SYSTEM_ICONS: Record<SystemId, React.ComponentType<{ size?: number; classN
   col: Receipt,
 };
 
+type NavId = SystemId | "logs";
+
 function App() {
-  const [active, setActive] = useState<SystemId>("hiso");
+  const [active, setActive] = useState<NavId>("hiso");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const current = systems.find((s) => s.id === active)!;
+  const isLogs = active === "logs";
+  const current = systems.find((s) => s.id === active);
   const { state, setValue, setAuth } = useDashboardStore();
 
-  const selectSystem = (id: SystemId) => {
+  const selectSystem = (id: NavId) => {
     setActive(id);
     setMobileNavOpen(false);
   };
 
   return (
-    <div className="shell" data-theme={active}>
+    <div className="shell" data-theme={isLogs ? "hiso" : active}>
       {/* Mobile top bar: hamburger + brand, hidden on desktop */}
       <div className="flex items-center justify-between gap-3 border-b border-[var(--line)] bg-white px-4 py-3 md:hidden">
         <button
@@ -65,6 +69,13 @@ function App() {
                     </button>
                   );
                 })}
+                <button
+                  className={`nav-item nav-item--logs ${isLogs ? "is-active" : ""}`}
+                  onClick={() => selectSystem("logs")}
+                >
+                  <ScrollText size={16} />
+                  Logs
+                </button>
               </nav>
             </aside>
           </div>
@@ -92,29 +103,54 @@ function App() {
               </button>
             );
           })}
+          <button
+            className={`nav-item nav-item--logs ${isLogs ? "is-active" : ""}`}
+            onClick={() => selectSystem("logs")}
+          >
+            <ScrollText size={16} />
+            Logs
+          </button>
         </nav>
       </aside>
 
       <main className="content">
-        <header className="content-header">
-          <h1>{current.label}</h1>
-          <p className="content-subtitle">{current.fullName}</p>
-        </header>
+        {isLogs ? (
+          <>
+            <header className="content-header">
+              <h1>Logs</h1>
+              <p className="content-subtitle">Plain-English call history</p>
+            </header>
+            <section className="panel">
+              <p className="panel-description">
+                Every entry below is a real call through the hub, in plain English: who called, for which
+                patient, what happened, and which database server/environment served it.
+              </p>
+            </section>
+            <LogsPanel />
+          </>
+        ) : (
+          <>
+            <header className="content-header">
+              <h1>{current!.label}</h1>
+              <p className="content-subtitle">{current!.fullName}</p>
+            </header>
 
-        <section className="panel">
-          <div className="panel-row">
-            <span className="panel-label">Auth</span>
-            <span className="panel-value">{current.authKind}</span>
-          </div>
-          <p className="panel-description">{current.description}</p>
-        </section>
+            <section className="panel">
+              <div className="panel-row">
+                <span className="panel-label">Auth</span>
+                <span className="panel-value">{current!.authKind}</span>
+              </div>
+              <p className="panel-description">{current!.description}</p>
+            </section>
 
-        <SystemDashboard
-          system={current.id}
-          auth={state[current.id]}
-          onSetValue={(key, value) => setValue(current.id, key, value)}
-          onSetAuth={(patch) => setAuth(current.id, patch)}
-        />
+            <SystemDashboard
+              system={current!.id}
+              auth={state[current!.id]}
+              onSetValue={(key, value) => setValue(current!.id, key, value)}
+              onSetAuth={(patch) => setAuth(current!.id, patch)}
+            />
+          </>
+        )}
 
         <section className="panel panel--callflow">
           <div className="panel-row">

@@ -23,6 +23,10 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 RUN addgroup --system --gid 1000 hek && adduser --system --uid 1000 --ingroup hek hek
 COPY --from=build /app .
+# Serilog's File sink writes to logs/ (relative, resolves to /app/logs) - create it and hand
+# ownership to the non-root "hek" user before switching, so the mounted log volume (docker-compose.yml)
+# is writable instead of silently failing (Serilog swallows file-sink errors by default).
+RUN mkdir -p /app/logs && chown -R hek:hek /app/logs
 USER hek
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "HekCoreApi.Api.dll"]
