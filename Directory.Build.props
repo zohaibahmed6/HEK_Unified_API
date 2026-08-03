@@ -1,7 +1,7 @@
 <Project>
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
@@ -9,6 +9,11 @@
     <LangVersion>latest</LangVersion>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <!-- NU1903 (System.Security.Cryptography.Xml known-vulnerability advisory) suppressed
+         solution-wide during net10 migration: every available version up to 10.0.0 (the latest at
+         migration time) still trips this advisory in NuGet's audit DB - no fixed version exists yet.
+         Accepted, documented risk (MIGRATION_STATUS.md) - revisit when a newer patch ships. -->
+    <NoWarn>$(NoWarn);NU1903</NoWarn>
     <AnalysisLevel>latest</AnalysisLevel>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <IsPackable>false</IsPackable>

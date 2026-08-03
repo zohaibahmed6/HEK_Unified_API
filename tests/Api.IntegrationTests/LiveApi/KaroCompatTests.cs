@@ -118,19 +118,13 @@ public sealed class KaroCompatTests : IClassFixture<KaroLiveFixture>
     }
 
     /// <summary>
-    /// KNOWN BUG, currently intermittent/environment-dependent: SP [HSS].[uspInsertUpdateService] on
-    /// dbserver-local/PMS_NZ_V2 succeeded once by hand this session (returned a real ServiceMappingId)
-    /// with this exact payload shape, but every repeat since - including with a brand-new unique
-    /// @pSubServiceCode, ruling out a duplicate-row branch - fails with "too many arguments specified"
-    /// (a real SQL parameter-count mismatch against the deployed SP signature). KaroWriteRepository's
-    /// param list (@pPatientID/@pAppointmentId/@pMasterServiceName/@pSubServiceName/@pSubServiceCode/
-    /// @pFee/@pLocationId/@pUserId/@pPayee/@pOutputParam) is otherwise fixed/deterministic for this
-    /// payload, so the cause isn't in this test's control - likely the real SP was altered or a second,
-    /// differently-shaped overload exists on the shared dev DB. Locks in current (broken) behavior;
-    /// flip to expect success once the real cause is found.
+    /// Formerly flagged as a known bug ([HSS].[uspInsertUpdateService] on dbserver-local/PMS_NZ_V2
+    /// returning "too many arguments specified") - re-verified by Zohaib against the local database
+    /// during the 2026-08-03 .NET 10 migration and confirmed working correctly now (SP signature/DB
+    /// state resolved server-side, unrelated to the .NET runtime version). Flipped to expect success.
     /// </summary>
     [Fact]
-    public async Task Invoice_Write_FailsWithKnownStoredProcedureArgumentMismatch()
+    public async Task Invoice_Write_SavesSuccessfully()
     {
         var uniqueCode = $"GP-{DateTime.UtcNow:yyyyMMddHHmmssfff}";
         var (response, raw) = await PostAsync("/karo/invoice", new
@@ -144,7 +138,7 @@ public sealed class KaroCompatTests : IClassFixture<KaroLiveFixture>
             payee = "Patient",
         });
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        raw.Should().Contain("too many arguments specified", "KNOWN BUG: uspInsertUpdateService parameter-count mismatch - see class doc comment");
+        raw.Should().Contain("\"status\":\"success\"");
     }
 
     [Fact]
@@ -193,13 +187,13 @@ public sealed class KaroCompatTests : IClassFixture<KaroLiveFixture>
     }
 
     /// <summary>
-    /// KNOWN BUG (pre-existing, not introduced this session): SP [dbo].[uspDocumentSave] on
-    /// dbserver-local/DMS_PMS has a TRY/CATCH that issues ROLLBACK TRANSACTION on a code path that
-    /// never opened a transaction. Connection routing/credentials are confirmed correct (this
-    /// session's fix) - the failure is inside the real stored procedure itself.
+    /// Formerly flagged as a known bug ([dbo].[uspDocumentSave] on dbserver-local/DMS_PMS issuing a
+    /// stray ROLLBACK TRANSACTION) - re-verified by Zohaib against the local database during the
+    /// 2026-08-03 .NET 10 migration and confirmed working correctly now (SP fixed server-side,
+    /// unrelated to the .NET runtime version). Flipped to expect success.
     /// </summary>
     [Fact]
-    public async Task Document_Write_FailsWithKnownStoredProcedureRollbackBug()
+    public async Task Document_Write_SavesSuccessfully()
     {
         var content = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("Integration test document content"));
         var (response, raw) = await PostAsync("/karo/document", new
@@ -212,6 +206,6 @@ public sealed class KaroCompatTests : IClassFixture<KaroLiveFixture>
             itemType = "Letter",
         });
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        raw.Should().Contain("ROLLBACK TRANSACTION", "KNOWN BUG: uspDocumentSave's TRY/CATCH rolls back with no matching BEGIN TRANSACTION - see class doc comment");
+        raw.Should().Contain("\"status\":\"success\"");
     }
 }

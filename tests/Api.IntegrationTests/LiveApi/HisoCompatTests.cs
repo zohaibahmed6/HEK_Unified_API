@@ -79,17 +79,14 @@ public sealed class HisoCompatTests : IClassFixture<HisoLiveFixture>
     }
 
     /// <summary>
-    /// KNOWN BUG (pre-existing, not introduced this session): saveContainer with a non-ACC45-shaped
-    /// body throws System.ArgumentException ("There are not enough fields in the Structured type...")
-    /// from Acc45DetailRepository.SaveAccidentInformationAsync / LegacyDbExecutor.ExecuteNonQueryAsync
-    /// - an uncaught SQL structured-parameter error that surfaces as HTTP 500 (the JSON body itself is
-    /// a generic ProblemDetails with no exception text; the real detail is server-side only - see
-    /// `docker logs hekcoreapi-api-1` for "Unhandled exception mapped to status 500"). This test locks
-    /// in that known-broken behavior so a future fix (a caught 400 with a real message, or a genuine
-    /// success) shows up as a loud, expected test failure here.
+    /// Formerly flagged as a known bug (saveContainer with a non-ACC45-shaped body throwing an
+    /// uncaught SQL structured-parameter ArgumentException, surfacing as HTTP 500) - re-verified by
+    /// Zohaib against the local database during the 2026-08-03 .NET 10 migration and confirmed
+    /// working correctly now (server-side fix, unrelated to the .NET runtime version). Flipped to
+    /// expect success.
     /// </summary>
     [Fact]
-    public async Task SaveContainer_WithMinimalNonAcc45Body_FailsWithKnownUnhandledServerError()
+    public async Task SaveContainer_WithMinimalNonAcc45Body_SavesSuccessfully()
     {
         var request = new
         {
@@ -105,6 +102,7 @@ public sealed class HisoCompatTests : IClassFixture<HisoLiveFixture>
         var raw = await response.Content.ReadAsStringAsync();
         _output.WriteLine($"POST /hiso/saveContainer\nrequest: {JsonSerializer.Serialize(request)}\nresponse ({(int)response.StatusCode}): {raw}");
 
-        response.StatusCode.Should().Be(HttpStatusCode.InternalServerError, "KNOWN BUG: an uncaught SQL structured-parameter ArgumentException maps to 500 - see class doc comment");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        raw.Should().Contain("\"response\":true");
     }
 }

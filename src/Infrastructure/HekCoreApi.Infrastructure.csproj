@@ -9,6 +9,8 @@
     <!-- Explicit override forcing a newer patch than EF Core 8.0.10 pulls transitively (5.2.0) - see
          Directory.Packages.props for why. -->
     <PackageReference Include="Microsoft.Data.SqlClient" />
+    <!-- Explicit override to force resolution to a patched build (see Directory.Packages.props). -->
+    <PackageReference Include="System.Security.Cryptography.Xml" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -23,7 +25,13 @@
     <PackageReference Include="Microsoft.IdentityModel.Tokens" />
     <PackageReference Include="System.Drawing.Common" />
     <PackageReference Include="PdfSharp" />
-    <PackageReference Include="System.Text.Encoding.CodePages" />
+    <!-- Used by AsposeMimeConverter.ConvertImageToPdfAsync in place of Aspose.Words -
+         cross-platform image decode, paired with PdfSharp to draw the image onto a PDF page. -->
+    <PackageReference Include="SixLabors.ImageSharp" />
+    <!-- Official Aspose.Words NuGet package (net10-compatible, replaces the old vendored net40
+         Aspose.Words.dll) for AsposeMimeConverter.ConvertHtmlToPdfAsync - see
+         Directory.Packages.props for the license status. -->
+    <PackageReference Include="Aspose.Words" />
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
   </ItemGroup>
 
@@ -33,15 +41,14 @@
     <Reference Include="AWSDocCore">
       <HintPath>Legacy\Hiso\vendor\AWSDocCore.dll</HintPath>
     </Reference>
-    <!-- PROJECT_STATUS.md item 30 resolved (2026-07-26): the real Aspose.Words.dll + Aspose.Words.lic
-         Zohaib supplied were sitting in legacy-reference/Hiso/bin the whole time - the earlier
-         "no license available" framing was stale/wrong, same mistake as the AWSDocCore gap. Confirmed
-         working under net8.0 via a scratch probe (real license load + Document->PDF render succeeded)
-         with System.Text.Encoding.CodePages + System.Drawing.Common as the only two extra shims a
-         .NET Framework 4.0 assembly needs under .NET 8. -->
-    <Reference Include="Aspose.Words">
-      <HintPath>Legacy\Hiso\vendor\Aspose.Words.dll</HintPath>
-    </Reference>
+    <!-- Old vendored net40 Aspose.Words.dll <Reference> removed 2026-08-03 (its license failed to
+         load under net10 - root cause unconfirmed, inside Aspose's closed-source code, see
+         MIGRATION_STATUS.md) - replaced by the official Aspose.Words NuGet PackageReference above.
+         The .lic file itself is still copied: it's expired against this newer Aspose.Words version
+         (confirmed live - "allows free upgrades until 20 Apr 2017, but this version was released
+         01 Nov 2024"), so AsposeMimeConverter currently runs unlicensed/evaluation (Zohaib's call,
+         2026-08-03 - watermarked PDFs, revisit once a current license exists). Drop a renewed
+         Aspose.Words.lic at this same path to pick up a real license with no further code changes. -->
     <None Include="Legacy\Hiso\vendor\Aspose.Words.lic" Link="Aspose.Words.lic" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

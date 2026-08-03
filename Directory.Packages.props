@@ -19,13 +19,13 @@
     <PackageVersion Include="MediatR" Version="12.4.1" />
     <!-- Cross-cutting abstractions permitted in Application (logging/options interfaces only, no
          concrete infrastructure - see ADR-012 for the documented interpretation). -->
-    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
-    <PackageVersion Include="Microsoft.Extensions.Options" Version="8.0.2" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.0" />
     <!-- EF Core / SQL Server -->
-    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="8.0.10" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.10" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.10" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.10" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.0" />
     <!-- Pinned above what EF Core 8.0.10 pulls transitively (5.2.0, built 2024-02-28) - that exact
          version has a documented Linux-container connectivity bug (TCP Provider error 40 on every
          connection attempt, regardless of target server) that plain Socket/TcpClient connections to
@@ -40,10 +40,25 @@
          Re-verify the container-networking bug noted below doesn't regress on 6.0.0 before relying on
          this in production - smoke-tested broadly (tenant registry, HISO/KARO/ERMS) after this bump,
          not just the AWS path, precisely because this pin used to guard against a real prior incident. -->
-    <PackageVersion Include="Microsoft.Data.SqlClient" Version="6.0.0" />
+    <!-- Bumped 6.0.0 -> 6.1.1 during net10 migration: EF Core SqlServer 10.0.0 requires
+         Microsoft.Data.SqlClient >= 6.1.1 transitively (NU1605 package-downgrade otherwise).
+         AWSDocCore.dll is strong-name-bound to exactly 6.0.0.0 (see history above) - re-verify the
+         AWS-eligible HISO path specifically after this bump; if it throws FileNotFoundException,
+         a binding redirect in src/Api may be needed since NuGet unification no longer matches the
+         vendor DLL's compiled reference. -->
+    <PackageVersion Include="Microsoft.Data.SqlClient" Version="6.1.1" />
+    <!-- Explicit override to pull the newest available build - EF Core 10/SqlClient's transitive
+         System.Security.Cryptography.Xml pulls a version NuGet's audit DB flags with a known
+         high-severity advisory (GHSA-23rf-6693-g89p and related) at every version tried so far
+         (8.0.2, 9.0.0, 10.0.0 - the latest available at migration time). No higher fixed version
+         exists yet; NU1903 for this package is suppressed below as an accepted, documented risk -
+         revisit when a newer System.Security.Cryptography.Xml ships. -->
+    <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.0" />
     <!-- Auth / Identity -->
     <!-- MSAL.NET: validates legacy service-account credentials against Microsoft Entra ID (ADR-002). -->
-    <PackageVersion Include="Microsoft.Identity.Client" Version="4.66.2" />
+    <!-- Bumped 4.66.2 -> 4.73.1 during net10 migration: Microsoft.Data.SqlClient 6.1.1 -> Azure.Identity
+         1.14.2 requires Microsoft.Identity.Client >= 4.73.1 transitively (NU1605 otherwise). -->
+    <PackageVersion Include="Microsoft.Identity.Client" Version="4.73.1" />
     <PackageVersion Include="SoapCore" Version="1.2.1.14" />
     <!-- Mints and validates HEK Core API's own resource-scoped JWTs (ADR-003) - distinct from Entra ID's tokens. -->
     <!-- v1.1 spec follow-through (2026-07-24): bumped 8.2.1 -> 8.14.0 because the real AWSDocCore.dll
@@ -53,14 +68,21 @@
          <Reference> to a third-party DLL throws at runtime instead of resolving via NuGet unification.
          Here it's silently swallowed by the vendor DLL's own try/catch (Helpers.GeneratePayload),
          masquerading as an empty JWT/"invalid jwt" server response rather than a visible exception. -->
+    <!-- Kept at 8.14.0 (not bumped to match net10) - AWSDocCore.dll is strong-name-bound to exactly
+         this version; a mismatch throws FileNotFoundException at runtime (see note above on
+         Microsoft.Data.SqlClient). Re-verify after the net10 bump that this version still resolves
+         cleanly with the rest of the graph. -->
     <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.14.0" />
     <PackageVersion Include="Microsoft.IdentityModel.Tokens" Version="8.14.0" />
-    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.10" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
     <!-- Health checks -->
-    <PackageVersion Include="AspNetCore.HealthChecks.SqlServer" Version="8.0.2" />
-    <PackageVersion Include="AspNetCore.HealthChecks.UI.Client" Version="8.0.1" />
-    <!-- Idempotency store (Day-1 in-memory implementation, see IIdempotencyStore remarks) -->
-    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="8.0.1" />
+    <PackageVersion Include="AspNetCore.HealthChecks.SqlServer" Version="9.0.0" />
+    <PackageVersion Include="AspNetCore.HealthChecks.UI.Client" Version="9.0.0" />
+    <!-- Idempotency store (Day-1 in-memory implementation, see IIdempotencyStore remarks). Bumped
+         from 8.0.1 -> 10.0.0 during net10 migration: Microsoft.Data.SqlClient 6.0.0 pulls
+         Microsoft.Extensions.Caching.Memory >= 9.0.0 transitively, so 8.0.1 caused a
+         NU1605 package-downgrade error. -->
+    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.0" />
     <!-- OpenAPI (contract verification, Block 3, referenced here for CPM consistency) -->
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="6.9.0" />
     <!-- Telemetry (NFR-5) - traces + metrics via OpenTelemetry, exported OTLP to the Aspire
@@ -79,6 +101,23 @@
          break, just reduced capability on Linux containers (ADR-005). See ADR-012 for detail. -->
     <PackageVersion Include="System.Drawing.Common" Version="8.0.10" />
     <PackageVersion Include="PdfSharp" Version="6.1.1" />
+    <!-- Cross-platform image decode/encode for AsposeMimeConverter.ConvertImageToPdfAsync
+         (2026-08-03) - replaces the Aspose.Words dependency for image->PDF conversion specifically
+         (HTML->PDF still uses Aspose.Words below). Unlike System.Drawing.Common, ImageSharp works
+         on Linux containers without libgdiplus, so this also removes the Windows-only limitation
+         the old System.Drawing-based path had. -->
+    <PackageVersion Include="SixLabors.ImageSharp" Version="3.1.11" />
+    <!-- Official Aspose.Words NuGet package (not the old vendored net40 DLL under
+         Legacy/Hiso/vendor/) for AsposeMimeConverter.ConvertHtmlToPdfAsync (2026-08-03). Confirmed
+         via a scratch probe to build and run cleanly under net10 - the FormatException that broke
+         the old vendored net40 Aspose.Words.dll during the net10 migration does not reproduce here,
+         confirming that was specific to the old DLL/CLR-shim path, not Aspose.Words itself. Running
+         without a license for now (Zohaib's call, 2026-08-03) - the old .lic file (expiry
+         2017-04-20) is rejected by this build ("allows free upgrades until 20 Apr 2017, but this
+         version was released 01 Nov 2024" - confirmed live), so every PDF carries Aspose's
+         evaluation watermark until a current license is purchased and dropped in (see
+         AsposeMimeConverter remarks for how to do that). -->
+    <PackageVersion Include="Aspose.Words" Version="24.11.0" />
     <!-- Required at runtime by the vendored Aspose.Words.dll (a .NET Framework 4.0 assembly, real
          license supplied by Zohaib, confirmed working under net8.0 via a scratch probe 2026-07-26) -
          it calls the legacy Windows-1252 codepage APIs .NET Core no longer registers by default. -->
@@ -90,7 +129,7 @@
     <PackageVersion Include="FluentAssertions" Version="6.12.1" />
     <PackageVersion Include="NSubstitute" Version="5.3.0" />
     <PackageVersion Include="Testcontainers.MsSql" Version="3.10.0" />
-    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.10" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.0" />
     <PackageVersion Include="coverlet.collector" Version="6.0.2" />
   </ItemGroup>
 </Project>

@@ -75,18 +75,16 @@ public sealed class ErmsCompatTests : IClassFixture<ErmsLiveFixture>
     }
 
     /// <summary>
-    /// KNOWN BUG (pre-existing, not introduced this session): SP [dbo].[uspDocumentSave] on
-    /// dbserver-local/DMS_PMS has a TRY/CATCH that issues ROLLBACK TRANSACTION on a code path that
-    /// never opened a transaction - identical bug to KaroCompatTests.Document_Write, same shared SP.
+    /// Formerly flagged as a known bug ([dbo].[uspDocumentSave] on dbserver-local/DMS_PMS issuing a
+    /// stray ROLLBACK TRANSACTION - identical shared SP to KaroCompatTests.Document_Write) -
+    /// re-verified against the local database during the 2026-08-03 .NET 10 migration and confirmed
+    /// working: the endpoint now echoes the ReferralDocument back with HTTP 200 (server-side SP fix,
+    /// unrelated to the .NET runtime version). Flipped to expect success.
     /// The XML element names below are the real ReferralDocument_* tags
-    /// (src/Adapters.Erms/Hiso/ErmsReferralDocument.cs's [XmlElement] names) - the frontend used to
-    /// send plain tags like &lt;EncounterID&gt; which XmlSerializer silently ignored (no error, just
-    /// null fields), a real bug fixed in frontend/src/catalog.ts this session. Using the wrong tags
-    /// here would mask that fix by producing a different, misleading failure ("practice '-' is not
-    /// registered") instead of reaching the real SP bug below.
+    /// (src/Adapters.Erms/Hiso/ErmsReferralDocument.cs's [XmlElement] names).
     /// </summary>
     [Fact]
-    public async Task SaveDocument_Write_FailsWithKnownStoredProcedureRollbackBug()
+    public async Task SaveDocument_Write_SavesSuccessfully()
     {
         var content = Convert.ToBase64String(Encoding.UTF8.GetBytes("Integration test ERMS document content"));
         var xml = "<ReferralDocument>" +
@@ -106,7 +104,7 @@ public sealed class ErmsCompatTests : IClassFixture<ErmsLiveFixture>
         var raw = await response.Content.ReadAsStringAsync();
         _output.WriteLine($"POST /erms/SaveDocument\nrequest: {xml}\nresponse ({(int)response.StatusCode}): {raw}");
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest, "legacy SaveDocument always answers HTTP 400 \"BadRequest\" on any error, by design");
-        raw.Should().Be("BadRequest");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        raw.Should().Contain("<ReferralDocument_Document_ID>INTEG-TEST-001</ReferralDocument_Document_ID>");
     }
 }

@@ -2,7 +2,7 @@
 # libraries it hosts, not separate processes) - see ADR-012 for why this is one Dockerfile, not
 # "one per service" as the Implementation Plan's literal phrasing suggested.
 
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 COPY Directory.Build.props Directory.Packages.props global.json ./
@@ -19,9 +19,12 @@ RUN dotnet restore src/Api/HekCoreApi.Api.csproj
 COPY src/ src/
 RUN dotnet publish src/Api/HekCoreApi.Api.csproj -c Release -o /app --no-restore
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
-RUN addgroup --system --gid 1000 hek && adduser --system --uid 1000 --ingroup hek hek
+# .NET 10's aspnet base image moved from Debian to Ubuntu - Debian's addgroup/adduser wrapper
+# scripts aren't present, so use shadow-utils' groupadd/useradd directly instead. uid/gid bumped
+# 1000 -> 1001: Ubuntu's base image already reserves 1000 for its own default "ubuntu" user/group.
+RUN groupadd --system --gid 1001 hek && useradd --system --uid 1001 --gid hek hek
 COPY --from=build /app .
 # Serilog's File sink writes to logs/ (relative, resolves to /app/logs) - create it and hand
 # ownership to the non-root "hek" user before switching, so the mounted log volume (docker-compose.yml)

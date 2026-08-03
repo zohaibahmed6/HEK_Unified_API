@@ -24,9 +24,14 @@ practice-management systems (HISO, KARO/HSS, ERMS) plus COL/Pegasus. It exposes:
 
 ## 2. Current state (update this every session)
 
-- **Status (2026-08-03)**: Zohaib closed 2 of the 3 carried-forward open items (ERMS
-  Azure-forwarding gap, SOUTH-environment) as accepted/out-of-scope — see §2 bottom.
-  Only Measurements delimiter shape remains genuinely open.
+- **Status (2026-08-03)**: Migrated from .NET 8 to .NET 10 (all 13 projects) — build clean,
+  63/66 tests pass (3 pre-existing live-DB failures, unrelated to the migration), Docker
+  containers healthy on net10. See `MIGRATION_STATUS.md` + `docs/migration/*.md` for full detail.
+- **Status (2026-08-03)**: All 3 carried-forward open items now closed — ERMS
+  Azure-forwarding gap + SOUTH-environment closed by Zohaib as accepted/out-of-scope;
+  Measurements delimiter shape re-checked and found already correctly decoded (stale
+  note), only the unbuilt canonical Measurements resource remains as a future-work
+  item, not a blocker. See §2 bottom for detail.
 - **Deliverable (2026-07-31)**: wrote `docs/azure-deployment-checklist.md` - a step-by-step,
   checkbox deployment-day checklist for Azure Container Apps (secrets hardening, resource
   provisioning, image build/push, Container App deploy, legacy host-domain DNS cutover reused
@@ -651,8 +656,22 @@ practice-management systems (HISO, KARO/HSS, ERMS) plus COL/Pegasus. It exposes:
 - **Open items carried forward (updated 2026-08-03)**: ERMS Azure-forwarding gap and
   SOUTH-environment (practice 518, untestable locally) — closed by Zohaib as accepted/
   out-of-scope for now, not actionable without further input he hasn't provided; not
-  re-opened unless he brings new info. Still genuinely open: Measurements delimiter
-  shape undecoded.
+  re-opened unless he brings new info.
+  - **Measurements delimiter — re-checked 2026-08-03, closed as decoded (was stale).** The
+    "shape not decoded" note (`hek_analysis/PROJECT_STATUS.md` 2026-07-28) only ever blocked
+    the *canonical* `/v1` Measurements resource, which was never built. The shape itself
+    (`"{ref}|&|{value}|?|{type}|?|{code}|?|{label}|?|{date}"` on BPSYS/BPDIA/Weight/Height/BMI
+    columns from `[HSS].[uspGetMeasurement]`) is already fully decoded, correctly, by
+    `ErmsDataTableMapper.ToListHiso<T>` (`src/Adapters.Erms/Hiso/ErmsDataTableMapper.cs`) — an
+    exact line-by-line port of real legacy's `ERMSDataTableToListHiso<T>`
+    (`APIController.cs:1759-1856`): outer `"|&|"` split into (conceptId, text), inner `"|?|"`
+    split of `text` into (text, name, qualifierId, qualifierName, dateTaken). This is proven
+    correct, not just plausible — the legacy-compat `GetPatientMeasurement` endpoint uses this
+    exact mapper and is confirmed byte-matching real legacy (`crosscheck/SUMMARY.md`:
+    `GetPatientMeasurement ✅ Match`; `LEGACY_PARITY_VALIDATOR.md` line 39). No canonical
+    Measurements resource exists yet, but that's an unbuilt-feature gap, not an
+    unknown-data-shape blocker — see `hek_analysis/PROJECT_STATUS.md`'s canonical-resource
+    build-order list if/when that gets picked up.
 - **Docs infra (2026-07-29)**: this file + root `CLAUDE.md` created as the
   single-source-of-truth + auto-update mechanism. Not yet fixed: dead spec
   links in `DOCUMENT_INDEX.md`, duplicate AI usage logs (see §4).

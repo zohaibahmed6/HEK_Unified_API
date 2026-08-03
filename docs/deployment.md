@@ -1,8 +1,10 @@
 # Deployment
 
 ## Dockerfile
-`src/Api/Dockerfile` — multi-stage build (SDK 8.0 → aspnet 8.0 runtime), non-root user (`hek`,
-uid/gid 1000), `EXPOSE 8080`, entrypoint `dotnet HekCoreApi.Api.dll`. Only `Api` is a deployable
+`src/Api/Dockerfile` — multi-stage build (SDK 10.0 → aspnet 10.0 runtime, migrated from 8.0 on
+2026-08-03, see `MIGRATION_STATUS.md`), non-root user (`hek`, uid/gid 1001 — bumped from 1000
+because the net10 aspnet base image switched Debian → Ubuntu, which reserves gid 1000 for its own
+default `ubuntu` group), `EXPOSE 8080`, entrypoint `dotnet HekCoreApi.Api.dll`. Only `Api` is a deployable
 image — `Adapters.*`/`Infrastructure` are class libraries it hosts, not separate processes (see
 `docs/adr/ADR-012-solution-structure-and-block1-inferences.md` for why this is one Dockerfile, not
 "one per service").

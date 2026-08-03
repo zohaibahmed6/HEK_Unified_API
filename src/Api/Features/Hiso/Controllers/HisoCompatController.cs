@@ -55,7 +55,7 @@ public sealed class HisoCompatController : ControllerBase
     [HttpPost("getData")]
     public async Task<IActionResult> GetData([FromBody] GetDataRequest request, CancellationToken ct)
     {
-        var calledServerAddress = HttpContext.Request.Host.Value;
+        var calledServerAddress = HttpContext.Request.Host.Value ?? string.Empty;
         var context = new Dictionary<string, object?> { ["SessionKey"] = request.SessionKey, ["FormInstanceOperationMode"] = request.DataContainer.FormMetaData.FormInstanceOperationMode };
 
         var result = await _observer.ObserveAsync(
@@ -89,7 +89,7 @@ public sealed class HisoCompatController : ControllerBase
     [HttpPost("getVersion")]
     public async Task<IActionResult> GetVersion([FromBody] GetVersionRequest request, CancellationToken ct)
     {
-        var calledServerAddress = HttpContext.Request.Host.Value;
+        var calledServerAddress = HttpContext.Request.Host.Value ?? string.Empty;
         var context = new Dictionary<string, object?> { ["SessionKey"] = request.SessionKey };
 
         var result = await _observer.ObserveAsync(
@@ -107,7 +107,7 @@ public sealed class HisoCompatController : ControllerBase
     [HttpPost("getDeliveryOptions")]
     public async Task<IActionResult> GetDeliveryOptions([FromBody] GetDeliveryOptionsRequest request, CancellationToken ct)
     {
-        var calledServerAddress = HttpContext.Request.Host.Value;
+        var calledServerAddress = HttpContext.Request.Host.Value ?? string.Empty;
         var context = new Dictionary<string, object?> { ["SessionKey"] = request.SessionKey };
 
         var result = await _observer.ObserveAsync(
@@ -130,7 +130,7 @@ public sealed class HisoCompatController : ControllerBase
     [HttpPost("processAction")]
     public async Task<IActionResult> ProcessAction([FromBody] ProcessActionRequest request, CancellationToken ct)
     {
-        var calledServerAddress = HttpContext.Request.Host.Value;
+        var calledServerAddress = HttpContext.Request.Host.Value ?? string.Empty;
         var context = new Dictionary<string, object?> { ["SessionKey"] = request.SessionKey, ["ActionId"] = request.ActionId };
 
         var result = await _observer.ObserveAsync(
@@ -150,7 +150,7 @@ public sealed class HisoCompatController : ControllerBase
     [HttpPost("saveContainer")]
     public async Task<IActionResult> SaveContainer([FromBody] SaveContainerRequest request, CancellationToken ct)
     {
-        var calledServerAddress = HttpContext.Request.Host.Value;
+        var calledServerAddress = HttpContext.Request.Host.Value ?? string.Empty;
         var metaData = new SaveContainerFormMetaDataInput(
             request.FormMetaData.FormInstanceId, request.FormMetaData.FormInstanceVersion, request.FormMetaData.FormEngineId,
             request.FormMetaData.FormInstanceOperationMode, request.FormMetaData.FormDefinitionId,
@@ -176,7 +176,7 @@ public sealed class HisoCompatController : ControllerBase
     [HttpPost("getFormView")]
     public async Task<IActionResult> GetFormView([FromBody] GetFormViewRequest request, CancellationToken ct)
     {
-        var calledServerAddress = HttpContext.Request.Host.Value;
+        var calledServerAddress = HttpContext.Request.Host.Value ?? string.Empty;
         var context = new Dictionary<string, object?> { ["SessionKey"] = request.SessionKey };
 
         var result = await _observer.ObserveAsync(
