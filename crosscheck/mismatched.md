@@ -6,16 +6,25 @@ live-verified against the real legacy servers directly (KARO/HSS `localhost:2345
 itself crashes/hangs) or inconclusive without a real test payload - not new-API defects to fix.
 
 
-## ✅ CORRECTED 2026-07-31 (were wrongly flagged as data gaps): GetRegisteredPractitioners / GetPrescribedMedications / GetRegularMedications / GetConsultNotes
+## ✅ FIXED 2026-07-31 (were wrongly flagged as data gaps, then found to need a real fix): GetRegisteredPractitioners / GetPrescribedMedications / GetRegularMedications / GetConsultNotes
 Re-tested all 4 live against both APIs. Result: **same complete set of rows in every case** (sorted
 referenceID lists are identical - 0 missing, 0 extra), just returned in a different order. Proved
 this is inherent, real non-determinism in the shared SQL query (no stable secondary `ORDER BY` key
-when several rows tie on the same date) - not a new-API defect - by calling **real legacy itself
+when several rows tie on the same date) - not a data defect - by calling **real legacy itself
 twice in a row**: its own row order changed between the two calls (`GetRegularMedications` position 5
 was a different referenceID each time). Since both APIs call the identical real stored procedure,
-they inherit the identical non-determinism. `GetRegisteredPractitioners` even came back byte-for-byte
-identical on this rerun. Nothing to fix - the original crosscheck compared two independently-ordered
-snapshots and mistook reordering for missing data.
+they inherit the identical non-determinism.
+
+**Follow-up fix (2026-07-31, same day)**: initially left as "nothing to fix, legacy is non-deterministic
+too" - but Zohaib wanted the new API's own order to be stable/legacy-like regardless, not just
+"technically excused" by legacy's own inconsistency. Added `ErmsDataRepository.StableSort` - after
+the SP call, sorts the `DataTable` by its date column (`date` for consult notes, `startDate` for
+medications, matching the requested `ASC`/`DESC`) then always by `ReferenceId` as a tiebreaker
+(`GetRegisteredPractitioners` has no date column, so it sorts by `ReferenceId` alone). This can't force
+the new API to match legacy's own arbitrary per-call order (legacy has none to match), but it does make
+the new API's own output **fully deterministic** - the same request now returns the exact same row
+order every single time. Live-verified: 3 repeated calls to each of the 4 operations, identical
+`referenceID` sequence (MD5-compared) every time; previously this same test would have varied.
 
 ## ✅ FIXED 2026-07-31: GET ERMS GetLaboratoryReportDetails (line-ending)
 Root cause: `ErmsRtfConverter.ConvertString2Rtf` used `Environment.NewLine`, which is `"\r\n"` on

@@ -72,7 +72,7 @@ public sealed class ErmsDataRepository : IErmsDataRepository
     public Task<DataTable> GetNextOfKinAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, CancellationToken ct = default) =>
         ExecuteAsync(routingContext, "[HSS].[uspGetNextOfKin]", PatientOnly(patientId), ct);
 
-    public Task<DataTable> GetRegisteredPractitionersAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? locationId, CancellationToken ct = default)
+    public async Task<DataTable> GetRegisteredPractitionersAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? locationId, CancellationToken ct = default)
     {
         var parameters = PatientOnly(patientId);
         if (!string.IsNullOrWhiteSpace(locationId))
@@ -80,7 +80,8 @@ public sealed class ErmsDataRepository : IErmsDataRepository
             parameters.Add(new SqlParameter("@pLocationId", locationId));
         }
 
-        return ExecuteAsync(routingContext, "[HSS].[uspGetRegisteredPractitioners]", parameters, ct);
+        var table = await ExecuteAsync(routingContext, "[HSS].[uspGetRegisteredPractitioners]", parameters, ct);
+        return StableSort(table, dateColumn: null, sortOrder: null);
     }
 
     public Task<DataTable> GetAcc45Async(string practiceSuffix, RoutingContext routingContext, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, CancellationToken ct = default) =>
@@ -89,18 +90,22 @@ public sealed class ErmsDataRepository : IErmsDataRepository
     public Task<DataTable> GetConditionsAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, CancellationToken ct = default) =>
         ExecuteAsync(routingContext, "[HSS].[uspGetConditions]", Dated(patientId, sortOrder, minDate, maxDate), ct);
 
-    public Task<DataTable> GetConsultNotesAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, CancellationToken ct = default) =>
-        ExecuteAsync(routingContext, "[HSS].[uspGetConsultNotes]", Dated(patientId, sortOrder, minDate, maxDate), ct);
+    public async Task<DataTable> GetConsultNotesAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, CancellationToken ct = default)
+    {
+        var table = await ExecuteAsync(routingContext, "[HSS].[uspGetConsultNotes]", Dated(patientId, sortOrder, minDate, maxDate), ct);
+        return StableSort(table, dateColumn: "date", sortOrder);
+    }
 
     public Task<DataTable> GetMedicalAllergiesAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, CancellationToken ct = default) =>
         ExecuteAsync(routingContext, "[HSS].[uspGetAllergies]", Dated(patientId, sortOrder, minDate, maxDate), ct);
 
-    public Task<DataTable> GetMedicationsAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, bool isLongTerm, CancellationToken ct = default)
+    public async Task<DataTable> GetMedicationsAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, bool isLongTerm, CancellationToken ct = default)
     {
         var parameters = Dated(patientId, sortOrder, minDate, maxDate);
         parameters.Add(new SqlParameter("@pIsLongTerm", isLongTerm));
         parameters.Add(new SqlParameter("@pShowStop", false));
-        return ExecuteAsync(routingContext, "[HSS].[uspGetMedications]", parameters, ct);
+        var table = await ExecuteAsync(routingContext, "[HSS].[uspGetMedications]", parameters, ct);
+        return StableSort(table, dateColumn: "startDate", sortOrder);
     }
 
     public Task<DataTable> GetLabsAsync(string practiceSuffix, RoutingContext routingContext, string? patientId, string? sortOrder, DateTime minDate, DateTime maxDate, CancellationToken ct = default) =>
@@ -283,5 +288,36 @@ public sealed class ErmsDataRepository : IErmsDataRepository
     {
         var connectionString = await _connectionResolver.ResolveAsync(routingContext, ct);
         return await LegacyDbExecutor.ExecuteDataTableAsync(connectionString, CommandType.StoredProcedure, procName, parameters, ct);
+    }
+
+    /// <summary>
+    /// The underlying SPs have no stable ORDER BY, so SQL Server can return rows in a different
+    /// physical order on every call - confirmed live against real legacy itself (same request, two
+    /// calls, two different row orders; the row *set* always matched). Rather than leave that
+    /// non-determinism in our own output too, impose a deterministic sort here: by <paramref
+    /// name="dateColumn"/> (matching <paramref name="sortOrder"/>, "ASC"/"DESC") when present, then
+    /// always by <c>ReferenceId</c> as a tiebreaker so ties on the same date - or tables with no date
+    /// column at all - still come back in the same order every time.
+    /// </summary>
+    private static DataTable StableSort(DataTable table, string? dateColumn, string? sortOrder)
+    {
+        var clauses = new List<string>();
+        if (dateColumn is not null && table.Columns.Contains(dateColumn))
+        {
+            clauses.Add($"[{dateColumn}] {(string.Equals(sortOrder, "DESC", StringComparison.OrdinalIgnoreCase) ? "DESC" : "ASC")}");
+        }
+
+        if (table.Columns.Contains("ReferenceId"))
+        {
+            clauses.Add("[ReferenceId] ASC");
+        }
+
+        if (clauses.Count == 0)
+        {
+            return table;
+        }
+
+        table.DefaultView.Sort = string.Join(", ", clauses);
+        return table.DefaultView.ToTable();
     }
 }

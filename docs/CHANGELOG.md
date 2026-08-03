@@ -17,6 +17,23 @@ each session is responsible for adding its own entry before/at the end of the se
 
 ---
 
+## 2026-07-31 (2) — Built complete verified Postman collection (Legacy vs New API, all 4 systems)
+- Feature: added `crosscheck/HEK_Complete_Verified.postman_collection.json` (118 requests across
+  "Legacy - HISO/ERMS/KARO/COL" and "New API - HISO/ERMS/KARO/COL" folders) and updated
+  `crosscheck/HEK_4APIs.postman_environment.json` with base URLs/credentials/IDs for all 4 systems.
+- Reason: prior crosscheck attempt (`crosscheck/HekCoreApi-Crosscheck.postman_collection.json`) used
+  guessed/incomplete sample data; this pass re-derived every request's body/headers/params from real
+  evidence (`crosscheck/errors.md`, `crosscheck/SUMMARY.md`, `crosscheck/PARITY_MEMORY.md`, and the
+  already-verified `HEK_4APIs_Manual_Verification.postman_collection.json`) and cited the source in
+  each request's `description` field, so the collection itself is traceable and no field is invented.
+- Files changed: `crosscheck/HEK_Complete_Verified.postman_collection.json` (new),
+  `crosscheck/HEK_4APIs.postman_environment.json` (updated), `docs/PROJECT_MASTER.md` §2.
+- Documentation updated: `docs/PROJECT_MASTER.md` §2 (this entry).
+- Breaking changes: none (docs/tooling only, no `src/` changes).
+- Known gaps: HISO `getData`/`saveContainer`/`getFormView` and ERMS `GetRadiologyReportDetails` have
+  no full real success body preserved verbatim anywhere in the repo's docs - marked in-collection as
+  needing a live capture rather than fabricated.
+
 ## 2026-07-23 (3) — Implemented full OpenTelemetry telemetry (closed NFR-5 gap)
 - Feature: added OpenTelemetry tracing + metrics to `src/Api/Program.cs` (ASP.NET Core, HTTP client,
   and SQL Server dependency instrumentation, plus .NET runtime metrics), exported via OTLP to a new

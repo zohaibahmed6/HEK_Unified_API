@@ -12,8 +12,8 @@ this index) as secondary to those two files.
 ## Spec & Assessment
 | Doc | Description |
 |---|---|
-| `docs/HEK_UNIFIED_API_SPEC.md` | Governing product spec: FR-1..9, NFR-1..9 for the unified API hub. |
-| `docs/assessment-2026-07-22.md` | Enterprise self-audit (architecture, code quality, security, logging, telemetry, performance, scalability, docs, risks, roadmap). **§5 Telemetry updated 2026-07-23: NFR-5 gap resolved**, see below. |
+| `docs/HEK_UNIFIED_API_SPEC_presentable.html` | Governing product spec: FR-1..9, NFR-1..9 for the unified API hub. **Corrected 2026-07-31**: the old `.md` versions of this spec (`HEK_UNIFIED_API_SPEC.md`/`_v1.1.md`) were deleted from the repo; this HTML file is the current, presentable replacement — link here instead. |
+| `docs/PROJECT_STATUS_SUMMARY.html` | Presentable project-status snapshot (companion HTML alongside `PROJECT_MASTER.md`'s narrative form). |
 | `docs/CHANGELOG.md` | Per-change log, going forward (see Rule 4 of the documentation skill). |
 
 ## API Contract
@@ -69,3 +69,17 @@ section mapping FR-1..9/NFR-1..9 to where it's satisfied, partial, or a gap — 
 | Doc | Description |
 |---|---|
 | `docs/demo/CanonicalDemoScript.md` | Script for demoing the canonical `/v1` surface. |
+
+## AI Usage Log
+| Doc | Description |
+|---|---|
+| `docs/ai_usage_log.md` | **Current, active log** — keep writing here. |
+| `AI_USAGE_LOG.md` (repo root) | **Stale, frozen 2026-07-22** — superseded by `docs/ai_usage_log.md`. Kept for history only; do not add new entries here. |
+
+## Legacy Parity (crosscheck, live-verified against real running legacy servers)
+| Doc | Description |
+|---|---|
+| `crosscheck/dashboard.html` | **Most current parity status** — live-tested against real running legacy servers (not just source-code comparison), all 60 legacy operations across HISO/ERMS/KARO/COL. As of 2026-07-31: 60/60 confirmed matching or fixed. |
+| `crosscheck/SUMMARY.md` | Same data as the dashboard, plain-text/markdown form. |
+| `crosscheck/mismatched.md` / `crosscheck/errors.md` | Detail write-ups per finding, including root causes and fixes. |
+| `LEGACY_PARITY_VALIDATOR.md` (repo root) | **Older, code-comparison-only pass (2026-07-27/28) — superseded by `crosscheck/` for anything it disagrees with.** Kept for its per-field diff notes on operations `crosscheck/` didn't re-examine in detail (e.g. HISO field-level diffs). Known stale item: still lists ERMS `Authenticate`'s Azure-forwarding gap as unconfirmed-fixed — this is still real and open (see `PROJECT_MASTER.md` §2 "Open items carried forward").

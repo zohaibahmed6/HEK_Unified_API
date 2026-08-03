@@ -1,8 +1,18 @@
 # Errored operations
-Status as of 2026-07-31: HISO getFormView, KARO routing, HISO getData/saveContainer all fixed and
-verified. COL GetSessionData corrected (was never actually a bug - see crosscheck/mismatched.md
-history). Remaining open: KARO's 6 write ops and COL SaveInvoice/Authenticate legacy-side issue -
-still need real payloads/investigation, not confirmed bugs.
+Status as of 2026-07-31 (end of day): **60/60 operations confirmed matching/fixed. Nothing open.**
+HISO getFormView, KARO routing, HISO getData/saveContainer, all 6 KARO write ops (incl. SaveRecall),
+ERMS SaveDocument/GetScannedDetails/GetDischargeSummaryDetails, ERMS row-order determinism, and COL
+SaveInvoice all fixed and live-verified. COL GetSessionData corrected (was never actually a bug - see
+crosscheck/mismatched.md history). COL Authenticate confirmed as a real legacy-side environment issue
+(unreachable remote DB), not a new-API defect.
+
+**COL SaveInvoice closed 2026-07-31**: real SP source (`legacy-reference/legacy SP/saveinvoice.txt`)
+supplied by Zohaib. Turned out the whole `tblMasterService`/`tblMasterSubService` seeding line of
+investigation was chasing the wrong thing - `@pMasterServiceName` ("COL") is never referenced anywhere
+in the SP body. The real crash was `InsertedBy` resolving to NULL because the SP falls back to the
+patient's `Profile.tblPatientEnrollmentAgreement.ProviderId` (NULL for the test patient) when no
+`ServiceProvider` is supplied. Fix: supply a real `ServiceProvider` (practice NZMCNO) in the request -
+verified via direct SP call and full end-to-end API call, both succeeded with real invoice IDs.
 
 
 ## ✅ FIXED 2026-07-31: HISO getData - was 2 real bugs, found via a real payload

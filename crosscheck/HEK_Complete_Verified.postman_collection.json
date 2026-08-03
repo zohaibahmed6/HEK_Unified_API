@@ -1,0 +1,2329 @@
+{
+  "info": {
+    "name": "HEK Complete Verified — Legacy + New API (2026-07-31)",
+    "description": "Complete, ready-to-execute collection covering every legacy reference API operation (HISO, ERMS, KARO/HSS, COL) and its equivalent new/unified HEK Core API operation, built from real evidence in logs/*/readable-*.log, crosscheck/errors.md, crosscheck/SUMMARY.md, crosscheck/PARITY_MEMORY.md, and the prior crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json (2026-07-30/31 live runs). 60/60 operations tracked; every request carries a 'description' field citing its data provenance. Run 'Authenticate' in each folder first (auto-captures token into the matching environment variable). Canonical known-good test identity used throughout: patientId=2450776, encounterId=19592581__901__FZZ999-B, HISO sessionKey=439CC902-4C78-4F9A-A001-837C553DE0C1 (practice 901, confirmed active/non-expiring 2026-07-31).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Legacy - HISO",
+      "description": "Real legacy HISO SOAP server, localhost:53507.",
+      "item": [
+        {
+          "name": "getVersion",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              },
+              {
+                "key": "SOAPAction",
+                "value": "\"http://www.hiso.govt.nz/10014.2/1.0/formsession/getVersion\""
+              }
+            ],
+            "url": "{{legacyHisoBase}}/FormSessionService.svc",
+            "body": {
+              "mode": "raw",
+              "raw": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tns=\"http://www.hiso.govt.nz/10014.2/1.0/formsession\">\n  <soap:Body>\n    <tns:getVersion><tns:sessionKey>439CC902-4C78-4F9A-A001-837C553DE0C1</tns:sessionKey></tns:getVersion>\n  </soap:Body>\n</soap:Envelope>"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json + crosscheck/PARITY_MEMORY.md (2026-07-30/31 live runs). sessionKey 439CC902-... is a REAL active HISO session for practice 901, confirmed live 2026-07-31 (does not expire). Confirmed 200 with <return><application>PMS</application>...</return>."
+          },
+          "response": []
+        },
+        {
+          "name": "getDeliveryOptions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              },
+              {
+                "key": "SOAPAction",
+                "value": "\"http://www.hiso.govt.nz/10014.2/1.0/formsession/getDeliveryOptions\""
+              }
+            ],
+            "url": "{{legacyHisoBase}}/FormSessionService.svc",
+            "body": {
+              "mode": "raw",
+              "raw": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tns=\"http://www.hiso.govt.nz/10014.2/1.0/formsession\">\n  <soap:Body>\n    <tns:getDeliveryOptions><tns:sessionKey>439CC902-4C78-4F9A-A001-837C553DE0C1</tns:sessionKey></tns:getDeliveryOptions>\n  </soap:Body>\n</soap:Envelope>"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json + crosscheck/PARITY_MEMORY.md (2026-07-30/31 live runs). sessionKey 439CC902-... is a REAL active HISO session for practice 901, confirmed live 2026-07-31 (does not expire). Legacy returns real senderAccount=Testn28n6ujh, senderPassword=1 (see PARITY_MEMORY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "getData",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              },
+              {
+                "key": "SOAPAction",
+                "value": "\"http://www.hiso.govt.nz/10014.2/1.0/formsession/getData\""
+              }
+            ],
+            "url": "{{legacyHisoBase}}/FormSessionService.svc",
+            "body": {
+              "mode": "raw",
+              "raw": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tns=\"http://www.hiso.govt.nz/10014.2/1.0/formsession\">\n  <soap:Body>\n    <tns:getData><tns:sessionKey>439CC902-4C78-4F9A-A001-837C553DE0C1</tns:sessionKey><tns:dataContainer><formMetaData xmlns=\"http://www.hiso.govt.nz/10014.2/1.0/formInstanceMeta\"><formInstanceOperationMode>N</formInstanceOperationMode></formMetaData><submittedData xmlns=\"\"><dummy/></submittedData></tns:dataContainer></tns:getData>\n  </soap:Body>\n</soap:Envelope>"
+            },
+            "description": "Source: crosscheck/HekCoreApi-Crosscheck.postman_collection.json (2026-07-30) + crosscheck/errors.md 'HISO getData' fix entry (2026-07-31, 2 bugs fixed). This is the minimal dataContainer shape confirmed structurally correct against the real WSDL - a full real captured formMetaData (all 14 fields) was used during the actual fix verification but is not preserved verbatim in the docs. NO FULL REAL SUCCESS BODY CAPTURED VERBATIM - needs live capture for exhaustive field coverage."
+          },
+          "response": []
+        },
+        {
+          "name": "saveContainer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              },
+              {
+                "key": "SOAPAction",
+                "value": "\"http://www.hiso.govt.nz/10014.2/1.0/formsession/saveContainer\""
+              }
+            ],
+            "url": "{{legacyHisoBase}}/FormSessionService.svc",
+            "body": {
+              "mode": "raw",
+              "raw": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tns=\"http://www.hiso.govt.nz/10014.2/1.0/formsession\">\n  <soap:Body>\n    <tns:saveContainer><tns:sessionKey>439CC902-4C78-4F9A-A001-837C553DE0C1</tns:sessionKey><tns:resumePath></tns:resumePath><tns:dataContainer xmlns=\"\"><dummy/></tns:dataContainer><tns:view></tns:view><tns:viewType></tns:viewType><tns:viewSignature></tns:viewSignature><tns:completed>false</tns:completed><tns:continueSession>false</tns:continueSession></tns:saveContainer>\n  </soap:Body>\n</soap:Envelope>"
+            },
+            "description": "Source: crosscheck/HekCoreApi-Crosscheck.postman_collection.json + crosscheck/errors.md 'HISO saveContainer' fix entry (2026-07-31, 4 bugs fixed using a real client-captured Work Capacity Med Cert form payload supplied by Zohaib). The real captured payload itself is not preserved verbatim in any doc file - this is the minimal structurally-correct shape. NO FULL REAL SUCCESS BODY CAPTURED VERBATIM - needs live capture."
+          },
+          "response": []
+        },
+        {
+          "name": "getFormView",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              },
+              {
+                "key": "SOAPAction",
+                "value": "\"http://www.hiso.govt.nz/10014.2/1.0/formsession/getFormView\""
+              }
+            ],
+            "url": "{{legacyHisoBase}}/FormSessionService.svc",
+            "body": {
+              "mode": "raw",
+              "raw": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tns=\"http://www.hiso.govt.nz/10014.2/1.0/formsession\">\n  <soap:Body>\n    <tns:getFormView><tns:sessionKey>439CC902-4C78-4F9A-A001-837C553DE0C1</tns:sessionKey><tns:formInstanceId>a30f8f2e-519d-449b-a194-03a1c3157fa9</tns:formInstanceId></tns:getFormView>\n  </soap:Body>\n</soap:Envelope>"
+            },
+            "description": "Source: crosscheck/PARITY_MEMORY.md (2026-07-30). This formInstanceId does not exist in test data - legacy returns 500 Fault (expected/documented behavior, not an error in the sample). NO VERIFIED SUCCESS SAMPLE FOUND for a formInstanceId that actually resolves - needs live capture."
+          },
+          "response": []
+        },
+        {
+          "name": "processAction",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              },
+              {
+                "key": "SOAPAction",
+                "value": "\"http://www.hiso.govt.nz/10014.2/1.0/formsession/processAction\""
+              }
+            ],
+            "url": "{{legacyHisoBase}}/FormSessionService.svc",
+            "body": {
+              "mode": "raw",
+              "raw": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tns=\"http://www.hiso.govt.nz/10014.2/1.0/formsession\">\n  <soap:Body>\n    <tns:processAction><tns:sessionKey>439CC902-4C78-4F9A-A001-837C553DE0C1</tns:sessionKey><tns:actionId>launchForm</tns:actionId><tns:actionContainer xmlns=\"\"><dummy/></tns:actionContainer></tns:processAction>\n  </soap:Body>\n</soap:Envelope>"
+            },
+            "description": "Source: crosscheck/HekCoreApi-Crosscheck.postman_collection.json + PARITY_MEMORY.md (2026-07-30/31). Legacy returns 200 <return><processed>false</processed></return> (launchForm is a documented no-op stub)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Legacy - ERMS",
+      "description": "Real legacy ERMS server, localhost:2003, Host: southerms.indici.nz.",
+      "item": [
+        {
+          "name": "Ping",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{legacyErmsBase}}/API/Ping",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Confirmed match (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "Authenticate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/xml"
+              }
+            ],
+            "url": "{{legacyErmsBase}}/API/Authenticate",
+            "body": {
+              "mode": "raw",
+              "raw": "<Credential><Username>ermsdev</Username><Password>eRMsd3V</Password><PatientId>2450776</PatientId><EncounterId>19592581__901__FZZ999-B</EncounterId></Credential>"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Byte-for-byte match confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetPatientData",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{legacyErmsBase}}/API/GetPatientData?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Match confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetPatientMeasurement",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{legacyErmsBase}}/API/GetPatientMeasurement?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Match confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetSmokingStatus",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{legacyErmsBase}}/API/GetSmokingStatus?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Match confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetCurrentUser",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{legacyErmsBase}}/API/GetCurrentUser?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Match confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetNextOfKin",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{legacyErmsBase}}/API/GetNextOfKin?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Match confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetRegisteredPractitioners",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{legacyErmsBase}}/API/GetRegisteredPractitioners?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. FIXED 2026-07-31: row-order now deterministic via StableSort (errors.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetAccidents",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{legacyErmsBase}}/API/GetAccidents?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsOrder=desc&pmsMinDateTime=2000-01-01&pmsMaxDateTime=2030-01-01",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Match confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetClassifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{legacyErmsBase}}/API/GetClassifications?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsOrder=desc&pmsMinDateTime=2000-01-01&pmsMaxDateTime=2030-01-01",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Match confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetConsultNotes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{legacyErmsBase}}/API/GetConsultNotes?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsOrder=ASC&pmsMinDateTime=2000-01-01&pmsMaxDateTime=2030-01-01",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Order params from HEK_4APIs_Manual_Verification.postman_collection.json. FIXED 2026-07-31: row order now deterministic."
+          },
+          "response": []
+        },
+        {
+          "name": "GetMedicalAllergies",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{legacyErmsBase}}/API/GetMedicalAllergies?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsOrder=desc&pmsMinDateTime=2000-01-01&pmsMaxDateTime=2030-01-01",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Match confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetPrescribedMedications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{legacyErmsBase}}/API/GetPrescribedMedications?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsOrder=desc&pmsMinDateTime=2000-01-01&pmsMaxDateTime=2030-01-01",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. FIXED 2026-07-31: row order deterministic (errors.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetRegularMedications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{legacyErmsBase}}/API/GetRegularMedications?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsOrder=desc&pmsMinDateTime=2000-01-01&pmsMaxDateTime=2030-01-01",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. FIXED 2026-07-31: shares GetMedicationsAsync fix."
+          },
+          "response": []
+        },
+        {
+          "name": "GetLaboratoryReportList",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{legacyErmsBase}}/API/GetLaboratoryReportList?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsOrder=desc&pmsMinDateTime=2000-01-01&pmsMaxDateTime=2030-01-01",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Match confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetRadiologyReportList",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{legacyErmsBase}}/API/GetRadiologyReportList?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsOrder=desc&pmsMinDateTime=2000-01-01&pmsMaxDateTime=2030-01-01",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Match confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetDischargeSummaryReportList",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{legacyErmsBase}}/API/GetDischargeSummaryReportList?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsOrder=desc&pmsMinDateTime=2000-01-01&pmsMaxDateTime=2030-01-01",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Match confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetScannedList",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{legacyErmsBase}}/API/GetScannedList?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsOrder=desc&pmsMinDateTime=2000-01-01&pmsMaxDateTime=2030-01-01",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Match confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetLaboratoryReportDetails",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{legacyErmsBase}}/API/GetLaboratoryReportDetails?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsReferenceId=B3A928B7-3FE9-42D7-AFAE-802C71607AE8",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. pmsReferenceId from HekCoreApi-Crosscheck.postman_collection.json (real, confirmed-working reference id). FIXED 2026-07-31: RTF line-ending bug (errors.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetRadiologyReportDetails",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{legacyErmsBase}}/API/GetRadiologyReportDetails?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsReferenceId=",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. NO VERIFIED REAL pmsReferenceId FOUND for radiology in the logs/docs - needs live capture; patient/encounter themselves are verified."
+          },
+          "response": []
+        },
+        {
+          "name": "GetDischargeSummaryDetails",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{legacyErmsBase}}/API/GetDischargeSummaryDetails?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsReferenceId=",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Source: HekCoreApi-Crosscheck.postman_collection.json - empty pmsReferenceId is the actual verified test case (legacy is slow 2-14s then NullReferenceException; new API returns empty result in ~0.1s - see errors.md 'GetDischargeSummaryDetails')."
+          },
+          "response": []
+        },
+        {
+          "name": "GetScannedDetails",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{legacyErmsBase}}/API/GetScannedDetails?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsReferenceId=4171A2EC-586D-45DE-84FA-A080AA2266A8",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. pmsReferenceId from HekCoreApi-Crosscheck.postman_collection.json. FIXED 2026-07-31: Content column MaxLength bug for base64 docs >limit (errors.md 'GetScannedDetails')."
+          },
+          "response": []
+        },
+        {
+          "name": "SaveDocument",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/xml"
+              }
+            ],
+            "url": "{{legacyErmsBase}}/API/SaveDocument",
+            "body": {
+              "mode": "raw",
+              "raw": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<ReferralDocument>\n<ReferralDocument_Referral_ID>1</ReferralDocument_Referral_ID>\n<ReferralDocument_Document_ID>1001</ReferralDocument_Document_ID>\n<ReferralDocument_Patient_PMS_ID>2450776</ReferralDocument_Patient_PMS_ID>\n<ReferralDocument_Encounter_ID>19592581__901__FZZ999-B</ReferralDocument_Encounter_ID>\n<ReferralDocument_Referral_Type>Specialist Referral</ReferralDocument_Referral_Type>\n<ReferralDocument_Item_Type>in</ReferralDocument_Item_Type>\n<ReferralDocument_Referral_Status>New</ReferralDocument_Referral_Status>\n<ReferralDocument_Created_Date>2026-07-31</ReferralDocument_Created_Date>\n<ReferralDocument_Referrer_Fullname>Test Referrer</ReferralDocument_Referrer_Fullname>\n<ReferralDocument_Referrer_PMS_ID>2450776</ReferralDocument_Referrer_PMS_ID>\n<ReferralDocument_Document_Source>Manual verification</ReferralDocument_Document_Source>\n<ReferralDocument_Content_Type>application/pdf</ReferralDocument_Content_Type>\n<ReferralDocument_Description_Type>Referral</ReferralDocument_Description_Type>\n<ReferralDocument_Description>Manual verification document</ReferralDocument_Description>\n<ReferralDocument_Encoding>base64</ReferralDocument_Encoding>\n<ReferralDocument_Content>SGVsbG8gV29ybGQ=</ReferralDocument_Content>\n<ReferralDocument_Error_Text></ReferralDocument_Error_Text>\n</ReferralDocument>"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Real ReferralDocument shape from legacy source (APIController.cs:1535). Legacy itself returns 400 'BadRequest' (its own generic error text, hides real cause - errors.md 'SaveDocument')."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Legacy - KARO",
+      "description": "Real legacy KARO/HSS server, localhost:2345.",
+      "item": [
+        {
+          "name": "Ping",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{legacyKaroBase}}/API/ping",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Confirmed match."
+          },
+          "response": []
+        },
+        {
+          "name": "Authenticate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{legacyKaroBase}}/API/Authenticate",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"Username\":\"hsslive\",\"Password\":\"H$$L1v3005\",\"patientId\":\"2450776\",\"encounterId\":\"19592581__901__FZZ999-B\",\"system\":\"hss\",\"pho\":\"HBPHO\"}"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetDemographics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              }
+            ],
+            "url": "{{legacyKaroBase}}/API/GetDemographics?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). FIXED 2026-07-31: added missing endEnrolmentDate field, empty-string vs null fix."
+          },
+          "response": []
+        },
+        {
+          "name": "GetClinicalNotes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              }
+            ],
+            "url": "{{legacyKaroBase}}/API/GetClinicalNotes?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). FIXED 2026-07-31: DataTableMapper line-ending/null fix (42/50 mismatch -> 0/50)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetConditions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              }
+            ],
+            "url": "{{legacyKaroBase}}/API/GetConditions?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). FIXED 2026-07-31: shared DataTableMapper fix."
+          },
+          "response": []
+        },
+        {
+          "name": "GetDocuments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              }
+            ],
+            "url": "{{legacyKaroBase}}/API/GetDocuments?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B&identifier=",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Match confirmed."
+          },
+          "response": []
+        },
+        {
+          "name": "GetLabResults",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              }
+            ],
+            "url": "{{legacyKaroBase}}/API/GetLabResults?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Already matched pre-fix."
+          },
+          "response": []
+        },
+        {
+          "name": "GetMedications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              }
+            ],
+            "url": "{{legacyKaroBase}}/API/GetMedications?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). FIXED 2026-07-31: shared DataTableMapper fix."
+          },
+          "response": []
+        },
+        {
+          "name": "GetObservations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              }
+            ],
+            "url": "{{legacyKaroBase}}/API/GetObservations?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B&conceptId=",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). FIXED 2026-07-31: shared DataTableMapper fix."
+          },
+          "response": []
+        },
+        {
+          "name": "GetProvider",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              }
+            ],
+            "url": "{{legacyKaroBase}}/API/GetProvider?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B&userId=",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Match confirmed."
+          },
+          "response": []
+        },
+        {
+          "name": "GetRecallCategories",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              }
+            ],
+            "url": "{{legacyKaroBase}}/API/GetRecallCategories?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B&group=",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). FIXED 2026-07-31: 'group' made nullable string - blank/missing now returns {entry:[]} like legacy."
+          },
+          "response": []
+        },
+        {
+          "name": "GetEncounterSummary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              }
+            ],
+            "url": "{{legacyKaroBase}}/API/GetEncounterSummary?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B&identifier=",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Match confirmed."
+          },
+          "response": []
+        },
+        {
+          "name": "GetRecalls",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              }
+            ],
+            "url": "{{legacyKaroBase}}/API/GetRecalls?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). FIXED 2026-07-31: shared DataTableMapper fix."
+          },
+          "response": []
+        },
+        {
+          "name": "GetScreeningCodes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              }
+            ],
+            "url": "{{legacyKaroBase}}/API/GetScreeningCodes?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Match confirmed."
+          },
+          "response": []
+        },
+        {
+          "name": "GetPatientAttachment",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              }
+            ],
+            "url": "{{legacyKaroBase}}/API/GetPatientAttachment?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B&referenceID=&sortOrder=&subject=&dateFrom=&dateTo=",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Match confirmed."
+          },
+          "response": []
+        },
+        {
+          "name": "SaveScreeningCode",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{legacyKaroBase}}/API/SaveScreeningCode",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"test\":\"crosscheck\"}"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Source: HekCoreApi-Crosscheck.postman_collection.json - confirmed stub match (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "SaveClinicalNotes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{legacyKaroBase}}/API/SaveClinicalNotes",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"PatientId\":\"2450776\",\"EncounterId\":\"19592581__901__FZZ999-B\",\"UserId\":\"hsslive\",\"ProviderID\":\"1763690\",\"NoteDate\":\"2026-07-31T12:00:00\",\"Note\":\"Manual verification consult note\"}"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Model shape derived from legacy source ConsultNote class (legacy-reference/hsswebapi APIModels.cs) per errors.md 'KARO write operations'. NOTE: exact field values not preserved verbatim in docs beyond the class shape - byte-for-byte match confirmed live 2026-07-31, but this specific request body is a reasonable reconstruction of that shape, not a captured raw payload; verify field names against KaroConsultNoteRequest in src/Api if replaying."
+          },
+          "response": []
+        },
+        {
+          "name": "SaveCondition",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{legacyKaroBase}}/API/SaveCondition",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"PatientId\":\"2450776\",\"EncounterId\":\"19592581__901__FZZ999-B\",\"UserId\":\"hsslive\",\"ConditionCode\":\"J45\",\"ConditionDescription\":\"Asthma\",\"OnsetDate\":\"2026-07-31\",\"ProviderID\":\"1763690\"}"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Shape derived from legacy Condition class (errors.md 'KARO write operations'). Idempotency sentinel (-5 'already exists') confirmed on rerun since legacy/new share one live DB."
+          },
+          "response": []
+        },
+        {
+          "name": "SaveObservations",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{legacyKaroBase}}/API/SaveObservations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"PatientId\":\"2450776\",\"EncounterId\":\"19592581__901__FZZ999-B\",\"UserId\":\"hsslive\",\"ConceptId\":\"12345\",\"ObservationDate\":\"2026-07-31T12:00:00\",\"Value\":\"120/80\",\"ProviderID\":\"1763690\"}"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Shape derived from legacy Observations class (errors.md). Matched immediately, byte-for-byte."
+          },
+          "response": []
+        },
+        {
+          "name": "SaveSummary",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{legacyKaroBase}}/API/SaveSummary",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patientId\": \"2450776\",\n  \"encounterID\": \"19592581__901__FZZ999-B\",\n  \"system\": \"hss\",\n  \"identifier\": \"DIAP\",\n  \"providerID\": \"1763690\",\n  \"dateTimeRecorded\": \"2026-07-31T12:00:00\",\n  \"entry\": [\n    {\n      \"Diabetic risk\":\"Low\",\"HbA1c\":\"60\",\"Type of Diabetes\":\"Type 1\",\"Year of Diagnosis\":\"2018\",\n      \"Height\":\"164\",\"Weight\":\"84\",\"Year Last Retinal\":\"2015\",\"BP Systolic\":\"80\",\"BP Diastolic\":\"90\",\n      \"Creatine Ratio\":\"2\",\"Dip-Stick Test\":\"Negative\",\"Total Cholesterol\":\"40\",\"HDL Cholesterol\":\"50\",\n      \"Triglyceride\":\"20\",\"Ethnic Origin\":\"Maori\",\"NHI\":\"ZZZ0026\",\"Smoker\":\"No\",\"Insulin\":\"No\",\n      \"Oral Medication\":\"No\",\"Diet Only\":\"No\",\"ACE Inhibitor\":\"No\",\"Anti-hypertensive\":\"No\",\n      \"Statin inhibitor\":\"No\",\"Other medication\":\"No\",\"Foot Sensation/Pulse\":\"No\",\"Prev PVD/Ulcer\":\"No\",\n      \"Food Changes\":\"No\",\"Activity\":\"No\",\"OutCome\":\"A\"\n    }\n  ]\n}"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Source: HEK_4APIs_Manual_Verification.postman_collection.json - real working sample from KARO_HSS_doc.md (identifier=DIAP, Outcome=A). Both sides return {\"status\":\"success\"} byte-for-byte."
+          },
+          "response": []
+        },
+        {
+          "name": "SaveRecall",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{legacyKaroBase}}/API/SaveRecall",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"PatientId\":\"2450776\",\"EncounterId\":\"19592581__901__FZZ999-B\",\"UserId\":\"hsslive\",\"Priority\":\"High\",\"Group\":\"Vaccine\",\"DueDate\":\"2026-12-01\",\"Notes\":\"Manual verification\",\"CategoryId\":\"4690\"}"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Source: HEK_4APIs_Manual_Verification.postman_collection.json. Real, confirmed-valid combo: group='Vaccine', categoryId=4690 ('Flu vaccine') derived from uspGetRecalls/uspGetRecallCategories for patient 2450776 (errors.md 'SaveRecall RESOLVED'). Both sides return {\"status\":\"success\",\"message\":\"\"} byte-for-byte."
+          },
+          "response": []
+        },
+        {
+          "name": "SaveDocument",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{legacyKaroBase}}/API/SaveDocument",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"PatientId\":\"2450776\",\"EncounterId\":\"19592581__901__FZZ999-B\",\"DocumentName\":\"CrosscheckDoc.txt\",\"DocumentTypeID\":\"1\",\"Description\":\"Manual verification document\",\"Content\":\"SGVsbG8gV29ybGQ=\",\"PracticeID\":\"901\"}"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Shape derived from legacy Document class (errors.md 'SaveDocument' under KARO write operations). FIXED 2026-07-31: SqlParameter type mismatches (@pDocumentSize/@pPracticeID) + missing Karo:DMSDocTypes config."
+          },
+          "response": []
+        },
+        {
+          "name": "SaveInvoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{legacyKaroBase}}/API/SaveInvoice",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"ServiceCode\":\"#KF005\",\"ServiceName\":\"Medical Examination\",\"AmountInclGST\":\"50.00\",\"Description\":\"Manual verification invoice\",\"AccountHolderID\":\"2450776\",\"PatientID\":\"2450776\",\"EncounterID\":\"19592581__901__FZZ999-B\",\"ServiceDate\":\"20260731\",\"ServiceProvider\":\"111\"}"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Shape adapted from COL SaveInvoice real payload (HEK_4APIs_Manual_Verification.postman_collection.json) for the KARO Invoice class per errors.md - FIXED 2026-07-31: removed extra @pPayee param not accepted by real HSSDA.cs:1221-1224 proc call. Verified live: real serviceMappingId returned."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Legacy - COL",
+      "description": "Real legacy COL server, localhost:2003/COL, Host: southerms.indici.nz.",
+      "item": [
+        {
+          "name": "Authenticate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{legacyColBase}}/COL/Authenticate",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"Username\":\"ermsdev\",\"Password\":\"eRMsd3V\",\"PatientId\":\"2450776\",\"EncounterId\":\"19592581__901__FZZ999-B\"}"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md COL table / crosscheck/errors.md (2026-07-31 live runs, real production credentials supplied by Zohaib). NOTE: real legacy HANGS (4+ min, no response) for this practice/account - root cause: legacy's connection-string for this account points to an unreachable remote IP (43.255.162.58) from this dev machine (same class of gap as HISO DMSProxy). This is a confirmed real legacy-side environment issue, not a new-API defect (errors.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetCurrentPatientData",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{colToken}}"
+              }
+            ],
+            "url": "{{legacyColBase}}/COL/GetCurrentPatientData?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md COL table / crosscheck/errors.md (2026-07-31 live runs, real production credentials supplied by Zohaib). Legacy side blocked by the Authenticate hang above (auth token unobtainable from real legacy for this practice) - cannot independently confirm this specific legacy response; documented as a known gap (errors.md 'inconclusive (auth blocked)')."
+          },
+          "response": []
+        },
+        {
+          "name": "GetSessionData",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{colToken}}"
+              }
+            ],
+            "url": "{{legacyColBase}}/COL/GetSessionData?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md COL table / crosscheck/errors.md (2026-07-31 live runs, real production credentials supplied by Zohaib). Legacy side blocked by the Authenticate hang above (auth token unobtainable from real legacy for this practice) - cannot independently confirm this specific legacy response; documented as a known gap (errors.md 'inconclusive (auth blocked)')."
+          },
+          "response": []
+        },
+        {
+          "name": "GetProviderData",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{colToken}}"
+              }
+            ],
+            "url": "{{legacyColBase}}/COL/GetProviderData?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md COL table / crosscheck/errors.md (2026-07-31 live runs, real production credentials supplied by Zohaib). Legacy side blocked by the Authenticate hang above (auth token unobtainable from real legacy for this practice) - cannot independently confirm this specific legacy response; documented as a known gap (errors.md 'inconclusive (auth blocked)')."
+          },
+          "response": []
+        },
+        {
+          "name": "GetSurgeryData",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{colToken}}"
+              }
+            ],
+            "url": "{{legacyColBase}}/COL/GetSurgeryData?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&LocationId=",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md COL table / crosscheck/errors.md (2026-07-31 live runs, real production credentials supplied by Zohaib). Legacy side blocked by the Authenticate hang above (auth token unobtainable from real legacy for this practice) - cannot independently confirm this specific legacy response; documented as a known gap (errors.md 'inconclusive (auth blocked)')."
+          },
+          "response": []
+        },
+        {
+          "name": "GetDiagnosisData",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{colToken}}"
+              }
+            ],
+            "url": "{{legacyColBase}}/COL/GetDiagnosisData?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsOrder=desc&pmsMinDateTime=2000-01-01&pmsMaxDateTime=2030-01-01",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md COL table / crosscheck/errors.md (2026-07-31 live runs, real production credentials supplied by Zohaib). Legacy side blocked by the Authenticate hang above (auth token unobtainable from real legacy for this practice) - cannot independently confirm this specific legacy response; documented as a known gap (errors.md 'inconclusive (auth blocked)')."
+          },
+          "response": []
+        },
+        {
+          "name": "SaveInvoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{colToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{legacyColBase}}/COL/SaveInvoice",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"ServiceCode\":\"#KF005\",\"ServiceName\":\"Medical Examination\",\"AmountInclGST\":\"50.00\",\"Description\":\"Manual verification invoice\",\"AccountHolderID\":\"2450776\",\"PatientID\":\"2450776\",\"EncounterID\":\"19592581__901__FZZ999-B\",\"ServiceDate\":\"20260731\",\"ServiceProvider\":\"111\",\"ClaimShortCode\":\"#KF005\"}"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md COL table / crosscheck/errors.md (2026-07-31 live runs, real production credentials supplied by Zohaib). FULLY RESOLVED 2026-07-31: real SP source (legacy-reference/legacy SP/saveinvoice.txt) showed InsertedBy resolves via ServiceProvider (real NZMCNO) or falls back to a NULL enrollment ProviderId for this patient - so ServiceProvider must be supplied. Verified via direct sqlcmd SP call: real invoice ID 18279074."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "New API - HISO",
+      "description": "HEK Core API SOAP compat endpoint, localhost:8080/FormSessionService.svc.",
+      "item": [
+        {
+          "name": "getVersion",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              },
+              {
+                "key": "SOAPAction",
+                "value": "\"http://www.hiso.govt.nz/10014.2/1.0/formsession/getVersion\""
+              }
+            ],
+            "url": "{{newBase}}/FormSessionService.svc",
+            "body": {
+              "mode": "raw",
+              "raw": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tns=\"http://www.hiso.govt.nz/10014.2/1.0/formsession\">\n  <soap:Body>\n    <tns:getVersion><tns:sessionKey>439CC902-4C78-4F9A-A001-837C553DE0C1</tns:sessionKey></tns:getVersion>\n  </soap:Body>\n</soap:Envelope>"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json + crosscheck/PARITY_MEMORY.md (2026-07-30/31 live runs). sessionKey 439CC902-... is a REAL active HISO session for practice 901, confirmed live 2026-07-31 (does not expire). New API confirmed 200, field values match legacy exactly (wrapper element name differs: <getVersionResult><GetVersionResponseReturn> vs legacy's <return> - see PARITY_MEMORY.md; values match)."
+          },
+          "response": []
+        },
+        {
+          "name": "getDeliveryOptions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              },
+              {
+                "key": "SOAPAction",
+                "value": "\"http://www.hiso.govt.nz/10014.2/1.0/formsession/getDeliveryOptions\""
+              }
+            ],
+            "url": "{{newBase}}/FormSessionService.svc",
+            "body": {
+              "mode": "raw",
+              "raw": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tns=\"http://www.hiso.govt.nz/10014.2/1.0/formsession\">\n  <soap:Body>\n    <tns:getDeliveryOptions><tns:sessionKey>439CC902-4C78-4F9A-A001-837C553DE0C1</tns:sessionKey></tns:getDeliveryOptions>\n  </soap:Body>\n</soap:Envelope>"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json + crosscheck/PARITY_MEMORY.md (2026-07-30/31 live runs). sessionKey 439CC902-... is a REAL active HISO session for practice 901, confirmed live 2026-07-31 (does not expire). NOTE: new API's senderPassword/URL are still CHANGE_ME placeholders - real HealthLink credentials never supplied (documented gap, see crosscheck/errors.md and PROJECT_MASTER.md). senderAccount now resolves correctly post-fix."
+          },
+          "response": []
+        },
+        {
+          "name": "getData",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              },
+              {
+                "key": "SOAPAction",
+                "value": "\"http://www.hiso.govt.nz/10014.2/1.0/formsession/getData\""
+              }
+            ],
+            "url": "{{newBase}}/FormSessionService.svc",
+            "body": {
+              "mode": "raw",
+              "raw": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tns=\"http://www.hiso.govt.nz/10014.2/1.0/formsession\">\n  <soap:Body>\n    <tns:getData><tns:sessionKey>439CC902-4C78-4F9A-A001-837C553DE0C1</tns:sessionKey><tns:dataContainer><formMetaData xmlns=\"http://www.hiso.govt.nz/10014.2/1.0/formInstanceMeta\"><formInstanceOperationMode>N</formInstanceOperationMode></formMetaData><submittedData xmlns=\"\"><dummy/></submittedData></tns:dataContainer></tns:getData>\n  </soap:Body>\n</soap:Envelope>"
+            },
+            "description": "See legacy request description. Post-fix (2026-07-31), new API's response now includes the submittedData/dummy wrapper and all 14 FormMetaDataSoap fields matching legacy's real XML shape field-for-field (crosscheck/errors.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "saveContainer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              },
+              {
+                "key": "SOAPAction",
+                "value": "\"http://www.hiso.govt.nz/10014.2/1.0/formsession/saveContainer\""
+              }
+            ],
+            "url": "{{newBase}}/FormSessionService.svc",
+            "body": {
+              "mode": "raw",
+              "raw": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tns=\"http://www.hiso.govt.nz/10014.2/1.0/formsession\">\n  <soap:Body>\n    <tns:saveContainer><tns:sessionKey>439CC902-4C78-4F9A-A001-837C553DE0C1</tns:sessionKey><tns:resumePath></tns:resumePath><tns:dataContainer xmlns=\"\"><dummy/></tns:dataContainer><tns:view></tns:view><tns:viewType></tns:viewType><tns:viewSignature></tns:viewSignature><tns:completed>false</tns:completed><tns:continueSession>false</tns:continueSession></tns:saveContainer>\n  </soap:Body>\n</soap:Envelope>"
+            },
+            "description": "See legacy request description. Post-fix, verified end-to-end: real document produced in DMS_PMS with byte-for-byte identical DocumentData to what was sent (crosscheck/errors.md). Note legacy itself is whitespace-sensitive on submittedData content - keep it fully compacted."
+          },
+          "response": []
+        },
+        {
+          "name": "getFormView",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              },
+              {
+                "key": "SOAPAction",
+                "value": "\"http://www.hiso.govt.nz/10014.2/1.0/formsession/getFormView\""
+              }
+            ],
+            "url": "{{newBase}}/FormSessionService.svc",
+            "body": {
+              "mode": "raw",
+              "raw": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tns=\"http://www.hiso.govt.nz/10014.2/1.0/formsession\">\n  <soap:Body>\n    <tns:getFormView><tns:sessionKey>439CC902-4C78-4F9A-A001-837C553DE0C1</tns:sessionKey><tns:formInstanceId>a30f8f2e-519d-449b-a194-03a1c3157fa9</tns:formInstanceId></tns:getFormView>\n  </soap:Body>\n</soap:Envelope>"
+            },
+            "description": "See legacy request description. Operation was entirely missing pre-fix (2026-07-30/31, see crosscheck/errors.md) - now wired and returns the real resumePath/dataContainer/view/viewType shape when a matching session+form exist. NO VERIFIED SUCCESS SAMPLE FOUND for a resolving formInstanceId in this environment - needs live capture."
+          },
+          "response": []
+        },
+        {
+          "name": "processAction",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/xml; charset=utf-8"
+              },
+              {
+                "key": "SOAPAction",
+                "value": "\"http://www.hiso.govt.nz/10014.2/1.0/formsession/processAction\""
+              }
+            ],
+            "url": "{{newBase}}/FormSessionService.svc",
+            "body": {
+              "mode": "raw",
+              "raw": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tns=\"http://www.hiso.govt.nz/10014.2/1.0/formsession\">\n  <soap:Body>\n    <tns:processAction><tns:sessionKey>439CC902-4C78-4F9A-A001-837C553DE0C1</tns:sessionKey><tns:actionId>launchForm</tns:actionId><tns:actionContainer xmlns=\"\"><dummy/></tns:actionContainer></tns:processAction>\n  </soap:Body>\n</soap:Envelope>"
+            },
+            "description": "See legacy request description. New API matches value (processed=false); only the response wrapper element naming differs (<processActionResult><ProcessActionResponseReturn> vs legacy's <return>) - PARITY_MEMORY.md."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "New API - ERMS",
+      "description": "HEK Core API ERMS compat endpoints, localhost:8080/API/*, Host: southerms.indici.nz.",
+      "item": [
+        {
+          "name": "Ping",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              }
+            ],
+            "url": "{{newBase}}/API/Ping",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations."
+          },
+          "response": []
+        },
+        {
+          "name": "Authenticate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/xml"
+              }
+            ],
+            "url": "{{newBase}}/API/Authenticate",
+            "body": {
+              "mode": "raw",
+              "raw": "<Credential><Username>ermsdev</Username><Password>eRMsd3V</Password><PatientId>2450776</PatientId><EncounterId>19592581__901__FZZ999-B</EncounterId></Credential>"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var m = pm.response.text().match(/<Token>([^<]+)<\\/Token>/);",
+                  "if (m) { pm.collectionVariables.set('ermsToken', m[1]); pm.environment.set('ermsToken', m[1]); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GetPatientData",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{newBase}}/API/GetPatientData?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Match confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetPatientMeasurement",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{newBase}}/API/GetPatientMeasurement?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Match confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetSmokingStatus",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{newBase}}/API/GetSmokingStatus?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Match confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetCurrentUser",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{newBase}}/API/GetCurrentUser?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Match confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetNextOfKin",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{newBase}}/API/GetNextOfKin?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Match confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetRegisteredPractitioners",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{newBase}}/API/GetRegisteredPractitioners?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. FIXED 2026-07-31: row-order now deterministic via StableSort (errors.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetAccidents",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{newBase}}/API/GetAccidents?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsOrder=desc&pmsMinDateTime=2000-01-01&pmsMaxDateTime=2030-01-01",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Match confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetClassifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{newBase}}/API/GetClassifications?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsOrder=desc&pmsMinDateTime=2000-01-01&pmsMaxDateTime=2030-01-01",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Match confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetConsultNotes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{newBase}}/API/GetConsultNotes?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsOrder=ASC&pmsMinDateTime=2000-01-01&pmsMaxDateTime=2030-01-01",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Order params from HEK_4APIs_Manual_Verification.postman_collection.json. FIXED 2026-07-31: row order now deterministic."
+          },
+          "response": []
+        },
+        {
+          "name": "GetMedicalAllergies",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{newBase}}/API/GetMedicalAllergies?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsOrder=desc&pmsMinDateTime=2000-01-01&pmsMaxDateTime=2030-01-01",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Match confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetPrescribedMedications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{newBase}}/API/GetPrescribedMedications?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsOrder=desc&pmsMinDateTime=2000-01-01&pmsMaxDateTime=2030-01-01",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. FIXED 2026-07-31: row order deterministic (errors.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetRegularMedications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{newBase}}/API/GetRegularMedications?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsOrder=desc&pmsMinDateTime=2000-01-01&pmsMaxDateTime=2030-01-01",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. FIXED 2026-07-31: shares GetMedicationsAsync fix."
+          },
+          "response": []
+        },
+        {
+          "name": "GetLaboratoryReportList",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{newBase}}/API/GetLaboratoryReportList?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsOrder=desc&pmsMinDateTime=2000-01-01&pmsMaxDateTime=2030-01-01",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Match confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetRadiologyReportList",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{newBase}}/API/GetRadiologyReportList?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsOrder=desc&pmsMinDateTime=2000-01-01&pmsMaxDateTime=2030-01-01",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Match confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetDischargeSummaryReportList",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{newBase}}/API/GetDischargeSummaryReportList?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsOrder=desc&pmsMinDateTime=2000-01-01&pmsMaxDateTime=2030-01-01",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Match confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetScannedList",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{newBase}}/API/GetScannedList?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsOrder=desc&pmsMinDateTime=2000-01-01&pmsMaxDateTime=2030-01-01",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Match confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetLaboratoryReportDetails",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{newBase}}/API/GetLaboratoryReportDetails?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsReferenceId=B3A928B7-3FE9-42D7-AFAE-802C71607AE8",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. pmsReferenceId from HekCoreApi-Crosscheck.postman_collection.json (real, confirmed-working reference id). FIXED 2026-07-31: RTF line-ending bug (errors.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetRadiologyReportDetails",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{newBase}}/API/GetRadiologyReportDetails?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsReferenceId=",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. NO VERIFIED REAL pmsReferenceId FOUND for radiology in the logs/docs - needs live capture; patient/encounter themselves are verified."
+          },
+          "response": []
+        },
+        {
+          "name": "GetDischargeSummaryDetails",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{newBase}}/API/GetDischargeSummaryDetails?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsReferenceId=",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. Source: HekCoreApi-Crosscheck.postman_collection.json - empty pmsReferenceId is the actual verified test case (legacy is slow 2-14s then NullReferenceException; new API returns empty result in ~0.1s - see errors.md 'GetDischargeSummaryDetails')."
+          },
+          "response": []
+        },
+        {
+          "name": "GetScannedDetails",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              }
+            ],
+            "url": "{{newBase}}/API/GetScannedDetails?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsReferenceId=4171A2EC-586D-45DE-84FA-A080AA2266A8",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. pmsReferenceId from HekCoreApi-Crosscheck.postman_collection.json. FIXED 2026-07-31: Content column MaxLength bug for base64 docs >limit (errors.md 'GetScannedDetails')."
+          },
+          "response": []
+        },
+        {
+          "name": "SaveDocument",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ermsToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/xml"
+              }
+            ],
+            "url": "{{newBase}}/API/SaveDocument",
+            "body": {
+              "mode": "raw",
+              "raw": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<ReferralDocument>\n<ReferralDocument_Referral_ID>1</ReferralDocument_Referral_ID>\n<ReferralDocument_Document_ID>1001</ReferralDocument_Document_ID>\n<ReferralDocument_Patient_PMS_ID>2450776</ReferralDocument_Patient_PMS_ID>\n<ReferralDocument_Encounter_ID>19592581__901__FZZ999-B</ReferralDocument_Encounter_ID>\n<ReferralDocument_Referral_Type>Specialist Referral</ReferralDocument_Referral_Type>\n<ReferralDocument_Item_Type>in</ReferralDocument_Item_Type>\n<ReferralDocument_Referral_Status>New</ReferralDocument_Referral_Status>\n<ReferralDocument_Created_Date>2026-07-31</ReferralDocument_Created_Date>\n<ReferralDocument_Referrer_Fullname>Test Referrer</ReferralDocument_Referrer_Fullname>\n<ReferralDocument_Referrer_PMS_ID>2450776</ReferralDocument_Referrer_PMS_ID>\n<ReferralDocument_Document_Source>Manual verification</ReferralDocument_Document_Source>\n<ReferralDocument_Content_Type>application/pdf</ReferralDocument_Content_Type>\n<ReferralDocument_Description_Type>Referral</ReferralDocument_Description_Type>\n<ReferralDocument_Description>Manual verification document</ReferralDocument_Description>\n<ReferralDocument_Encoding>base64</ReferralDocument_Encoding>\n<ReferralDocument_Content>SGVsbG8gV29ybGQ=</ReferralDocument_Content>\n<ReferralDocument_Error_Text></ReferralDocument_Error_Text>\n</ReferralDocument>"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md ERMS table / crosscheck/errors.md (2026-07-31 live runs). Patient 2450776 / encounter 19592581__901__FZZ999-B confirmed working across 23 ERMS operations. RETESTED 2026-07-31 with this real shape: new API genuinely returns 200, document saved to DMS (uspUpdateExistingDoc_AWS -> uspDocumentSave -> uspInsertDocument all succeed) - errors.md 'SaveDocument'."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "New API - KARO",
+      "description": "HEK Core API KARO compat endpoints, localhost:8080/api/* (external) and /karo/* (internal, POST writes).",
+      "item": [
+        {
+          "name": "Ping",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "hss.itsmyhealth.nz"
+              }
+            ],
+            "url": "{{newBase}}/api/ping",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs)."
+          },
+          "response": []
+        },
+        {
+          "name": "Authenticate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Host",
+                "value": "hss.itsmyhealth.nz"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{newBase}}/api/Authenticate",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"Username\":\"hsslive\",\"Password\":\"H$$L1v3005\",\"patientId\":\"2450776\",\"encounterId\":\"19592581__901__FZZ999-B\",\"system\":\"hss\",\"pho\":\"HBPHO\"}"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). FIXED 2026-07-31: removed spurious extra 'message:null' field on fail branch."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var j = pm.response.json();",
+                  "if (j && j.token) { pm.collectionVariables.set('karoToken', j.token); pm.environment.set('karoToken', j.token); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GetDemographics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "hss.itsmyhealth.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              }
+            ],
+            "url": "{{newBase}}/api/GetDemographics?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). FIXED 2026-07-31: added missing endEnrolmentDate field, empty-string vs null fix. Real external route confirmed 200 post-routing-fix (KaroOperationNameMap, errors.md 'KARO routing bug')."
+          },
+          "response": []
+        },
+        {
+          "name": "GetClinicalNotes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "hss.itsmyhealth.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              }
+            ],
+            "url": "{{newBase}}/api/GetClinicalNotes?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). FIXED 2026-07-31: DataTableMapper line-ending/null fix (42/50 mismatch -> 0/50). Real external route confirmed 200 post-routing-fix (KaroOperationNameMap, errors.md 'KARO routing bug')."
+          },
+          "response": []
+        },
+        {
+          "name": "GetConditions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "hss.itsmyhealth.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              }
+            ],
+            "url": "{{newBase}}/api/GetConditions?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). FIXED 2026-07-31: shared DataTableMapper fix. Real external route confirmed 200 post-routing-fix (KaroOperationNameMap, errors.md 'KARO routing bug')."
+          },
+          "response": []
+        },
+        {
+          "name": "GetDocuments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "hss.itsmyhealth.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              }
+            ],
+            "url": "{{newBase}}/api/GetDocuments?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B&identifier=",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Match confirmed. Real external route confirmed 200 post-routing-fix (KaroOperationNameMap, errors.md 'KARO routing bug')."
+          },
+          "response": []
+        },
+        {
+          "name": "GetLabResults",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "hss.itsmyhealth.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              }
+            ],
+            "url": "{{newBase}}/api/GetLabResults?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Already matched pre-fix. Real external route confirmed 200 post-routing-fix (KaroOperationNameMap, errors.md 'KARO routing bug')."
+          },
+          "response": []
+        },
+        {
+          "name": "GetMedications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "hss.itsmyhealth.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              }
+            ],
+            "url": "{{newBase}}/api/GetMedications?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). FIXED 2026-07-31: shared DataTableMapper fix. Real external route confirmed 200 post-routing-fix (KaroOperationNameMap, errors.md 'KARO routing bug')."
+          },
+          "response": []
+        },
+        {
+          "name": "GetObservations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "hss.itsmyhealth.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              }
+            ],
+            "url": "{{newBase}}/api/GetObservations?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B&conceptId=",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). FIXED 2026-07-31: shared DataTableMapper fix. Real external route confirmed 200 post-routing-fix (KaroOperationNameMap, errors.md 'KARO routing bug')."
+          },
+          "response": []
+        },
+        {
+          "name": "GetProvider",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "hss.itsmyhealth.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              }
+            ],
+            "url": "{{newBase}}/api/GetProvider?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B&userId=",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Match confirmed. Real external route confirmed 200 post-routing-fix (KaroOperationNameMap, errors.md 'KARO routing bug')."
+          },
+          "response": []
+        },
+        {
+          "name": "GetRecallCategories",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "hss.itsmyhealth.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              }
+            ],
+            "url": "{{newBase}}/api/GetRecallCategories?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B&group=",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). FIXED 2026-07-31: 'group' made nullable string - blank/missing now returns {entry:[]} like legacy. Real external route confirmed 200 post-routing-fix (KaroOperationNameMap, errors.md 'KARO routing bug')."
+          },
+          "response": []
+        },
+        {
+          "name": "GetEncounterSummary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "hss.itsmyhealth.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              }
+            ],
+            "url": "{{newBase}}/api/GetEncounterSummary?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B&identifier=",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Match confirmed. Real external route confirmed 200 post-routing-fix (KaroOperationNameMap, errors.md 'KARO routing bug')."
+          },
+          "response": []
+        },
+        {
+          "name": "GetRecalls",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "hss.itsmyhealth.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              }
+            ],
+            "url": "{{newBase}}/api/GetRecalls?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). FIXED 2026-07-31: shared DataTableMapper fix. Real external route confirmed 200 post-routing-fix (KaroOperationNameMap, errors.md 'KARO routing bug')."
+          },
+          "response": []
+        },
+        {
+          "name": "GetScreeningCodes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "hss.itsmyhealth.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              }
+            ],
+            "url": "{{newBase}}/api/GetScreeningCodes?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Match confirmed. Real external route confirmed 200 post-routing-fix (KaroOperationNameMap, errors.md 'KARO routing bug')."
+          },
+          "response": []
+        },
+        {
+          "name": "GetPatientAttachment",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "hss.itsmyhealth.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              }
+            ],
+            "url": "{{newBase}}/api/GetPatientAttachment?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B&referenceID=&sortOrder=&subject=&dateFrom=&dateTo=",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Match confirmed. Real external route confirmed 200 post-routing-fix (KaroOperationNameMap, errors.md 'KARO routing bug')."
+          },
+          "response": []
+        },
+        {
+          "name": "SaveScreeningCode",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Host",
+                "value": "hss.itsmyhealth.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{newBase}}/api/SaveScreeningCode",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"test\":\"crosscheck\"}"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Stub confirmed identical (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "SaveClinicalNotes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{newBase}}/karo/clinicalnotes",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"PatientId\":\"2450776\",\"EncounterId\":\"19592581__901__FZZ999-B\",\"UserId\":\"hsslive\",\"ProviderID\":\"1763690\",\"NoteDate\":\"2026-07-31T12:00:00\",\"Note\":\"Manual verification consult note\"}"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Matched immediately, byte-for-byte identical success response (errors.md). Route: internal /karo/clinicalnotes (KaroCompatController.cs) - real external POST route not confirmed in docs, use internal."
+          },
+          "response": []
+        },
+        {
+          "name": "SaveCondition",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{newBase}}/karo/conditions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"PatientId\":\"2450776\",\"EncounterId\":\"19592581__901__FZZ999-B\",\"UserId\":\"hsslive\",\"ConditionCode\":\"J45\",\"ConditionDescription\":\"Asthma\",\"OnsetDate\":\"2026-07-31\",\"ProviderID\":\"1763690\"}"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Both succeed; matched (errors.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "SaveObservations",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{newBase}}/karo/observations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"PatientId\":\"2450776\",\"EncounterId\":\"19592581__901__FZZ999-B\",\"UserId\":\"hsslive\",\"ConceptId\":\"12345\",\"ObservationDate\":\"2026-07-31T12:00:00\",\"Value\":\"120/80\",\"ProviderID\":\"1763690\"}"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Matched immediately (errors.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "SaveSummary",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{newBase}}/karo/summary",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patientId\": \"2450776\",\n  \"encounterID\": \"19592581__901__FZZ999-B\",\n  \"system\": \"hss\",\n  \"identifier\": \"DIAP\",\n  \"providerID\": \"1763690\",\n  \"dateTimeRecorded\": \"2026-07-31T12:00:00\",\n  \"entry\": [\n    {\n      \"Diabetic risk\":\"Low\",\"HbA1c\":\"60\",\"Type of Diabetes\":\"Type 1\",\"Year of Diagnosis\":\"2018\",\n      \"Height\":\"164\",\"Weight\":\"84\",\"Year Last Retinal\":\"2015\",\"BP Systolic\":\"80\",\"BP Diastolic\":\"90\",\n      \"Creatine Ratio\":\"2\",\"Dip-Stick Test\":\"Negative\",\"Total Cholesterol\":\"40\",\"HDL Cholesterol\":\"50\",\n      \"Triglyceride\":\"20\",\"Ethnic Origin\":\"Maori\",\"NHI\":\"ZZZ0026\",\"Smoker\":\"No\",\"Insulin\":\"No\",\n      \"Oral Medication\":\"No\",\"Diet Only\":\"No\",\"ACE Inhibitor\":\"No\",\"Anti-hypertensive\":\"No\",\n      \"Statin inhibitor\":\"No\",\"Other medication\":\"No\",\"Foot Sensation/Pulse\":\"No\",\"Prev PVD/Ulcer\":\"No\",\n      \"Food Changes\":\"No\",\"Activity\":\"No\",\"OutCome\":\"A\"\n    }\n  ]\n}"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Matches, only extra empty \"message\":\"\" field on new API side."
+          },
+          "response": []
+        },
+        {
+          "name": "SaveRecall",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{newBase}}/karo/recalls",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"PatientId\":\"2450776\",\"EncounterId\":\"19592581__901__FZZ999-B\",\"UserId\":\"hsslive\",\"Priority\":\"High\",\"Group\":\"Vaccine\",\"DueDate\":\"2026-12-01\",\"Notes\":\"Manual verification\",\"CategoryId\":\"4690\"}"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). RESOLVED 2026-07-31 (errors.md) - matches legacy exactly with this real data."
+          },
+          "response": []
+        },
+        {
+          "name": "SaveDocument",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{newBase}}/karo/document",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"PatientId\":\"2450776\",\"EncounterId\":\"19592581__901__FZZ999-B\",\"DocumentName\":\"CrosscheckDoc.txt\",\"DocumentTypeID\":\"1\",\"Description\":\"Manual verification document\",\"Content\":\"SGVsbG8gV29ybGQ=\",\"PracticeID\":\"901\"}"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Verified live: real document saved, byte-for-byte matching content via sqlcmd."
+          },
+          "response": []
+        },
+        {
+          "name": "SaveInvoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{karoToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{newBase}}/karo/invoice",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"ServiceCode\":\"#KF005\",\"ServiceName\":\"Medical Examination\",\"AmountInclGST\":\"50.00\",\"Description\":\"Manual verification invoice\",\"AccountHolderID\":\"2450776\",\"PatientID\":\"2450776\",\"EncounterID\":\"19592581__901__FZZ999-B\",\"ServiceDate\":\"20260731\",\"ServiceProvider\":\"111\"}"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md KARO table / crosscheck/errors.md (2026-07-31 live runs). Matches legacy exact response shape after fix (errors.md)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "New API - COL",
+      "description": "HEK Core API COL compat endpoints, localhost:8080/COL/*, Host: southerms.indici.nz.",
+      "item": [
+        {
+          "name": "Authenticate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{newBase}}/COL/Authenticate",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"Username\":\"ermsdev\",\"Password\":\"eRMsd3V\",\"PatientId\":\"2450776\",\"EncounterId\":\"19592581__901__FZZ999-B\"}"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md COL table / crosscheck/errors.md (2026-07-31 live runs, real production credentials supplied by Zohaib). New API returns real token in 0.68s (maraenui practice), Expiry format bug fixed 2026-07-31 (now correctly +12 offset)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var j = pm.response.json();",
+                  "if (j && j.Token) { pm.collectionVariables.set('colToken', j.Token); pm.environment.set('colToken', j.Token); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GetCurrentPatientData",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{colToken}}"
+              }
+            ],
+            "url": "{{newBase}}/COL/GetCurrentPatientData?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md COL table / crosscheck/errors.md (2026-07-31 live runs, real production credentials supplied by Zohaib). Real demographic record confirmed, 200 OK (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetSessionData",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{colToken}}"
+              }
+            ],
+            "url": "{{newBase}}/COL/GetSessionData?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md COL table / crosscheck/errors.md (2026-07-31 live runs, real production credentials supplied by Zohaib). CORRECTED 2026-07-31: 'CommandText not initialized' error is an intentional faithful reproduction of a real legacy bug (empty proc name, confirmed in PHCO.cs:69) - not a defect."
+          },
+          "response": []
+        },
+        {
+          "name": "GetProviderData",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{colToken}}"
+              }
+            ],
+            "url": "{{newBase}}/COL/GetProviderData?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md COL table / crosscheck/errors.md (2026-07-31 live runs, real production credentials supplied by Zohaib). 150+ real providers confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetSurgeryData",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{colToken}}"
+              }
+            ],
+            "url": "{{newBase}}/COL/GetSurgeryData?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&LocationId=",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md COL table / crosscheck/errors.md (2026-07-31 live runs, real production credentials supplied by Zohaib). Real practice location/address confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "GetDiagnosisData",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{colToken}}"
+              }
+            ],
+            "url": "{{newBase}}/COL/GetDiagnosisData?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsOrder=desc&pmsMinDateTime=2000-01-01&pmsMaxDateTime=2030-01-01",
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md COL table / crosscheck/errors.md (2026-07-31 live runs, real production credentials supplied by Zohaib). 50+ real diagnosis records with SNOMED codes confirmed (SUMMARY.md)."
+          },
+          "response": []
+        },
+        {
+          "name": "SaveInvoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Host",
+                "value": "southerms.indici.nz"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{colToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{newBase}}/COL/SaveInvoice",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"ServiceCode\":\"#KF005\",\"ServiceName\":\"Medical Examination\",\"AmountInclGST\":\"50.00\",\"Description\":\"Manual verification invoice\",\"AccountHolderID\":\"2450776\",\"PatientID\":\"2450776\",\"EncounterID\":\"19592581__901__FZZ999-B\",\"ServiceDate\":\"20260731\",\"ServiceProvider\":\"111\",\"ClaimShortCode\":\"#KF005\"}"
+            },
+            "description": "Source: crosscheck/HEK_4APIs_Manual_Verification.postman_collection.json / crosscheck/SUMMARY.md COL table / crosscheck/errors.md (2026-07-31 live runs, real production credentials supplied by Zohaib). Verified end-to-end: POST /COL/SaveInvoice -> {\"status\":\"success\",\"message\":\"18279076\"} (errors.md 'COL SaveInvoice closed')."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

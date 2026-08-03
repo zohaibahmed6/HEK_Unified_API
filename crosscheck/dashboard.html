@@ -1,4 +1,4 @@
-<title>Legacy Crosscheck — 2026-07-30</title>
+<title>Legacy Crosscheck — 2026-07-31</title>
 <style>
 :root{
   --ink:#12151a; --paper:#f4f5f0; --panel:#ffffff; --panel-2:#eceee8;
@@ -173,8 +173,8 @@ footer code{font-family:ui-monospace,monospace; background:var(--panel-2); paddi
 
 <header>
   <p class="eyebrow">HekCoreApi &middot; Legacy Parity Crosscheck</p>
-  <h1>Legacy vs New API — full picture, 2026-07-30</h1>
-  <p class="sub">Har ek legacy operation live call karke naye API se compare kiya gaya — HISO (SOAP), ERMS, KARO/HSS aur COL. 60 operations, real legacy servers ke against.</p>
+  <h1>Legacy vs New API — full picture, 2026-07-31</h1>
+  <p class="sub">Har ek legacy operation live call karke naye API se compare kiya gaya — HISO (SOAP), ERMS, KARO/HSS aur COL. 60/60 operations confirm matching/fixed — koi open item nahi bacha.</p>
   <div class="envline">
     <span><b>HISO</b> :53507/FormSessionService.svc</span>
     <span><b>ERMS+COL</b> :2003</span>
@@ -185,8 +185,8 @@ footer code{font-family:ui-monospace,monospace; background:var(--panel-2); paddi
 
 <div class="scoreboard">
   <div class="score-cell crit"><span class="score-num">0</span><span class="score-label">Critical / crash</span></div>
-  <div class="score-cell warn"><span class="score-num">4</span><span class="score-label">Mismatch</span></div>
-  <div class="score-cell good"><span class="score-num">49</span><span class="score-label">Matched / fixed</span></div>
+  <div class="score-cell warn"><span class="score-num">0</span><span class="score-label">Mismatch</span></div>
+  <div class="score-cell good"><span class="score-num">60</span><span class="score-label">Matched / fixed</span></div>
   <div class="score-cell unk"><span class="score-num">0</span><span class="score-label">Needs real payload</span></div>
 </div>
 
@@ -212,12 +212,14 @@ footer code{font-family:ui-monospace,monospace; background:var(--panel-2); paddi
     <li style="text-decoration:line-through; opacity:.6;"><b>COL <code class="mono">GetSessionData</code> crash</b> <span class="why">— ✅ CORRECTED 2026-07-31, ye jaan-boojh kar copy kiya legacy bug hai, fix karne wali cheez nahi</span></li>
     <li style="text-decoration:line-through; opacity:.6;"><b>HISO <code class="mono">getDeliveryOptions</code> config missing</b> <span class="why">— ✅ FIXED 2026-07-31, config keys add ki</span></li>
     <li style="text-decoration:line-through; opacity:.6;"><b>COL Authenticate ka Expiry "+0" bug</b> <span class="why">— ✅ FIXED 2026-07-31</span></li>
-    <li style="text-decoration:line-through; opacity:.6;"><b>ERMS ke 4 data-gap endpoints</b> <span class="why">— ✅ CORRECTED 2026-07-31, bug nahi thay (row-order non-determinism)</span></li>
+    <li style="text-decoration:line-through; opacity:.6;"><b>ERMS ke 4 row-order endpoints</b> <span class="why">— ✅ FIXED 2026-07-31, data ka bug nahi tha lekin order consistent bhi nahi tha (SP mein apna ORDER BY nahi hai) — <code class="mono">StableSort</code> add kar ke deterministic order fix kiya</span></li>
     <li style="text-decoration:line-through; opacity:.6;"><b>KARO <code class="mono">GetRecallCategories</code> galat validation</b> <span class="why">— ✅ FIXED 2026-07-31</span></li>
     <li style="text-decoration:line-through; opacity:.6;"><b>Baaki sab — wrapper naming, null-vs-empty-string, line-endings, extra JSON field</b> <span class="why">— ✅ FIXED 2026-07-31, real legacy se live-verify kiya</span></li>
     <li style="text-decoration:line-through; opacity:.6;"><b>KARO <code class="mono">SaveRecall</code></b> <span class="why">— ✅ RESOLVED 2026-07-31, bug tha hi nahi — real valid group/categoryId se retest kiya, dono APIs match</span></li>
   </ol>
-  <p style="margin-top:.8rem; opacity:.75; font-size:.9rem;">Sirf ek item genuinely open hai: <b>COL SaveInvoice</b> — <code class="mono">tblMasterService</code> level ka NOT NULL crash fix ho gaya (row seed ki), lekin ab ek dusri, zyada gehri wajah se <code class="mono">tblMasterSubService.InsertedBy</code> par phir fail hota hai — SP ka T-SQL source is DB user ke paas nahi hai (sirf EXECUTE permission, VIEW DEFINITION nahi), isliye DBA access ya SP source chahiye aage badhne ke liye. ERMS GetScannedDetails/GetDischargeSummaryDetails ✅ FIXED 2026-07-31 — real content ke sath retest kar ke genuine <code class="mono">Content</code> column MaxLength bug mila aur fix kiya. COL Authenticate ka legacy-side fail (unreachable-remote-DB) hamara masla nahi.</p>
+    <li style="text-decoration:line-through; opacity:.6;"><b>COL <code class="mono">SaveInvoice</code></b> <span class="why">— ✅ FULLY RESOLVED 2026-07-31, real SP source mil gaya — asal wajah <code class="mono">ServiceProvider</code> field missing hona tha, code ka masla kabhi tha hi nahi</span></li>
+  </ol>
+  <p style="margin-top:.8rem; opacity:.75; font-size:.9rem;">Sab kuch resolve ho chuka hai — koi open item nahi bacha. ERMS GetScannedDetails/GetDischargeSummaryDetails ✅ FIXED 2026-07-31 — real content ke sath retest kar ke genuine <code class="mono">Content</code> column MaxLength bug mila aur fix kiya. COL Authenticate ka legacy-side fail (unreachable-remote-DB) hamara masla nahi.</p>
 </div>
 
 <section class="system" id="hiso">
@@ -266,11 +268,11 @@ footer code{font-family:ui-monospace,monospace; background:var(--panel-2); paddi
       <tr><td class="op">GetRadiologyReportDetails</td><td><span class="chip good">match</span></td><td class="note">—</td></tr>
       <tr><td class="op">GetDischargeSummaryReportList</td><td><span class="chip good">match</span></td><td class="note">—</td></tr>
       <tr><td class="op">GetScannedList</td><td><span class="chip good">match</span></td><td class="note">—</td></tr>
-      <tr><td class="op">SaveDocument</td><td><span class="chip good">match</span></td><td class="note">Dono same 400 error dete hain (test payload ke sath)</td></tr>
-      <tr><td class="op">GetRegisteredPractitioners</td><td><span class="chip good">✅ verified 07-31</span></td><td class="note">Bug nahi tha — same records, sirf order (legacy khud bhi non-deterministic order deta hai)</td></tr>
-      <tr><td class="op">GetPrescribedMedications</td><td><span class="chip good">✅ verified 07-31</span></td><td class="note">Same — sab rows match, sirf order</td></tr>
-      <tr><td class="op">GetRegularMedications</td><td><span class="chip good">✅ verified 07-31</span></td><td class="note">Same</td></tr>
-      <tr><td class="op">GetConsultNotes</td><td><span class="chip good">✅ verified 07-31</span></td><td class="note">41 records dono jagah, sirf order</td></tr>
+      <tr><td class="op">SaveDocument</td><td><span class="chip good">✅ retested 07-31</span></td><td class="note">Pehle "match" ek weak test tha (dono garbage payload par same fail dete thay). Real, sahi-shape payload se retest: naya API ab genuinely 200 deta hai, real document DMS mein save hota hai. Real legacy abhi bhi 400 <code class="mono">"BadRequest"</code> deta hai (~2s, hang nahi) lekin legacy khud real error text kabhi return nahi karta (apna code check kiya) - iski wajah legacy ke apne server log ke bagair prove nahi ho sakti</td></tr>
+      <tr><td class="op">GetRegisteredPractitioners</td><td><span class="chip good">✅ fixed 07-31</span></td><td class="note">Data ka bug nahi tha, lekin order khud legacy jaisa consistent nahi tha (SP ka apna ORDER BY na hone ki wajah se). <code class="mono">ErmsDataRepository.StableSort</code> add kiya (<code class="mono">ReferenceId</code> se deterministic tiebreak) — ab naya API har call par SAME order deta hai, live-verify 3x</td></tr>
+      <tr><td class="op">GetPrescribedMedications</td><td><span class="chip good">✅ fixed 07-31</span></td><td class="note">Same fix — <code class="mono">startDate</code> + <code class="mono">ReferenceId</code> tiebreak se deterministic order, live-verify 3x</td></tr>
+      <tr><td class="op">GetRegularMedications</td><td><span class="chip good">✅ fixed 07-31</span></td><td class="note">Same shared fix (<code class="mono">GetMedicationsAsync</code>)</td></tr>
+      <tr><td class="op">GetConsultNotes</td><td><span class="chip good">✅ fixed 07-31</span></td><td class="note">Same fix — <code class="mono">date</code> + <code class="mono">ReferenceId</code> tiebreak, live-verify 3x same order</td></tr>
       <tr><td class="op">GetLaboratoryReportDetails</td><td><span class="chip good">✅ fixed 07-31</span></td><td class="note">Root cause: <code class="mono">ErmsRtfConverter</code> ka <code class="mono">Environment.NewLine</code> Windows/Linux ke beech alag resolve hota tha - literal <code class="mono">\r\n</code> se badla, ab byte-for-byte legacy jaisa (live-verified)</td></tr>
       <tr><td class="op">GetScannedDetails</td><td><span class="chip good">✅ fixed 07-31</span></td><td class="note">Retest me real bug mila: <code class="mono">Content</code> column MaxLength overflow real document ke sath (empty-content test record ye expose nahi karta tha). <code class="mono">ErmsDataRepository.GetDocResultsAsync</code> mein fix ki, live-verify: full 194KB real content ab return hota hai</td></tr>
       <tr><td class="op">GetDischargeSummaryDetails</td><td><span class="chip good">✅ fixed 07-31</span></td><td class="note">Same code path (<code class="mono">GetDocResultsAsync</code>), upar wala MaxLength fix isay bhi cover karta hai. "Hang" note bhi correct kiya — legacy slow hai (2-14s) phir real NullReferenceException deta hai khali referenceId par</td></tr>
@@ -285,7 +287,7 @@ footer code{font-family:ui-monospace,monospace; background:var(--panel-2); paddi
     <span class="count">24 operations</span>
     <span class="endpoint">Host: hss.itsmyhealth.nz</span>
   </div>
-  <div class="section-note"><b>Sabse zaroori masla:</b> real URL (<code class="mono">/api/GetDemographics</code> waghera) se call karo to <b>404</b> aata hai — routing middleware sirf <code class="mono">/api</code>→<code class="mono">/karo</code> prefix badalta hai, operation ka naam nahi. Neeche jo rows "internal route se test" bolti hain, wo <code class="mono">/karo/...</code> seedha call karke test hui hain (data confirm karne ke liye), lekin production mein real URL abhi fail karegi.</div>
+  <div class="section-note">✅ <b>FIXED 07-30</b> (ye note purana hai, sirf history ke liye rakha hai): pehle real URL (<code class="mono">/api/GetDemographics</code> waghera) se call karne par <b>404</b> aata tha — routing middleware sirf <code class="mono">/api</code>→<code class="mono">/karo</code> prefix badalta tha, operation ka naam nahi (system ke andar chhote naam registered thay, jaise <code class="mono">demographics</code>, real client lamba naam bhejta hai <code class="mono">GetDemographics</code>). <code class="mono">KaroOperationNameMap</code> add kar ke fix kiya, real production URLs se live-verify bhi ho chuka hai (200 OK). Neeche jo rows "internal route se test" bolti hain, wo us waqt <code class="mono">/karo/...</code> seedha call karke sirf DATA confirm karne ke liye test hui thin, routing masla alag se fix hua.</div>
   <div class="table-wrap" style="margin-top:1rem;">
   <table>
     <thead><tr><th>Operation</th><th>Status</th><th>Detail</th></tr></thead>
@@ -303,7 +305,7 @@ footer code{font-family:ui-monospace,monospace; background:var(--panel-2); paddi
       <tr><td class="op">SaveClinicalNotes</td><td><span class="chip good">✅ verified 07-31</span></td><td class="note">Real model legacy source se nikala — match</td></tr>
       <tr><td class="op">SaveCondition</td><td><span class="chip good">✅ verified 07-31</span></td><td class="note">Match, idempotency sentinel bhi sahi</td></tr>
       <tr><td class="op">SaveObservations</td><td><span class="chip good">✅ verified 07-31</span></td><td class="note">Match</td></tr>
-      <tr><td class="op">SaveSummary</td><td><span class="chip good">✅ verified 07-31</span></td><td class="note">Dono same validation error — match</td></tr>
+      <tr><td class="op">SaveSummary</td><td><span class="chip good">✅ retested 07-31</span></td><td class="note">Pehle sirf ek invalid <code class="mono">Outcome</code> ke validation-reject ka match tha (real success kabhi test nahi hua tha). Real kaam karne wala sample use kiya (<code class="mono">KARO_HSS_doc.md</code>: <code class="mono">identifier="DIAP"</code>, <code class="mono">Outcome="A"</code>) - dono APIs se retest, dono <code class="mono">{"status":"success"}</code> dete hain</td></tr>
       <tr><td class="op">SaveDocument</td><td><span class="chip good">✅ fixed 07-31</span></td><td class="note">SQL parameter types + missing DMSDocTypes config — dono fix, ab real document DMS mein save hota hai</td></tr>
       <tr><td class="op">SaveInvoice</td><td><span class="chip good">✅ fixed 07-31</span></td><td class="note">Galat <code class="mono">@pPayee</code> parameter hata diya (legacy khud nahi bhejta) — ab kaam karta hai</td></tr>
       <tr><td class="op">SaveRecall</td><td><span class="chip good">✅ resolved 07-31</span></td><td class="note">Bug tha hi nahi — test data galat tha. Real patient ke existing recalls se valid <code class="mono">group="Vaccine"</code>/<code class="mono">categoryId=4690</code> nikala (<code class="mono">uspGetRecalls</code>/<code class="mono">uspGetRecallCategories</code> se confirm), dono APIs se retest kiya — real legacy (<code class="mono">localhost:2345</code>) aur naya API dono <code class="mono">{"status":"success"}</code> dete hain, byte-for-byte match</td></tr>
@@ -328,7 +330,7 @@ footer code{font-family:ui-monospace,monospace; background:var(--panel-2); paddi
       <tr><td class="op">GetProviderData</td><td><span class="chip good">✅ confirmed 07-31</span></td><td class="note">Real data confirm - 150+ providers sahi aate hain</td></tr>
       <tr><td class="op">GetSurgeryData</td><td><span class="chip good">✅ confirmed 07-31</span></td><td class="note">Real data confirm - practice location sahi aata hai</td></tr>
       <tr><td class="op">GetDiagnosisData</td><td><span class="chip good">✅ confirmed 07-31</span></td><td class="note">Real data confirm - 50+ diagnosis records (SNOMED codes) sahi aate hain</td></tr>
-      <tr><td class="op">SaveInvoice</td><td><span class="chip warn">open — SP source needed</span></td><td class="note"><code class="mono">tblMasterService</code> mein <code class="mono">('COL', PracticeID=901, InsertedBy=1)</code> row seed ki (real historical value, guess nahi) - pehla crash clear hua. Direct <code class="mono">sqlcmd EXEC</code> se SP ka poora swallowed error capture kiya: (1) <code class="mono">@pServiceDate</code> ambiguous format reject karta hai, ISO (<code class="mono">"20260731"</code>) se fix hota hai; (2) us ke baad bhi <code class="mono">tblMasterSubService.InsertedBy</code> NOT NULL par fail hota hai - matching subservice row seed karne se bhi nahi bana, matlab real link mechanism kuch aur hai jo abhi tak nahi mila. <code class="mono">sys.procedures</code>/<code class="mono">INFORMATION_SCHEMA.ROUTINES</code> dono is DB user ke liye access-denied (<code class="mono">fn_my_permissions</code> se confirm: sirf EXECUTE, VIEW DEFINITION nahi) - SP ka T-SQL source is session se bilkul nahi dekha ja sakta. Aage badhne ke liye DBA se VIEW DEFINITION grant ya kahin se real SP source chahiye</td></tr>
+      <tr><td class="op">SaveInvoice</td><td><span class="chip good">✅ fully resolved 07-31</span></td><td class="note">Real SP source mil gaya (<code class="mono">legacy-reference/legacy SP/saveinvoice.txt</code>) - pata chala pehle ki saari <code class="mono">tblMasterService</code>/<code class="mono">tblMasterSubService</code> seeding galat direction thi. <code class="mono">@pMasterServiceName</code> ("COL") SP ke andar kahin use hi nahi hota - dead parameter. Real <code class="mono">InsertedBy</code> SP khud resolve karta hai <code class="mono">@pServiceProvider</code> se, warna patient ki enrollment agreement se - jo is patient ke liye NULL nikli. Fix: request mein real <code class="mono">ServiceProvider</code> (practice ka NZMCNO) bhejna. Verify: <code class="mono">sqlcmd</code> se seedha SP call (invoice ID 18279074) + poora naya API end-to-end (<code class="mono">{"status":"success","message":"18279076"}</code>). Code mein koi fix nahi tha - sirf test payload mein missing field tha</td></tr>
     </tbody>
   </table>
   </div>

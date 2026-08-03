@@ -24,6 +24,35 @@ practice-management systems (HISO, KARO/HSS, ERMS) plus COL/Pegasus. It exposes:
 
 ## 2. Current state (update this every session)
 
+- **Status (2026-08-03)**: Zohaib closed 2 of the 3 carried-forward open items (ERMS
+  Azure-forwarding gap, SOUTH-environment) as accepted/out-of-scope — see §2 bottom.
+  Only Measurements delimiter shape remains genuinely open.
+- **Deliverable (2026-07-31)**: wrote `docs/azure-deployment-checklist.md` - a step-by-step,
+  checkbox deployment-day checklist for Azure Container Apps (secrets hardening, resource
+  provisioning, image build/push, Container App deploy, legacy host-domain DNS cutover reused
+  verbatim from `docs/deployment.md`, post-deploy verification, known gaps). Region and Entra ID
+  account are deliberately treated as not-yet-decided/switch-later, per Zohaib - deployment can
+  proceed without them.
+- **Deliverable (2026-07-31)**: built `crosscheck/HEK_Complete_Verified.postman_collection.json` (118
+  requests) + updated `crosscheck/HEK_4APIs.postman_environment.json` - one ready-to-execute Postman
+  collection covering all 59 tracked legacy operations (HISO 6, ERMS 23, KARO 23, COL 7) x2 (Legacy vs
+  New API folders), every request's body/params sourced from `crosscheck/errors.md`,
+  `crosscheck/SUMMARY.md`, `crosscheck/PARITY_MEMORY.md`, and the prior manual-verification collection
+  (not invented), with a provenance note in each request's `description` field; 4 HISO ops (getData/
+  saveContainer/getFormView) and 1 ERMS op (radiology reference id) flagged as needing a live capture
+  since no full real success body was preserved verbatim in the docs.
+- **Fix (2026-07-31)**: `GetRegisteredPractitioners`/`GetPrescribedMedications`/`GetRegularMedications`/
+  `GetConsultNotes` row order made deterministic. Earlier same-day investigation found these 4 ERMS
+  reads return the same complete row set as legacy, just in a different order each call - proved this
+  is real non-determinism in the underlying SP (no stable `ORDER BY`) by calling real legacy itself
+  twice and seeing its own order change too - and left it as "not a defect." Zohaib asked for the new
+  API's order to match legacy's intent regardless of legacy's own inconsistency, so added
+  `ErmsDataRepository.StableSort` (`src/Infrastructure/Legacy/Erms/ErmsDataRepository.cs`) - sorts the
+  returned `DataTable` by its date column (`date`/`startDate`, honoring the requested `ASC`/`DESC`) then
+  always by `ReferenceId` as a tiebreaker, applied to `GetRegisteredPractitionersAsync`,
+  `GetConsultNotesAsync`, and `GetMedicationsAsync` (covers both Prescribed/Regular). Rebuilt/redeployed
+  Docker `api`, live-verified: 3 repeated calls to each of the 4 operations now return byte-identical
+  `referenceID` order every time (MD5-compared) - previously this would vary between calls.
 - **Fix (2026-07-31)**: found and fixed a real ERMS bug during a requested retest of
   `GetScannedDetails`/`GetDischargeSummaryDetails`. The earlier crosscheck note ("legacy crashes, new
   API returns empty - behavioral difference, not a bug") only held because the original test record had
@@ -46,19 +75,31 @@ practice-management systems (HISO, KARO/HSS, ERMS) plus COL/Pegasus. It exposes:
   (`group="Vaccine"`, `categoryId=4690`) and retested against both real legacy (`localhost:2345`) and
   the new API - both now return identical `{"status":"success","message":""}`. All 60 KARO legacy
   operations now confirmed.
-- **Investigation (2026-07-31)**: COL `SaveInvoice` - partially unblocked, still open. Seeded a
-  `('COL', PracticeID=901, InsertedBy=1)` row into `[Billing].[tblMasterService]` directly (real,
-  already-used historical value, not a guess) to clear the first NOT NULL crash. Direct `sqlcmd EXEC`
-  of `[OnlineClaim].[uspInsertUpdateService]` (bypassing both APIs, capturing the SP's own swallowed
-  error result-set) revealed two more real issues: (1) `@pServiceDate` needs an unambiguous ISO format
-  (`"20260731"`, not `"2026-07-31"`) or the SP throws a date-conversion error before reaching the real
-  logic; (2) even past that, the SP still fails on `[Billing].[tblMasterSubService].InsertedBy` (line
-  218) for *any* subservice under the "COL" master service - seeding a matching subservice row
-  (`InsertedBy=1`) did not resolve it, meaning the actual master-to-subservice link isn't simply
-  `SubServiceName`+`ServiceCode`+`PracticeID` as assumed. `sys.procedures`/`INFORMATION_SCHEMA.ROUTINES`
-  are confirmed permission-denied for this DB user (`fn_my_permissions` shows `EXECUTE` only, no `VIEW
-  DEFINITION`) - the SP body genuinely cannot be read from this session. Needs either DBA-granted `VIEW
-  DEFINITION` on this proc, or the T-SQL source from wherever it's kept outside this DB.
+- **Fix (2026-07-31)**: COL `SaveInvoice` fully resolved - was never a NOT NULL/schema bug at all,
+  root cause was a missing required business field. Zohaib supplied the real SP source
+  (`legacy-reference/legacy SP/saveinvoice.txt`, `[OnlineClaim].[uspInsertUpdateService]`), which
+  settled everything the earlier blind `sqlcmd` trial-and-error had gotten wrong:
+  - `@pMasterServiceName` (the `"COL"` parameter) is **never referenced anywhere in the SP body** -
+    it's a dead/unused parameter. The SP always resolves/creates the subservice under a hardcoded
+    `'General Services'` master service instead, matched by `@pClaimShortCode` (not
+    `@pSubServiceCode`/`@pSubServiceName` as assumed). The `('COL', InsertedBy=1)` row seeded into
+    `[Billing].[tblMasterService]` earlier this session was consequently pointless - left in place
+    (harmless, SP never reads it) since this DB user has no `DELETE` permission to remove it.
+  - The real `InsertedBy` value for a new `tblMasterSubService` row is `@vProviderId`, resolved
+    *inside* the SP: first by matching `@pServiceProvider` (an NZMCNO) against `Profile.tblProvider`,
+    falling back to `Profile.tblPatientEnrollmentAgreement.ProviderId` for the patient if no provider
+    was supplied. Confirmed live: patient 2450776's enrollment agreement has `ProviderId = NULL` -
+    so any call omitting `ServiceProvider` was guaranteed to crash on the NOT NULL constraint,
+    completely independent of any master/subservice seeding.
+  - Fix: supply a real `ServiceProvider` (a real NZMCNO for the practice, e.g. `"111"` for practice
+    901, confirmed via `Profile.tblProvider`) and a real `ClaimShortCode` in the request. Verified
+    twice: once via direct `sqlcmd EXEC` of the SP (real invoice ID `18279074`), then end-to-end
+    through the actual running API (`POST /COL/SaveInvoice` -> `{"status":"success","message":"18279076"}`).
+  - Not a code defect on either side - legacy's own C# passes `ServiceProvider` straight through
+    unvalidated too, so an omitted/invalid provider with no patient-enrollment fallback would fail
+    identically on real legacy. Nothing to change in `ColDataRepository`/`ColSaveInvoiceRequest` -
+    both already forward every field the SP actually needs; the earlier blocker was purely test-data
+    (`ServiceProvider` was never supplied in prior test payloads).
 - **Finding (2026-07-31)**: COL Authenticate + 4 dependent GET operations
   (`GetCurrentPatientData`/`GetProviderData`/`GetSurgeryData`/`GetDiagnosisData`), previously
   unconfirmed because real legacy always failed the test, are now confirmed working correctly on the
@@ -607,9 +648,11 @@ practice-management systems (HISO, KARO/HSS, ERMS) plus COL/Pegasus. It exposes:
 - **Telemetry**: OpenTelemetry wired (traces + metrics), Aspire dashboard at
   `:18888`. Per-call field-scoping counters currently only on
   `CanonicalDemographicsController` — not yet replicated to the other 13.
-- **Open items carried forward**: ERMS Azure-forwarding gap; SOUTH-environment
-  (practice 518) untestable locally — needs real connection details from Zohaib;
-  Measurements delimiter shape undecoded.
+- **Open items carried forward (updated 2026-08-03)**: ERMS Azure-forwarding gap and
+  SOUTH-environment (practice 518, untestable locally) — closed by Zohaib as accepted/
+  out-of-scope for now, not actionable without further input he hasn't provided; not
+  re-opened unless he brings new info. Still genuinely open: Measurements delimiter
+  shape undecoded.
 - **Docs infra (2026-07-29)**: this file + root `CLAUDE.md` created as the
   single-source-of-truth + auto-update mechanism. Not yet fixed: dead spec
   links in `DOCUMENT_INDEX.md`, duplicate AI usage logs (see §4).
@@ -631,14 +674,18 @@ practice-management systems (HISO, KARO/HSS, ERMS) plus COL/Pegasus. It exposes:
 
 ## 4. Known doc drift (fix opportunistically)
 
-- `docs/DOCUMENT_INDEX.md` still links `docs/HEK_UNIFIED_API_SPEC.md` /
-  `_v1.1.md` — both were **deleted** from the repo (replaced by
-  `docs/HEK_UNIFIED_API_SPEC_presentable.html`). Index needs its Spec &
-  Assessment row updated to point at the HTML version, or the .md restored.
-- Two AI usage logs exist (`AI_USAGE_LOG.md` at repo root, `docs/ai_usage_log.md`).
-  Pick one location and stop writing to the other.
+- ~~`docs/DOCUMENT_INDEX.md` dead spec links~~ ✅ FIXED 2026-07-31 — index now points at
+  `docs/HEK_UNIFIED_API_SPEC_presentable.html`, added a Legacy Parity section pointing at
+  `crosscheck/` as the current source (superseding the older `LEGACY_PARITY_VALIDATOR.md` pass).
+- ~~Two AI usage logs~~ ✅ FIXED 2026-07-31 — `docs/DOCUMENT_INDEX.md` now explicitly marks
+  `docs/ai_usage_log.md` as current/active and `AI_USAGE_LOG.md` (repo root) as stale/frozen
+  2026-07-22, kept for history only.
 - `hek_analysis/docs/Unified-Healthcare-API_EAD.md` is a known byte-identical
   duplicate of the `architecture/` copy — noted, not deleted (per past decision).
+- `LEGACY_PARITY_VALIDATOR.md` (repo root) is now superseded by `crosscheck/` (2026-07-31's
+  live-verified-against-real-legacy pass is more current/trustworthy than this file's 07-27/28
+  code-only comparison) — kept for its per-field diff detail on ops `crosscheck/` didn't
+  re-examine, cross-referenced from `DOCUMENT_INDEX.md`.
 
 ## 5. Update protocol
 

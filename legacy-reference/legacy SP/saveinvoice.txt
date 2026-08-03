@@ -1,0 +1,542 @@
+USE [PMS_NZ_V2]
+GO
+/****** Object:  StoredProcedure [OnlineClaim].[uspInsertUpdateService]    Script Date: 2026-07-31 7:05:55 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+-- IIR-28574 (27-Mar-25) (Waqas Iqbal)
+ALTER PROCEDURE [OnlineClaim].[uspInsertUpdateService]	
+	@pPatientId INT,
+	@pAppointmentId BIGINT,
+	@pMasterServiceName NVARCHAR(2000),
+	@pSubServiceName NVARCHAR(2000),
+	@pSubServiceCode NVARCHAR(500) = NULL,
+	@pFee	FLOAT,
+	
+	@pLocationId	INT = NULL,
+
+	@pDescription as nvarchar(2000)=null,
+	@pPayee as nvarchar(50),
+	@pServiceProvider as nvarchar(50)=null,
+	@pServiceProviderType as nvarchar(50)=null,
+	@pServiceDate as nvarchar(50),
+	@pPegasusReference as nvarchar(50),
+	@pAccountHolderID INT=0,
+	@pClaimShortCode nvarchar(500)=Null,
+	@pOutputParam	INT OUTPUT 
+	
+AS
+BEGIN
+	SET NOCOUNT ON;
+
+	BEGIN TRY
+	BEGIN TRAN
+
+	DECLARE
+	@vProviderId INT = NULL
+	,@vPracticeID INT = NULL
+	,@vMasterServiceId INT = -1
+	,@vSubServiceId INT = -1
+	,@vSubServiceMappingId INT = -1
+	,@vServiceMappingId INT = -1
+	,@vPracticeServiceID INT = 0
+	,@vGeneratedInvoiceNo NVARCHAR(50) = NULL
+	,@vInvoiceNo INT = -1
+	,@vNotes NVARCHAR(2000) = NULL
+	,@vPracticeLocationID int =0
+	,@vMasterServiceSubServiceID int=-1
+	,@vpracticesettingtypeId int 
+	,@vIsLocationBasedPractice int
+	,@vSeenDate datetime  = getdate() --ISI-19802
+	--------------------- ISI-19802 --------------
+		IF @pServiceDate IS NOT NULL 
+		   AND ISDATE(@pServiceDate) = 1
+		BEGIN
+			SELECT @vSeenDate = CONVERT(DATETIME, @pServiceDate, 113)
+		END
+	---------------------- ISI-19802 ------------------
+	SELECT TOP 1 
+			@vPracticeID = PracticeId
+		FROM
+		Profile.tblPatientEnrollmentAgreement WITH(NOLOCK)
+		WHERE
+		PatientId = @pPatientId
+
+		--AKL006-1358
+	set @vIsLocationBasedPractice =(select  top 1 referenceID From [Lookup].[tblPracticeSettingDetail] WITH(NOLOCK) where PracticeSettingTypeID =(SELECT top 1 
+	                               PracticeSettingTypeID from [Lookup].[tblPracticeSettingType] WITH(NOLOCK)  Where Code = 'IsLocationBasedPractice' and IsActive = 1 and IsDeleted = 0) 
+								   And PracticeID = @vPracticeID and IsActive = 1 and IsDeleted = 0)
+	--AKL006-1358
+
+	IF(ISNULL(@pServiceProvider, '') <> '')
+	BEGIN
+		declare @tempProvideType as nvarchar(50)
+		IF(ISNULL(@pServiceProviderType,'')<>'')
+		begin
+			IF(@pServiceProviderType = 'GP')
+			begin
+				set @tempProvideType = '2'
+			end
+			else
+			begin
+				set @tempProvideType = '3,23,45'
+			end
+			
+			select top 1 @vProviderId = PR.providerid  from Profile.tblProfile (NOLOCK) PF
+			inner join Profile.tblProvider (NOLOCK) PR ON PR.ProviderId = PF.ProfileId
+			INNER JOIN Lookup.tblProfileType PFT WITH(NOLOCK) ON PFT.ProfileTypeID = PF.ProfileTypeID
+			where PR.NZMCNO = @pServiceProvider and PF.Practiceid = @vPracticeID and PFT.ProfileTypeID in (select  value  from STRING_SPLIT(@tempProvideType,','))  and pf.isactive = 1 and pf.isdeleted = 0
+			and isnull(GenericProfileTypeID,0) = 0
+			if(isnull(@pPayee,'')<>'')
+			begin
+				select top 1 @vProviderId = PR.providerid  from Profile.tblProfile (NOLOCK) PF
+					inner join Profile.tblProvider (NOLOCK) PR ON PR.ProviderId = PF.ProfileId
+					INNER JOIN Lookup.tblProfileType PFT WITH(NOLOCK) ON PFT.ProfileTypeID = PF.ProfileTypeID
+					where PR.NZMCNO = @pServiceProvider and PF.Practiceid = @vPracticeID and PFT.ProfileTypeID in (select  value  from STRING_SPLIT(@tempProvideType,','))  and pf.isactive = 1 and pf.isdeleted = 0
+					and isnull(GenericProfileTypeID,0) = 0
+					and PR.HBLPayeeNo = @pPayee
+			end
+		end
+		else
+		begin
+			select top 1 @vProviderId = PR.providerid  from Profile.tblProfile (NOLOCK) PF
+			inner join Profile.tblProvider (NOLOCK) PR ON PR.ProviderId = PF.ProfileId
+			--INNER JOIN Lookup.tblProfileType PFT ON PFT.ProfileTypeID = PF.ProfileTypeID
+			where PR.NZMCNO = @pServiceProvider and PF.Practiceid = @vPracticeID  and pf.isactive = 1 and pf.isdeleted = 0
+			and isnull(GenericProfileTypeID,0) = 0
+			if(isnull(@pPayee,'')<>'')
+			begin
+				select top 1 @vProviderId = PR.providerid  from Profile.tblProfile (NOLOCK) PF
+					inner join Profile.tblProvider (NOLOCK) PR ON PR.ProviderId = PF.ProfileId
+					--INNER JOIN Lookup.tblProfileType PFT ON PFT.ProfileTypeID = PF.ProfileTypeID
+					where PR.NZMCNO = @pServiceProvider and PF.Practiceid = @vPracticeID  and pf.isactive = 1 and pf.isdeleted = 0
+					and isnull(GenericProfileTypeID,0) = 0
+					and PR.HBLPayeeNo = @pPayee
+			end
+		end
+
+
+	END
+
+	IF(ISNULL(@vProviderId, '') = '')
+	BEGIN
+		SELECT TOP 1
+			@vProviderId = ProviderId		FROM
+		Profile.tblPatientEnrollmentAgreement WITH(NOLOCK)
+		WHERE
+		PatientId = @pPatientId
+	END
+
+	
+	if exists (select TOP 1 1 from POC.tblInvoiceTransaction (nolock) where appointmentID =@pAppointmentId)
+	Begin
+		set  @pAppointmentId = 0
+	END
+
+		-- Insert Dummy Appointment (ISI-742) ----------
+		Declare @vAppointmentID bigint, @vDate date,@vAppointmentLocation int= null , @vOutPutparm int, @vScheduleDate datetime
+	IF(ISNULL(@pAppointmentId, 0)= 0)
+	BEGIN
+	
+	Select @vAppointmentLocation=PracticeLocationId  from profile.tblprofile WITH(NOLOCK) where profileid=@pPatientId
+	if  @vAppointmentLocation = 0 set @vAppointmentLocation=null 
+		set @vScheduleDate = GETDATE()
+		EXEC [Appointment].[uspAppointmentDummyInsertUpdate]
+								@pPatientID = @pPatientId,
+								@pProviderID = @vProviderId,--@pProviderID,
+								@pPracticeID = @vPracticeID,
+								@pScheduleDate = @vScheduleDate,
+								@pScheduledBy = @vProviderId,--@pProviderID,
+								@pInsertedBy = @vProviderId,--@pProviderID,
+								@pIsNewConsult =1,
+								@pUserLoggingID = @vProviderId
+								,@pPracticeLocationID=@vAppointmentLocation
+								,@outPutparm = @vAppointmentID OUTPUT
+								
+	SET @pAppointmentId= @vAppointmentID
+	END
+	---------------------------------------------------------------------------
+
+	Select @vPracticeLocationID=isnull(PracticeLocationId,0) from appointment.tblAppointment WITH(NOLOCK) where AppointmentID=@pAppointmentId
+	if (@vPracticeLocationID=0)
+	begin
+	    Select @vPracticeLocationID=isnull(PracticeLocationId,0) from profile.tblprofile WITH(NOLOCK) where profileid=@pPatientId
+
+	    if (@vPracticeLocationID=0)
+	    begin
+	      Select top 1 @vPracticeLocationID=PracticeLocationID from admin.tblPracticeLocation WITH(NOLOCK) where practiceid=@vPracticeID and isactive=1 and isDeleted=0
+	    end
+	end
+
+
+	
+
+
+
+		DECLARE @udtInvoiceDetail POC.UDT_tblInvoiceDetail
+		DECLARE @vAppointmentServiceID INT = NULL
+		DECLARE @vCurrentDate DATETIME =GETDATE()
+		DECLARE @vCompanyId INT = -1
+		DECLARE @vCompanyServiceId INT = -1
+
+		SELECT TOP 1
+		@vAppointmentServiceID = ASR.AppointmentServiceID
+		FROM 
+		[POC].[tblAppointmentServices] (NOLOCK) ASR
+		INNER JOIN Billing.[tblMasterServiceSubService] (NOLOCK) MSU ON MSU.MasterServiceSubServiceID = ASR.MasterServiceSubServiceID
+		INNER JOIN Billing.tblMasterSubService (NOLOCK) MSS ON MSS.MasterSubServiceID = MSU.MasterSubServiceID
+		INNER JOIN Billing.tblMasterService (NOLOCK) MS ON MS.MasterServiceID = MSU.MasterServiceID 
+		WHERE 
+		ASR.AppointmentID = @pAppointmentId 
+		AND ASR.IsDeleted = 0 
+		AND MSU.IsAdhoc = 0
+		AND MSS.IsAdhoc = 0
+		AND MSS.ServiceCode = @pClaimShortCode
+		AND MS.practiceid = @vPracticeID
+
+
+		SELECT TOP 1
+		@vMasterServiceSubServiceID = MSU.MasterServiceSubServiceID
+		FROM 
+		--[POC].[tblAppointmentServices] (NOLOCK) ASR
+		--INNER JOIN 
+		Billing.[tblMasterServiceSubService] (NOLOCK) MSU --ON MSU.MasterServiceSubServiceID = ASR.MasterServiceSubServiceID
+		INNER JOIN Billing.tblMasterSubService (NOLOCK) MSS ON MSS.MasterSubServiceID = MSU.MasterSubServiceID
+		INNER JOIN Billing.tblMasterService (NOLOCK) MS ON MS.MasterServiceID = MSU.MasterServiceID 
+		WHERE 
+		MSS.ServiceCode = @pClaimShortCode
+		--AND ASR.IsDeleted = 0 
+		AND MSU.IsAdhoc = 0
+		AND MSS.IsAdhoc = 0
+		AND MS.practiceid = @vPracticeID
+
+		if (isnull(@vMasterServiceSubServiceID,0) = 0 or @vMasterServiceSubServiceID=-1)
+		begin
+				declare @pMasterServiceID int  = (select top 1 MasterServiceID from billing.tblMasterService (NOLOCK) where ServiceName = 'General Services' and practiceid=@vPracticeID and IsActive=1 and IsDeleted=0)
+				if(isnull(@pMasterServiceID,0)=0)
+				begin
+					declare @vvMasterServiceID int = (NEXT VALUE FOR [Config].[seq_tblMasterService])
+					insert into billing.tblMasterService(MasterServiceID,ServiceName,Code,Description,IsAdhoc,IsActive,IsDeleted,InsertedBy,UpdatedBy,InsertedAt,UpdatedAt,UserLoggingID,BillingPracticeId,PracticeID)
+					values(@vvMasterServiceID,'General Services',null,null,0,1,0,@vProviderId,@vProviderId,getdate(),getdate(),@vProviderId,null,@vPracticeID)
+					set @pMasterServiceID=@vvMasterServiceID
+				end
+				Declare @seq_SubServiceID  int = (NEXT VALUE FOR [Config].[seq_tblMasterSubService])
+				Insert into Billing.tblMasterSubService(MasterSubServiceID,SubServiceName,DefaultPrice,Code,Description,IsFunded,ServiceCode,IsActive,IsDeleted,InsertedBy,InsertedAt,UpdatedBy,UpdatedAt,UserLoggingID)
+				Values(@seq_SubServiceID,@pSubServiceName,@pFee,@pClaimShortCode,@pDescription,1,@pClaimShortCode,1,0,@vProviderId,Getdate(),@vProviderId,Getdate(),@vProviderId)
+				
+				Declare @seq_SubServiceMappingID  int = (NEXT VALUE FOR CONFIG.SEQ_tblMasterServiceSubService)
+				Insert into Billing.tblMasterServiceSubService(MasterServiceSubServiceID,MasterServiceID,MasterSubServiceID,UpdatedAt,UpdatedBy, InsertedAt, InsertedBy, IsActive, IsDeleted,UserLoggingID)
+				Values(@seq_SubServiceMappingID,@pMasterServiceID,@seq_SubServiceID, GetDate(), @vProviderId, GetDate(),@vProviderId, 1, 0,@vProviderId)
+		set @vMasterServiceSubServiceID = @seq_SubServiceMappingID
+				Declare @seq_practiceserviceID  int = (NEXT VALUE FOR CONFIG.Seq_tblPracticeservices)
+				insert into config.tblpracticeservices(PracticeServiceID,MasterServiceSubServiceID,PracticeID,DefaultPayment,IsActive,IsDeleted,InsertedAt,InsertedBy,UpdatedAt,UpdatedBy,UserLoggingID,IsCommonService)
+				values(@seq_practiceserviceID,@vMasterServiceSubServiceID,@vPracticeID,0,1,0,GetDate(), @vProviderId, GetDate(),@vProviderId,@vProviderId,0)
+		end
+		if not exists (select TOP 1 1 from poc.tblappointmentservices  (nolock) where appointmentserviceid in (@vAppointmentServiceID) and  IsDeleted = 0 and isactive = 1)
+					Begin
+						set  @pAppointmentId = 0
+						Set @vAppointmentServiceID=0
+					END
+		IF(ISNULL(@pAppointmentId, 0)= 0)
+	BEGIN
+	
+	Select @vAppointmentLocation=PracticeLocationId  from profile.tblprofile WITH(NOLOCK) where profileid=@pPatientId
+	if  @vAppointmentLocation = 0 set @vAppointmentLocation=null 
+		set @vScheduleDate = GETDATE()
+		EXEC [Appointment].[uspAppointmentDummyInsertUpdate]
+								@pPatientID = @pPatientId,
+								@pProviderID = @vProviderId,--@pProviderID,
+								@pPracticeID = @vPracticeID,
+								@pScheduleDate = @vScheduleDate,
+								@pScheduledBy = @vProviderId,--@pProviderID,
+								@pInsertedBy = @vProviderId,--@pProviderID,
+								@pIsNewConsult =1,
+								@pUserLoggingID = @vProviderId
+								,@pPracticeLocationID=@vAppointmentLocation
+								,@outPutparm = @vAppointmentID OUTPUT
+								
+	SET @pAppointmentId= @vAppointmentID
+	END
+		IF(ISNULL(@vAppointmentServiceID, 0)= 0)
+		BEGIN
+			exec [POC].[uspPocAppointmentServicesInsert]
+					@pAppointmentServiceID	=0,
+					@pAppointmentID	=@pAppointmentId,
+					@pMasterServiceSubServiceID	= @vMasterServiceSubServiceID,
+					@pQuantity=0,
+					@pcoPayment =@pFee,
+					@pClaimAmount =0,
+					@pPrice =0,
+					@pComments =@pSubServiceName,
+					@pIsActive=1,
+					@pIsDeleted=0,
+					@pfunderId=null,
+					@pContractServiceId =null,
+					@pfunderName =null,
+					@pInsertedBy =@vProviderId,
+					@pAttributeValue  = null,
+					@pAttributeID  =null,
+					@pUserLoggingID =@vProviderId,
+					@pBillingRefID =null,
+					@pCaseNo =null,
+					@pBillingReferralID =-1,
+					@outPutparm   =@vAppointmentServiceID OUTPUT
+
+		END
+
+		IF(ISNULL(@pClaimShortCode, '') <> '')
+		BEGIN
+		    --AKL006-1358 location based Practice check implemented
+		    if @vIsLocationBasedPractice = 1
+			begin
+
+			SELECT TOP 1 
+			@vCompanyId = cs.EmployerId,
+			@vCompanyServiceId = CompanyServiceId
+			FROM HSS.tblCompanyServices cs WITH(NOLOCK) join profile.tblEmployer pe WITH(NOLOCK) on pe.EmployerID=cs.EmployerId
+			WHERE
+			cs.IsActive = 1
+			AND cs.IsDeleted = 0 
+			--and PracticeID=@vPracticeID
+			AND ServiceCode = @pClaimShortCode
+			AND cs.PracticeLocationID = @vPracticeLocationID
+			end
+			
+			else
+			begin
+			SELECT TOP 1 
+			@vCompanyId = cs.EmployerId,
+			@vCompanyServiceId = CompanyServiceId
+			FROM HSS.tblCompanyServices cs WITH(NOLOCK) join profile.tblEmployer pe WITH(NOLOCK) on pe.EmployerID=cs.EmployerId
+			WHERE
+			cs.IsActive = 1
+			AND cs.IsDeleted = 0 and PracticeID=@vPracticeID
+			AND ServiceCode = @pClaimShortCode
+			end
+			--AKL006-1358 location based Practice check ends here
+		END 
+
+		IF(ISNULL(@vCompanyId, 0) <= 0)
+		BEGIN
+				SELECT TOP 1 @vCompanyId = EmployerId 
+				FROM Profile.tblEmployer WITH(NOLOCK)
+				WHERE practiceid=@vPracticeID AND IsActive=1 AND IsDeleted=0 
+				AND HBLPAYEENO=@pPayee
+		END
+
+		IF(ISNULL(@vCompanyId, 0) <= 0)
+		BEGIN
+				select top 1 @vCompanyId = ReferenceID from [Lookup].[tblPracticeSettingType] pt WITH(NOLOCK)
+				join  Lookup.tblPracticeSettingDetail pd WITH(NOLOCK) on pt.PracticeSettingTypeID = pd.PracticeSettingTypeID
+				where Code ='Hssdefaultcompanysetting'
+				and pt.isactive =1 and pt.isdeleted =0
+				and pd.PracticeID = @vPracticeID
+				and pd.isactive =1 and pd.isdeleted =0
+
+		END
+
+		IF(ISNULL(@vCompanyId, 0) <= 0)
+		BEGIN
+			SELECT TOP 1 @vCompanyId = EmployerId 
+			FROM Profile.tblEmployer WITH(NOLOCK)
+			WHERE CompanyName LIKE '%PHO%Claim%' and Practiceid = @vPracticeID
+			
+		END
+
+		IF(ISNULL(@vCompanyId, 0) <= 0)
+		BEGIN
+			declare @p46 int
+			exec [Config].[uspEmployerInsertUpdate] @pEmployerID=NULL,@pEmployerAccountGroupID=NULL,@pCompanyName='PHO Claims',@pEmployerDayPhone=NULL,@pEmployerNightPhone=NULL,@pEmployerCellphone=NULL,
+					@pEmployerFax1=NULL,@pEmployerEmail=NULL,@pEmployerOtherContact=NULL,@pAddressTypeID=0,@pWorkPlaceInsurer=NULL,@pHouseNumber=NULL,@pBuildingNumber=NULL,@pStreetNumber=NULL,
+					@pSuburbTownID=NULL,
+					@pCityAreaID=NULL,@pPostCodeID=NULL,@pPostalHouseNumber=NULL,@pPostalBuildingNumber=NULL,@pPostalStreetNumber=NULL,@pPostalSuburbTownID=NULL,@pPostalCityAreaID=NULL,
+					@pPostalPostCodeID=NULL,
+					@pInterHouseNumber=NULL,@pInterBuildingNumber=NULL,@pInterStreetNumber=NULL,@pInterSuburbTownID=NULL,@pInterCityID=NULL,@pInterPostCode=NULL,@pInterCountryID=NULL,
+					@pIsActive=1,@pIsProtected=0,@pIsCorresponding=0,@pPracticeID=@vPracticeID,@pIsDeleted=0,@pInsertedBy=@vProviderId,@pUserLoggingID=@vProviderId,@pEmployerName=null,@pIsSameAddress=0,
+					@pFlexibleFundingDiscount=null,@pIsFlexibleFunding=0,@pIsServices=0,@pIsPatientName=0,@pIsACCCompany=0,@outPutparm=@p46 output
+
+					SELECT TOP 1 @vCompanyId = EmployerId 
+					FROM Profile.tblEmployer (nolock)
+					WHERE CompanyName LIKE '%PHO Claim%' and Practiceid = @vPracticeID
+			
+		END
+
+
+		Declare @pDataSourceid int =25
+		select top 1 @pDataSourceid = DataSourceID  from Lookup.tblDataSource WITH(NOLOCK) where DataSourceDesc='HSS'
+
+		INSERT INTO @udtInvoiceDetail
+		(
+			InvoiceDetailID,
+			InvoiceTransactionID,
+			MasterServiceSubServiceID,
+			AppointmentServiceID,
+			Comments,
+			Quantity,
+			ClaimAmount,
+			CoPayment,
+			GrossClaimAmount,
+			GrossCoPayment,
+			IsBillingAmount,
+			FunderID,
+			FunderName,
+			ContractServiceID,
+			IsFunded,
+			SubmissionStatus,
+			CaseNo,
+			IsActive,
+			IsDeleted,
+			InsertedBy,
+			UpdatedBy,
+			InsertedAt,
+			UpdatedAt,
+			BillingRefID,
+			BillingReferralID--,
+			--HTIReferralID
+		)
+		VALUES
+		(
+			-1, --[InvoiceDetailID]
+			0, --[InvoiceTransactionID]
+			@vMasterServiceSubServiceID, --[MasterServiceSubServiceID] Y
+			@vAppointmentServiceID, --[AppointmentServiceID] Y [Lookup].[uspLoadPOCtransaction]
+			@pSubServiceName, --[Comments]
+			1, --[Quantity]
+			0.00, --[ClaimAmount]
+			@pFee, --[CoPayment]
+			0.00, --[GrossClaimAmount]
+			0, --[GrossCoPayment]
+			0, --[IsBillingAmount]
+			0, --[FunderID]
+			NULL, --[FunderName]
+			-1, --[ContractServiceID]
+			0, --[IsFunded]
+			1, --[SubmissionStatus]
+			NULL, --[CaseNo]
+			1, --[IsActive]
+			0, --[IsDeleted]
+			@vProviderId, --[InsertedBy]
+			@vProviderId, --[UpdatedBy]
+			GETDATE(), --[InsertedAt]
+			GETDATE(), --[UpdatedAt]
+			0, --[BillingRefID]
+			0--, --[BillingReferralID]
+			--0 --[HTIReferralID]
+		)
+
+		SET @vGeneratedInvoiceNo = (NEXT VALUE FOR [POC].[seq_tblInvoiceTransaction])
+		SET @vNotes = @pSubServiceName+' - '+@pClaimShortCode
+
+		exec [POC].[UspTransactionInvoiceInsertUpdateNewV2] 
+			@pInvoiceTransactionID=0,
+			@pNewInvoiceTransactionID=@vGeneratedInvoiceNo,
+			@pDate=@vCurrentDate,
+			@pSeenDate=@vSeenDate,
+			@pPatientID=@pPatientId,
+			@pAppointmentID=@pAppointmentId,
+			@pPayerID=NULL,
+			@pOrganizationID=@vCompanyId,
+			@pIncomeProviderID=@vProviderId,
+			@pProviderID=NULL,
+			@pPracticeID=@vPracticeId,
+			@pPaymentModeID=NULL,
+			@pTransactionTypeID=1,
+			@pRelationshipTypeID=1,
+			@pTransactionNo=N'',
+			@pTransactionDate=NULL,
+			@pAccountHolderName=NULL,
+			@pNotes=@vNotes,
+			@pTotalClaimAmount=0,
+			@pTotalCoPayment=@pFee,
+			@pDiscount=0,
+			@pCreditCardCharges=0,
+			@pGSTAmount=0,
+			@pTotalAmount=@pFee,
+			@pReferenceNo=NULL,
+			@pIsActive=1,
+			@pLocationID=1,
+			@pIsDeleted=0,
+			@pBankBranchID=NULL,
+			@pInsertedBy=@vProviderId,
+			@pCardTypeID=NULL,
+			@tblInvoiceDetail=@udtInvoiceDetail,
+			@pServiceProviderID=@vProviderid,
+			@pUserLoggingID=@vProviderId,
+			@pPracticeLocationID=@vPracticeLocationID,
+			@IsFiledNote=0,
+			@pIsAutoPay=0,
+			@pIsReportInvoice=0,
+			@pFunderInvoiceBillingTypeID =null,
+			@pChequeNo  = null,
+			@pPatientEmployerID = null,
+			@pDataSourceid = @pDataSourceid,
+			@outputParam=@vInvoiceNo OUTPUT
+
+			DECLARE @vDummyInvoiceNo INT = -1
+
+			exec [PoC].[UspTransactionInvoicePaymentInsertUpdateNew] 
+			@pInvoiceTransactionID=0,
+			@pInvoiceID=@vInvoiceNo,
+			@pDate=@vCurrentDate,
+			@pPatientID=@pPatientId,
+			@pAppointmentID=@pAppointmentId,
+			@pOrganizationID=@vCompanyId,
+			@pPayerID=NULL,
+			@pIncomeProviderID=@vProviderId,
+			@pProviderID=NULL,
+			@pLocationID=1,
+			@pPracticeID=@vPracticeId,
+			@pPaymentModeID=NULL,
+			@pTransactionTypeID=1,
+			@pRelationshipTypeID=NULL,
+			@pTransactionNo=NULL,
+			@pTransactionDate=NULL,
+			@pBankBranchID=NULL,
+			@pAccountHolderName=NULL,
+			@pNotes=@vNotes,
+			@pTotalClaimAmount=0,
+			@pTotalCoPayment=@pFee,
+			@pDiscount=0,
+			@pCreditCardCharges=0,
+			@pGSTAmount=0,
+			@pTotalAmount=0,
+			@pReferenceNo=NULL,
+			@pIsActive=1,
+			@pIsDeleted=0,
+			@pInsertedBy=@vProviderId,
+			@pCardTypeID=NULL,
+			@pUserLoggingID=@vProviderId,
+			@pPracticeLocationID=@vPracticeLocationID,
+			@pServiceProviderID=@vProviderId,
+			@pIsAutoAdustment=0,
+			@outputParam=@vDummyInvoiceNo output
+
+
+	SET @pOutputParam = @vInvoiceNo
+
+	COMMIT TRANSACTION
+
+	END TRY
+	BEGIN CATCH	
+	SET @pOutputParam =-1
+		WHILE @@TRANCOUNT > 0
+		BEGIN
+			ROLLBACK TRANSACTION
+		END
+			INSERT INTO DBO.TBLERRORLOG
+			OUTPUT INSERTED. *
+			SELECT
+				ERROR_NUMBER() AS ERRORNUMBER, 
+				ERROR_SEVERITY() AS ERRORSEVERITY, 
+				ERROR_STATE() AS ERRORSTATE, 
+				ERROR_LINE() AS ERRORLINE, 
+				ERROR_PROCEDURE() AS ERRORPROCEDURE, 
+				ERROR_MESSAGE() AS ERRORMESSAGE, GETDate(), 
+				CONVERT(SYSNAME , USER_NAME())AS DBUSERNAME, 
+				CONVERT(SYSNAME, SUSER_SNAME()) AS SYSUSERNAME
+				RETURN ERROR_NUMBER()
+	END CATCH
+
+END
+

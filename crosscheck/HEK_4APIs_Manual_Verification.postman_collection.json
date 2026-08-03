@@ -1,0 +1,262 @@
+{
+  "info": {
+    "name": "HEK — 4 APIs Manual Verification (New vs Real Legacy)",
+    "description": "Every request in this collection uses REAL, hardcoded values (patient 2450776, encounter 19592581__901__FZZ999-B) already confirmed working on 2026-07-31 — nothing needs to be filled in. For each operation there are two requests, one under 'NEW API' and one under 'REAL LEGACY' with the exact same input — run both and compare the response body. The only things NOT hardcoded are the 3 login tokens ({{ermsToken}}, {{karoToken}}, {{colToken}}) — those are captured automatically the moment you run the 'Authenticate' request in each folder, so just run requests top to bottom within a folder.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. HISO (SOAP)",
+      "description": "IMPORTANT — every HISO operation, including getVersion, requires a real sessionKey (a GUID). getVersion's response payload is otherwise hardcoded, but the session itself is still checked first — legacy rejects an empty/wrong sessionKey with 'Invalid Session Key'. The sessionKey below (439CC902-4C78-4F9A-A001-837C553DE0C1) is a REAL, currently-active session for practice 901 confirmed live on 2026-07-31 — HISO sessions in this system do not expire, so it should keep working, but if either side ever returns 'Invalid Session Key', ask engineering for a fresh one (query the HekTenantRegistry database's HisoSessions table for an IsActive=1 row, practice 901). ALSO IMPORTANT: the SOAPAction header must be exactly 'http://www.hiso.govt.nz/10014.2/1.0/formsession/<operationName>' — real legacy strictly rejects any other form of this header (e.g. with '/IFormSessionService/' in it) with an ActionNotSupported fault, even though the new API is more lenient about it.",
+      "item": [
+        {
+          "name": "NEW API — getVersion",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "text/xml; charset=utf-8" }, { "key": "SOAPAction", "value": "\"http://www.hiso.govt.nz/10014.2/1.0/formsession/getVersion\"" } ],
+            "body": { "mode": "raw", "raw": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tns=\"http://www.hiso.govt.nz/10014.2/1.0/formsession\">\n  <soap:Body>\n    <tns:getVersion><tns:sessionKey>439CC902-4C78-4F9A-A001-837C553DE0C1</tns:sessionKey></tns:getVersion>\n  </soap:Body>\n</soap:Envelope>" },
+            "url": "http://localhost:8080/FormSessionService.svc"
+          },
+          "response": []
+        },
+        {
+          "name": "REAL LEGACY — getVersion",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "text/xml; charset=utf-8" }, { "key": "SOAPAction", "value": "\"http://www.hiso.govt.nz/10014.2/1.0/formsession/getVersion\"" } ],
+            "body": { "mode": "raw", "raw": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tns=\"http://www.hiso.govt.nz/10014.2/1.0/formsession\">\n  <soap:Body>\n    <tns:getVersion><tns:sessionKey>439CC902-4C78-4F9A-A001-837C553DE0C1</tns:sessionKey></tns:getVersion>\n  </soap:Body>\n</soap:Envelope>" },
+            "url": "http://localhost:53507/FormSessionService.svc"
+          },
+          "response": []
+        },
+        {
+          "name": "NEW API — getDeliveryOptions",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "text/xml; charset=utf-8" }, { "key": "SOAPAction", "value": "\"http://www.hiso.govt.nz/10014.2/1.0/formsession/getDeliveryOptions\"" } ],
+            "body": { "mode": "raw", "raw": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tns=\"http://www.hiso.govt.nz/10014.2/1.0/formsession\">\n  <soap:Body>\n    <tns:getDeliveryOptions><tns:sessionKey>439CC902-4C78-4F9A-A001-837C553DE0C1</tns:sessionKey></tns:getDeliveryOptions>\n  </soap:Body>\n</soap:Envelope>" },
+            "url": "http://localhost:8080/FormSessionService.svc"
+          },
+          "response": []
+        },
+        {
+          "name": "REAL LEGACY — getDeliveryOptions (NOTE: senderPassword/URL are placeholder CHANGE_ME on the new API — real HealthLink credentials never supplied, known/documented gap)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "text/xml; charset=utf-8" }, { "key": "SOAPAction", "value": "\"http://www.hiso.govt.nz/10014.2/1.0/formsession/getDeliveryOptions\"" } ],
+            "body": { "mode": "raw", "raw": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tns=\"http://www.hiso.govt.nz/10014.2/1.0/formsession\">\n  <soap:Body>\n    <tns:getDeliveryOptions><tns:sessionKey>439CC902-4C78-4F9A-A001-837C553DE0C1</tns:sessionKey></tns:getDeliveryOptions>\n  </soap:Body>\n</soap:Envelope>" },
+            "url": "http://localhost:53507/FormSessionService.svc"
+          },
+          "response": []
+        },
+        {
+          "name": "NOTE — getData / saveContainer / getFormView / processAction",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "http://localhost:8080/README-these-4-need-a-live-form-instance"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": { "exec": [ "// These 4 HISO operations need a sessionKey the same way getVersion/getDeliveryOptions do, PLUS a real formInstanceId/ACC45 record tied to that exact session.", "// The reusable session above (439CC902-...) currently has no ACC45 form data attached to it (confirmed live 2026-07-31), so it cannot be used for these 4 on its own.", "// To test these 4 operations: ask engineering for a session + formInstanceId pair that is currently populated with real data, captured at the time you want to test.", "// This request intentionally does nothing — it is a placeholder note only." ], "type": "text/javascript" }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. ERMS",
+      "item": [
+        {
+          "name": "NEW API — Ping",
+          "request": { "method": "GET", "header": [ { "key": "Host", "value": "southerms.indici.nz" } ], "url": "http://localhost:8080/API/Ping" }
+        },
+        {
+          "name": "REAL LEGACY — Ping",
+          "request": { "method": "GET", "header": [], "url": "http://localhost:2003/API/Ping" }
+        },
+        {
+          "name": "NEW API — Authenticate",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Host", "value": "southerms.indici.nz" }, { "key": "Content-Type", "value": "application/xml" } ],
+            "body": { "mode": "raw", "raw": "<Credential><Username>ermsdev</Username><Password>eRMsd3V</Password><PatientId>2450776</PatientId><EncounterId>19592581__901__FZZ999-B</EncounterId></Credential>" },
+            "url": "http://localhost:8080/API/Authenticate"
+          },
+          "event": [ { "listen": "test", "script": { "type": "text/javascript", "exec": [ "var m = pm.response.text().match(/<Token>([^<]+)<\\/Token>/);", "if (m) { pm.collectionVariables.set('ermsToken', m[1]); }" ] } } ]
+        },
+        {
+          "name": "REAL LEGACY — Authenticate",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/xml" } ],
+            "body": { "mode": "raw", "raw": "<Credential><Username>ermsdev</Username><Password>eRMsd3V</Password><PatientId>2450776</PatientId><EncounterId>19592581__901__FZZ999-B</EncounterId></Credential>" },
+            "url": "http://localhost:2003/API/Authenticate"
+          }
+        },
+        {
+          "name": "NEW API — GetPatientData",
+          "request": { "method": "GET", "header": [ { "key": "Host", "value": "southerms.indici.nz" }, { "key": "Authorization", "value": "Bearer {{ermsToken}}" } ], "url": "http://localhost:8080/API/GetPatientData?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B" }
+        },
+        {
+          "name": "REAL LEGACY — GetPatientData",
+          "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{ermsToken}}" } ], "url": "http://localhost:2003/API/GetPatientData?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B" }
+        },
+        {
+          "name": "NEW API — GetConsultNotes (order test)",
+          "request": { "method": "GET", "header": [ { "key": "Host", "value": "southerms.indici.nz" }, { "key": "Authorization", "value": "Bearer {{ermsToken}}" } ], "url": "http://localhost:8080/API/GetConsultNotes?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsOrder=ASC&pmsMinDateTime=2000-01-01&pmsMaxDateTime=2030-01-01" }
+        },
+        {
+          "name": "REAL LEGACY — GetConsultNotes (order test)",
+          "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{ermsToken}}" } ], "url": "http://localhost:2003/API/GetConsultNotes?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B&pmsOrder=ASC&pmsMinDateTime=2000-01-01&pmsMaxDateTime=2030-01-01" }
+        },
+        {
+          "name": "NEW API — SaveDocument (real payload)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Host", "value": "southerms.indici.nz" }, { "key": "Authorization", "value": "Bearer {{ermsToken}}" }, { "key": "Content-Type", "value": "application/xml" } ],
+            "body": { "mode": "raw", "raw": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<ReferralDocument>\n<ReferralDocument_Referral_ID>1</ReferralDocument_Referral_ID>\n<ReferralDocument_Document_ID>1001</ReferralDocument_Document_ID>\n<ReferralDocument_Patient_PMS_ID>2450776</ReferralDocument_Patient_PMS_ID>\n<ReferralDocument_Encounter_ID>19592581__901__FZZ999-B</ReferralDocument_Encounter_ID>\n<ReferralDocument_Referral_Type>Specialist Referral</ReferralDocument_Referral_Type>\n<ReferralDocument_Item_Type>in</ReferralDocument_Item_Type>\n<ReferralDocument_Referral_Status>New</ReferralDocument_Referral_Status>\n<ReferralDocument_Created_Date>2026-07-31</ReferralDocument_Created_Date>\n<ReferralDocument_Referrer_Fullname>Test Referrer</ReferralDocument_Referrer_Fullname>\n<ReferralDocument_Referrer_PMS_ID>2450776</ReferralDocument_Referrer_PMS_ID>\n<ReferralDocument_Document_Source>Manual verification</ReferralDocument_Document_Source>\n<ReferralDocument_Content_Type>application/pdf</ReferralDocument_Content_Type>\n<ReferralDocument_Description_Type>Referral</ReferralDocument_Description_Type>\n<ReferralDocument_Description>Manual verification document</ReferralDocument_Description>\n<ReferralDocument_Encoding>base64</ReferralDocument_Encoding>\n<ReferralDocument_Content>SGVsbG8gV29ybGQ=</ReferralDocument_Content>\n<ReferralDocument_Error_Text></ReferralDocument_Error_Text>\n</ReferralDocument>" },
+            "url": "http://localhost:8080/API/SaveDocument"
+          }
+        },
+        {
+          "name": "REAL LEGACY — SaveDocument (real payload)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Authorization", "value": "Bearer {{ermsToken}}" }, { "key": "Content-Type", "value": "application/xml" } ],
+            "body": { "mode": "raw", "raw": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<ReferralDocument>\n<ReferralDocument_Referral_ID>1</ReferralDocument_Referral_ID>\n<ReferralDocument_Document_ID>1002</ReferralDocument_Document_ID>\n<ReferralDocument_Patient_PMS_ID>2450776</ReferralDocument_Patient_PMS_ID>\n<ReferralDocument_Encounter_ID>19592581__901__FZZ999-B</ReferralDocument_Encounter_ID>\n<ReferralDocument_Referral_Type>Specialist Referral</ReferralDocument_Referral_Type>\n<ReferralDocument_Item_Type>in</ReferralDocument_Item_Type>\n<ReferralDocument_Referral_Status>New</ReferralDocument_Referral_Status>\n<ReferralDocument_Created_Date>2026-07-31</ReferralDocument_Created_Date>\n<ReferralDocument_Referrer_Fullname>Test Referrer</ReferralDocument_Referrer_Fullname>\n<ReferralDocument_Referrer_PMS_ID>2450776</ReferralDocument_Referrer_PMS_ID>\n<ReferralDocument_Document_Source>Manual verification</ReferralDocument_Document_Source>\n<ReferralDocument_Content_Type>application/pdf</ReferralDocument_Content_Type>\n<ReferralDocument_Description_Type>Referral</ReferralDocument_Description_Type>\n<ReferralDocument_Description>Manual verification document</ReferralDocument_Description>\n<ReferralDocument_Encoding>base64</ReferralDocument_Encoding>\n<ReferralDocument_Content>SGVsbG8gV29ybGQ=</ReferralDocument_Content>\n<ReferralDocument_Error_Text></ReferralDocument_Error_Text>\n</ReferralDocument>" },
+            "url": "http://localhost:2003/API/SaveDocument"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. KARO / HSS",
+      "item": [
+        {
+          "name": "NEW API — Ping",
+          "request": { "method": "GET", "header": [ { "key": "Host", "value": "hss.itsmyhealth.nz" } ], "url": "http://localhost:8080/api/ping" }
+        },
+        {
+          "name": "REAL LEGACY — Ping",
+          "request": { "method": "GET", "header": [], "url": "http://localhost:2345/API/ping" }
+        },
+        {
+          "name": "NEW API — Authenticate",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Host", "value": "hss.itsmyhealth.nz" }, { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\"Username\":\"hsslive\",\"Password\":\"H$$L1v3005\",\"patientId\":\"2450776\",\"encounterId\":\"19592581__901__FZZ999-B\",\"system\":\"hss\",\"pho\":\"HBPHO\"}" },
+            "url": "http://localhost:8080/api/Authenticate"
+          },
+          "event": [ { "listen": "test", "script": { "type": "text/javascript", "exec": [ "var j = pm.response.json();", "if (j && j.token) { pm.collectionVariables.set('karoToken', j.token); }" ] } } ]
+        },
+        {
+          "name": "REAL LEGACY — Authenticate",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\"Username\":\"hsslive\",\"Password\":\"H$$L1v3005\",\"patientId\":\"2450776\",\"encounterId\":\"19592581__901__FZZ999-B\",\"system\":\"hss\",\"pho\":\"HBPHO\"}" },
+            "url": "http://localhost:2345/API/Authenticate"
+          }
+        },
+        {
+          "name": "NEW API — GetDemographics",
+          "request": { "method": "GET", "header": [ { "key": "Host", "value": "hss.itsmyhealth.nz" }, { "key": "Authorization", "value": "{{karoToken}}" } ], "url": "http://localhost:8080/api/GetDemographics?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B" }
+        },
+        {
+          "name": "REAL LEGACY — GetDemographics",
+          "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "{{karoToken}}" } ], "url": "http://localhost:2345/API/GetDemographics?system=hss&pho=HBPHO&patientId=2450776&encounterId=19592581__901__FZZ999-B" }
+        },
+        {
+          "name": "NEW API — SaveRecall (real group/category)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Host", "value": "hss.itsmyhealth.nz" }, { "key": "Authorization", "value": "{{karoToken}}" }, { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\"PatientId\":\"2450776\",\"EncounterId\":\"19592581__901__FZZ999-B\",\"UserId\":\"hsslive\",\"Priority\":\"High\",\"Group\":\"Vaccine\",\"DueDate\":\"2026-12-01\",\"Notes\":\"Manual verification\",\"CategoryId\":\"4690\"}" },
+            "url": "http://localhost:8080/api/SaveRecall"
+          }
+        },
+        {
+          "name": "REAL LEGACY — SaveRecall (real group/category)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Authorization", "value": "{{karoToken}}" }, { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\"PatientId\":\"2450776\",\"EncounterId\":\"19592581__901__FZZ999-B\",\"UserId\":\"hsslive\",\"Priority\":\"High\",\"Group\":\"Vaccine\",\"DueDate\":\"2026-12-01\",\"Notes\":\"Manual verification\",\"CategoryId\":\"4690\"}" },
+            "url": "http://localhost:2345/API/SaveRecall"
+          }
+        },
+        {
+          "name": "NEW API — SaveSummary (real DIAP/Outcome=A payload)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Host", "value": "hss.itsmyhealth.nz" }, { "key": "Authorization", "value": "{{karoToken}}" }, { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\n  \"patientId\": \"2450776\",\n  \"encounterID\": \"19592581__901__FZZ999-B\",\n  \"system\": \"hss\",\n  \"identifier\": \"DIAP\",\n  \"providerID\": \"1763690\",\n  \"dateTimeRecorded\": \"2026-07-31T12:00:00\",\n  \"entry\": [\n    {\n      \"Diabetic risk\":\"Low\",\"HbA1c\":\"60\",\"Type of Diabetes\":\"Type 1\",\"Year of Diagnosis\":\"2018\",\n      \"Height\":\"164\",\"Weight\":\"84\",\"Year Last Retinal\":\"2015\",\"BP Systolic\":\"80\",\"BP Diastolic\":\"90\",\n      \"Creatine Ratio\":\"2\",\"Dip-Stick Test\":\"Negative\",\"Total Cholesterol\":\"40\",\"HDL Cholesterol\":\"50\",\n      \"Triglyceride\":\"20\",\"Ethnic Origin\":\"Maori\",\"NHI\":\"ZZZ0026\",\"Smoker\":\"No\",\"Insulin\":\"No\",\n      \"Oral Medication\":\"No\",\"Diet Only\":\"No\",\"ACE Inhibitor\":\"No\",\"Anti-hypertensive\":\"No\",\n      \"Statin inhibitor\":\"No\",\"Other medication\":\"No\",\"Foot Sensation/Pulse\":\"No\",\"Prev PVD/Ulcer\":\"No\",\n      \"Food Changes\":\"No\",\"Activity\":\"No\",\"OutCome\":\"A\"\n    }\n  ]\n}" },
+            "url": "http://localhost:8080/api/SaveSummary"
+          }
+        },
+        {
+          "name": "REAL LEGACY — SaveSummary (real DIAP/Outcome=A payload)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Authorization", "value": "{{karoToken}}" }, { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\n  \"patientId\": \"2450776\",\n  \"encounterID\": \"19592581__901__FZZ999-B\",\n  \"system\": \"hss\",\n  \"identifier\": \"DIAP\",\n  \"providerID\": \"1763690\",\n  \"dateTimeRecorded\": \"2026-07-31T12:00:00\",\n  \"entry\": [\n    {\n      \"Diabetic risk\":\"Low\",\"HbA1c\":\"60\",\"Type of Diabetes\":\"Type 1\",\"Year of Diagnosis\":\"2018\",\n      \"Height\":\"164\",\"Weight\":\"84\",\"Year Last Retinal\":\"2015\",\"BP Systolic\":\"80\",\"BP Diastolic\":\"90\",\n      \"Creatine Ratio\":\"2\",\"Dip-Stick Test\":\"Negative\",\"Total Cholesterol\":\"40\",\"HDL Cholesterol\":\"50\",\n      \"Triglyceride\":\"20\",\"Ethnic Origin\":\"Maori\",\"NHI\":\"ZZZ0026\",\"Smoker\":\"No\",\"Insulin\":\"No\",\n      \"Oral Medication\":\"No\",\"Diet Only\":\"No\",\"ACE Inhibitor\":\"No\",\"Anti-hypertensive\":\"No\",\n      \"Statin inhibitor\":\"No\",\"Other medication\":\"No\",\"Foot Sensation/Pulse\":\"No\",\"Prev PVD/Ulcer\":\"No\",\n      \"Food Changes\":\"No\",\"Activity\":\"No\",\"OutCome\":\"A\"\n    }\n  ]\n}" },
+            "url": "http://localhost:2345/API/SaveSummary"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. COL",
+      "item": [
+        {
+          "name": "NEW API — Authenticate",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Host", "value": "southerms.indici.nz" }, { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\"Username\":\"ermsdev\",\"Password\":\"eRMsd3V\",\"PatientId\":\"2450776\",\"EncounterId\":\"19592581__901__FZZ999-B\"}" },
+            "url": "http://localhost:8080/COL/Authenticate"
+          },
+          "event": [ { "listen": "test", "script": { "type": "text/javascript", "exec": [ "var j = pm.response.json();", "if (j && j.Token) { pm.collectionVariables.set('colToken', j.Token); }" ] } } ]
+        },
+        {
+          "name": "REAL LEGACY — Authenticate",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\"Username\":\"ermsdev\",\"Password\":\"eRMsd3V\",\"PatientId\":\"2450776\",\"EncounterId\":\"19592581__901__FZZ999-B\"}" },
+            "url": "http://localhost:2003/COL/Authenticate"
+          }
+        },
+        {
+          "name": "NEW API — GetCurrentPatientData",
+          "request": { "method": "GET", "header": [ { "key": "Host", "value": "southerms.indici.nz" }, { "key": "Authorization", "value": "{{colToken}}" } ], "url": "http://localhost:8080/COL/GetCurrentPatientData?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B" }
+        },
+        {
+          "name": "REAL LEGACY — GetCurrentPatientData",
+          "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "{{colToken}}" } ], "url": "http://localhost:2003/COL/GetCurrentPatientData?pmsPatientId=2450776&pmsEncounterId=19592581__901__FZZ999-B" }
+        },
+        {
+          "name": "NEW API — SaveInvoice (real ServiceProvider/ClaimShortCode)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Host", "value": "southerms.indici.nz" }, { "key": "Authorization", "value": "{{colToken}}" }, { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\"ServiceCode\":\"#KF005\",\"ServiceName\":\"Medical Examination\",\"AmountInclGST\":\"50.00\",\"Description\":\"Manual verification invoice\",\"AccountHolderID\":\"2450776\",\"PatientID\":\"2450776\",\"EncounterID\":\"19592581__901__FZZ999-B\",\"ServiceDate\":\"20260731\",\"ServiceProvider\":\"111\",\"ClaimShortCode\":\"#KF005\"}" },
+            "url": "http://localhost:8080/COL/SaveInvoice"
+          }
+        },
+        {
+          "name": "REAL LEGACY — SaveInvoice (real ServiceProvider/ClaimShortCode) — NOTE: this practice's real legacy hangs, see Word doc",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Authorization", "value": "{{colToken}}" }, { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\"ServiceCode\":\"#KF005\",\"ServiceName\":\"Medical Examination\",\"AmountInclGST\":\"50.00\",\"Description\":\"Manual verification invoice\",\"AccountHolderID\":\"2450776\",\"PatientID\":\"2450776\",\"EncounterID\":\"19592581__901__FZZ999-B\",\"ServiceDate\":\"20260731\",\"ServiceProvider\":\"111\",\"ClaimShortCode\":\"#KF005\"}" },
+            "url": "http://localhost:2003/COL/SaveInvoice"
+          }
+        }
+      ]
+    }
+  ]
+}
